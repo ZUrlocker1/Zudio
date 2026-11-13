@@ -68,12 +68,12 @@ import Foundation
 
     // MARK: - Activation
 
-    /// Reads the activation constant, so moving between the testing (80%) and release (20%)
+    /// Reads the activation constant, so moving between the testing (75%) and release (25%)
     /// weights needs no edit here.
     @Test func activatesAtTheConfiguredShare() {
         let n = Self.sohoSongs().count
         let pct = 100.0 * Double(n) / Double(Self.seeds.count)
-        let target = 80.0 * ChillMusicalFrameGenerator.sohoShareOfNonBlues   // Blues keeps 20%
+        let target = 75.0 * ChillMusicalFrameGenerator.sohoShareOfNonBlues   // Blues keeps 25%
         #expect(abs(pct - target) < 6, "Soho fired on \(pct)% of Chill seeds; target \(target)%")
     }
 

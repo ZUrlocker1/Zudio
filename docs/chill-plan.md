@@ -1927,7 +1927,7 @@ design and are out of date):
 ### Lead 2
 
 **As built (2026-11-11):** base Chill and Chill Blues draw CHL-LD2-002 Shadow hold (35% of base
-Chill, never Blues) or one of four answer rules that riff on Lead 1's phrases:
+Chill until 2026-11-12, then 22%; never Blues) or one of four answer rules that riff on Lead 1's phrases:
 CHL-LD2-003 Tail riff, CHL-LD2-004 Rhythm trade, CHL-LD2-005 Bebop enclosure and
 CHL-LD2-006 Question and answer. Chill Soho keeps CHL-LD2-001 (a fresh phrase in Lead 1's gaps)
 and Shadow hold. The answer rules are described under "Lead 2 answers" in

@@ -167,8 +167,8 @@ one, search for a replacement with the same criteria. Refreshed 2026-10-18: seed
   Every `withXxx()` copy method passes it explicitly
 - `displayStyleName` is `"Chill Soho"`; `.zudio` files write it on `Substyle:`, `Style:` stays
   `Chill`
-- **Share:** Blues 20% on the main stream, then `sohoShareOfNonBlues` (`30/80`) — **30% Soho /
-  20% Blues / 50% base** (Zack, 2026-10-18; it was 60/20/20 on 2026-10-16 and 70/15/15 before)
+- **Share:** Blues 25% on the main stream, then `sohoShareOfNonBlues` (`30/75`) — **30% Soho /
+  25% Blues / 45% base** (Zack, 2026-11-12; it was 50/30/20 on 2026-10-18, 60/20/20 on 2026-10-16 and 70/15/15 before)
 - **Groove**, once per song: `ChillBeatStyle.sohoLatin` 55%, `.sohoSoul` 45%
 - **Tempo:** 84–128 BPM, triangular with a peak at 100, independent of the groove
 - **Mode:** base Chill's weights — Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%
@@ -442,11 +442,11 @@ Measured from the named vocal tracks and the flute channels that stand in for th
 the reed lines for the counter-line. Phrases are open-ended — only 16% return to their starting
 pitch — so Motorik Europe's closed-cell machinery is not used.
 
-- `CHL-LD1-010` Operator 30%
+- `CHL-LD1-010` Operator 25% (30% until 2026-11-12)
 - `CHL-LD1-012` Avalon 20%
 - base Chill's `CHL-LD1-004` Blues lead 20%
-- base Chill's `CHL-LD1-001` Long phrase 15%
-- `CHL-LD1-011` Sustained tone 15%
+- base Chill's `CHL-LD1-001` Chet sigh 17.5% (15% until 2026-11-12)
+- `CHL-LD1-011` Sustained tone 17.5% (15% until 2026-11-12)
 
 **`CHL-LD1-010` Operator** — *Smooth Operator*, *Cherish the Day*, *Black Cow*; named for the first, which most of its measurements come from (called Soho Counter-Line until 2026-10-16). Flowing phrases
 of about 8 notes in eighths and sixteenths, mostly stepwise, with rests of about a bar and a

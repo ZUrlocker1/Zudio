@@ -207,12 +207,12 @@ now draw one of four answer rules (Chill Soho keeps CHL-LD2-001 and Shadow hold)
 song's habit, used for about 70% of its answers; the rest are drawn from the other three, so a
 song still varies. Marked "* " in the log while being tuned by ear.
 
-- **CHL-LD2-003 Tail riff** (30% of answer songs): Lead 1's last two to four notes in Lead 1's
+- **CHL-LD2-003 Tail riff** (25% of answer songs; 30% until 2026-11-12): Lead 1's last two to four notes in Lead 1's
   rhythm, a scale step lower or higher, a third lower or an octave down, then a resolving chord
   tone. A two-note tail is often sequenced twice.
 - **CHL-LD2-004 Rhythm trade** (25%): the rhythm of Lead 1's last notes with a new line moving
   the other way, ending on a chord tone.
-- **CHL-LD2-005 Bebop enclosure** (20%): Lead 1's last note, or a chord tone next to it,
+- **CHL-LD2-005 Bebop enclosure** (25%; 20% until 2026-11-12): Lead 1's last note, or a chord tone next to it,
   approached from a scale step above and a semitone below (or the reverse, or from two steps
   above, or as quick 16ths), then held, sometimes with a falling tag.
 - **CHL-LD2-006 Question and answer** (25%): after a phrase that ends off the root or fifth, a
@@ -237,7 +237,7 @@ song still varies. Marked "* " in the log while being tuned by ear.
   otherwise the instrument's own bottom octave and a half. The old rule could ask a flute under a
   muted trumpet for 55 to 67, under the flute's floor, and the final register fold then split its
   figures across octaves. The fix applies to the answer rules; Shadow hold and Soho are unchanged.
-- **Shares:** base Chill Shadow hold 35%, answer rules 65%. Blues: answer rules only.
+- **Shares:** base Chill Shadow hold 22%, answer rules 78%, the four answer rules 25% each (Zack, 2026-11-12; Shadow hold was 35% and the answers 30/25/20/25). Soho keeps Shadow hold at 25%. Blues: answer rules only.
 - **Bug fixes with it:** Lead 2 no longer starts over Lead 1's still-sounding last note, and a
   Lead 2 regen now gets Lead 1's notes and handoff windows (it replays Lead 1 on its own seed for
   the windows, as Kosmic does for its X-Files bars). A Shadow hold lead-in no longer lands in a

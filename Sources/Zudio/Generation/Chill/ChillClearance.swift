@@ -101,8 +101,8 @@ struct ChillClearance {
             }
             let p0 = Int(e.note)
             guard !ok(p0) else { continue }
-            let tones = structure.chordWindow(atBar: start / 16)?.chordTones ?? []
-            let next = sorted[(k + 1)...].first { $0.stepIndex > start }.map { Int($0.note) }
+            let tones = structure.chordWindow(atBar: e.stepIndex / 16)?.chordTones ?? []
+            let next = sorted[(k + 1)...].first { $0.stepIndex > e.stepIndex }.map { Int($0.note) }
             let toward = (next ?? p0) >= p0 ? 1 : -1
             let candidates = (1...4).flatMap { [p0 + $0 * toward, p0 - $0 * toward] }
                 .filter { $0 >= low && $0 <= high && scale.contains($0 % 12) && ok($0) }

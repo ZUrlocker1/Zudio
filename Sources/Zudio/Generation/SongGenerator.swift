@@ -1566,6 +1566,13 @@ struct SongGenerator {
 
     // MARK: - Per-track regenerate
 
+    /// The held notes of the song's current tracks, for a regenerated Chill track to keep clear of
+    /// (ChillClearance), as generation passes them: the stored tracks stand in for the ones
+    /// generation had written at that point. Draws nothing.
+    private static func regenChillBand(_ songState: SongState, _ tracks: [Int]) -> ChillClearance {
+        ChillClearance(tracks.map { songState.trackEvents[$0] })
+    }
+
     /// Regenerates a single track without touching any other track or the global seed.
     /// Appends regen log entries so the status box reflects the new rules used.
     static func regenerateTrack(_ trackIndex: Int, songState: SongState, overrideSeed: UInt64? = nil, passBodyBars: Int? = nil) -> SongState {
@@ -1780,13 +1787,14 @@ struct SongGenerator {
                     isDriftDreamscape: songState.isDriftDreamscape,
                     isKosmicSpace: isSpace, spaceArrangement: regenArrangement)
             } else if isChill {
-                (events, _, _, _) = ChillLeadGenerator.generateLead1(
+                (events, _, _) = ChillLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
                     leadInstrument: songState.chillLeadInstrument,
                     beatStyle: songState.chillBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
+                    band: songState.chillSohoVariation ? nil : regenChillBand(songState, [kTrackPads, kTrackBass]),
                     rng: &rng, usedRuleIDs: &usedRules, returns: { chillLead1Returns = $0 })
             } else {
                 // The breakdown windows as generation hands them to Lead 1, so hooks and solo
@@ -1842,21 +1850,7 @@ struct SongGenerator {
                         blockedBars: [], pads: songState.trackEvents[kTrackPads], rng: &rng)
                 }
             } else if isChill {
-                // Derive lead1Onsets from current Lead 1 events so Lead 2 avoids overlapping
                 let lead1Evts = songState.trackEvents[kTrackLead1]
-                let barsWithLead1 = Set(lead1Evts.map { $0.stepIndex / 16 }).sorted()
-                var lead1Onsets: [(startBar: Int, endBar: Int)] = []
-                var onsetStart: Int? = nil
-                var onsetPrev  = -2
-                for bar in barsWithLead1 {
-                    if bar == onsetPrev + 1 {
-                        onsetPrev = bar
-                    } else {
-                        if let s = onsetStart { lead1Onsets.append((s, onsetPrev + 1)) }
-                        onsetStart = bar; onsetPrev = bar
-                    }
-                }
-                if let s = onsetStart { lead1Onsets.append((s, onsetPrev + 1)) }
                 // Lead 1's handoff windows (where it lays out so Lead 2 can take over) are not kept
                 // on the song, so they are found by replaying Lead 1 on its own seed: its regen
                 // override if it has one, else the song's Lead 1 stream. Until 2026-11-11 a Lead 2
@@ -1871,14 +1865,17 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
+                    band: songState.chillSohoVariation ? nil : regenChillBand(songState, [kTrackPads, kTrackBass]),
                     rng: &lead1RNG, usedRuleIDs: &lead1Rules).handoffBars
                 events = ChillLeadGenerator.generateLead2(
                     frame: songState.frame, structure: songState.structure,
                     lead1Instrument: songState.chillLeadInstrument,
-                    lead1Onsets: lead1Onsets, lead1Events: lead1Evts, handoffBars: handoffBars,
+                    lead1Events: lead1Evts, handoffBars: handoffBars,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
                     keepInstrument: songState.chillLead2Instrument,
+                    band: regenChillBand(songState, [kTrackPads, kTrackBass, kTrackLead1]
+                                         + (songState.chillSohoVariation ? [kTrackRhythm] : [])),
                     rng: &rng, usedRuleIDs: &usedRules).events
             } else if motNoir {
                 // Noir has no Lead 2 (regen and Evolve's first pass gave it one until 2026-11-11).
@@ -1938,6 +1935,8 @@ struct SongGenerator {
                     beatStyle: songState.chillBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
+                    melody: songState.chillSohoVariation ? nil
+                        : regenChillBand(songState, [kTrackLead1, kTrackLead2]),
                     rng: &rng, usedRuleIDs: &usedRules,
                     switchAnnotation: &chillRhythmSwitchRegen)
             } else {
@@ -2091,9 +2090,7 @@ struct SongGenerator {
         var grooveFixupRegen: String? = nil
         if isChill, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
             events = chillLeadSkippingBarZero(events, structure: songState.structure)
-            let grooveBars = Set(songState.structure.sections
-                .filter { $0.label == .A || $0.label == .B }
-                .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+            let grooveBars = grooveBarSet(songState.structure)
             let pulse = grooveStepSupport(drums: songState.trackEvents[kTrackDrums],
                                           bass: songState.trackEvents[kTrackBass], bars: grooveBars)
             let before = events
@@ -4687,7 +4684,7 @@ struct SongGenerator {
         let padsAndBass = ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass]])
         var lead1Rules: Set<String> = []
         var lead1Returns = Set<Int>()
-        let (lead1Events, lead1Onsets, lead1HandoffBars, hookTreatments) = ChillLeadGenerator.generateLead1(
+        let (lead1Events, lead1HandoffBars, hookTreatments) = ChillLeadGenerator.generateLead1(
             frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation, forceRuleID: forceLeadRuleID,
@@ -4699,7 +4696,7 @@ struct SongGenerator {
         var lead2Rules: Set<String> = []
         let (lead2Events, chillLead2Instrument) = ChillLeadGenerator.generateLead2(
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
-            lead1Onsets: lead1Onsets, lead1Events: lead1Events, handoffBars: lead1HandoffBars,
+            lead1Events: lead1Events, handoffBars: lead1HandoffBars,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation,
             band: ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass], lead1Events]
                                  + (sohoVariation ? [trackEvents[kTrackRhythm]] : [])),
@@ -4813,8 +4810,7 @@ struct SongGenerator {
         // whatever the rhythm section is doing: nothing about them assumes a Latin pulse.
         var grooveFixupSummary: String? = nil
         do {
-            let grooveBars = Set(structure.sections.filter { $0.label == .A || $0.label == .B }
-                                  .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+            let grooveBars = grooveBarSet(structure)
             let pulse = grooveStepSupport(drums: trackEvents[kTrackDrums],
                                           bass: trackEvents[kTrackBass], bars: grooveBars)
             var adjusted: [Int: (changed: Int, total: Int)] = [:]
@@ -5164,6 +5160,12 @@ struct SongGenerator {
 
     // MARK: - Blues chord plan builder
 
+    /// The bars of the groove (A and B) sections, where the groove fixup runs.
+    private static func grooveBarSet(_ structure: SongStructure) -> Set<Int> {
+        Set(structure.sections.filter { $0.label == .A || $0.label == .B }
+            .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+    }
+
     /// Chill Soho chord plan: one measured cycle tiled across the groove sections, one bar per
     /// chord. Cycles come from tools/soho_harmony.py — see "Harmony" in docs/chill-soho-plan.md.
     /// Returns the plan and a log label naming the cycle and the record it was measured from.
@@ -5407,9 +5409,7 @@ struct SongGenerator {
     nonisolated static func applyGrooveFixup(to state: SongState,
                                             options: GrooveFixupOptions = .standard)
     -> (state: SongState, summary: String) {
-        let grooveBars = Set(state.structure.sections
-            .filter { $0.label == .A || $0.label == .B }
-            .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+        let grooveBars = grooveBarSet(state.structure)
         let pulse = grooveStepSupport(drums: state.trackEvents[kTrackDrums],
                                       bass: state.trackEvents[kTrackBass], bars: grooveBars)
         var updated = state

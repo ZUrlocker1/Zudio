@@ -2,7 +2,7 @@
 
 ## Overview
 
-A blues variation that appears in approximately 20% of Chill songs, adding a darker,
+A blues variation that appears in approximately 25% of Chill songs (20% until 2026-11-12), adding a darker,
 more organic groove feel. The effect is subtle — it sounds like a Chill song that drifted
 toward late-night slow blues rather than a genre change. The variation is defined by two
 new drum rules and three new bass patterns. All other track rules (pads,
@@ -18,7 +18,7 @@ implementation scope minimal.
 
 ## Activation
 
-- Probability: 20% of Chill songs activate the blues variation at frame generation time (60% are
+- Probability: 25% of Chill songs (20% until 2026-11-12) activate the blues variation at frame generation time (60% are
   Chill Soho and 20% base Chill; see docs/chill-soho-plan.md)
 - A `bluesVariation: Bool` flag is set in `ChillMusicalFrame` (or equivalent song frame)
 - When active, the drum generator routes to CHL-DRUM-006 (Intro, Groove A, Breakdown, Outro)

@@ -85,6 +85,8 @@ struct HarmonicFilter {
             return velocityArc(events, frame: frame, structure: structure)
         }
 
+        // Figures depend only on onsets and lengths, which no window changes: found once.
+        let figures = leadFigures(events)
         let windowBars  = 8
         let totalWindows = (frame.totalBars + windowBars - 1) / windowBars
         for w in 0..<totalWindows {
@@ -96,7 +98,7 @@ struct HarmonicFilter {
                   let leadMedian = medianPitch(events, startStep: startStep, endStep: endStep),
                   leadMedian < padMedian + 4
             else { continue }
-            events = pushLeadAbovePads(events, startStep: startStep, endStep: endStep,
+            events = pushLeadAbovePads(events, figures: figures, startStep: startStep, endStep: endStep,
                                        padMedian: padMedian, bounds: bounds)
         }
         return velocityArc(events, frame: frame, structure: structure)
@@ -169,18 +171,9 @@ struct HarmonicFilter {
             : pitches[mid]
     }
 
-    /// Transposes Lead figures that dip below `padMedian` up one octave, within bounds. A figure
-    /// is a run of notes with less than a bar's gap between them — a phrase, or an Avalon Hook
-    /// episode of call and answer — found across the whole track, and it moves whole or not at
-    /// all. This window decides the figures that START in it, so one that runs on past the window
-    /// moves with all its notes. Moving single notes split figures across octaves: C5 B♭4 B♭4
-    /// became C5 B♭5 B♭5, a step down turned into a seventh up, in 10 of Late Americano's 30
-    /// figures; deciding figures only inside the window still split the ones that crossed it
-    /// (Zack, 2026-10-16).
-    private static func pushLeadAbovePads(
-        _ events: [MIDIEvent], startStep: Int, endStep: Int,
-        padMedian: Double, bounds: RegisterBounds
-    ) -> [MIDIEvent] {
+    /// The track's figures as indices into `events`, in onset order: a figure is a run of notes
+    /// with less than a bar's gap between them.
+    private static func leadFigures(_ events: [MIDIEvent]) -> [[Int]] {
         let order = events.indices.sorted { events[$0].stepIndex < events[$1].stepIndex }
         var figures: [[Int]] = []
         for i in order {
@@ -191,6 +184,21 @@ struct HarmonicFilter {
                 figures.append([i])
             }
         }
+        return figures
+    }
+
+    /// Transposes Lead figures that dip below `padMedian` up one octave, within bounds. A figure
+    /// is a run of notes with less than a bar's gap between them — a phrase, or an Avalon Hook
+    /// episode of call and answer — found across the whole track, and it moves whole or not at
+    /// all. This window decides the figures that START in it, so one that runs on past the window
+    /// moves with all its notes. Moving single notes split figures across octaves: C5 B♭4 B♭4
+    /// became C5 B♭5 B♭5, a step down turned into a seventh up, in 10 of Late Americano's 30
+    /// figures; deciding figures only inside the window still split the ones that crossed it
+    /// (Zack, 2026-10-16).
+    private static func pushLeadAbovePads(
+        _ events: [MIDIEvent], figures: [[Int]], startStep: Int, endStep: Int,
+        padMedian: Double, bounds: RegisterBounds
+    ) -> [MIDIEvent] {
         var out = events
         for figure in figures {
             guard let first = figure.first,

@@ -13,7 +13,7 @@ This document identifies 3 more sub-styles, one for each remaining style. Each i
 
 These are the live values in the codebase as of this writing. Target release probabilities are noted separately where they differ.
 
-- **Chill Blues** — `20%` of Chill songs (`rng.nextDouble() < 0.20` in `ChillMusicalFrameGenerator.swift`)
+- **Chill Blues** — `25%` of Chill songs (`rng.nextDouble() < 0.25` in `ChillMusicalFrameGenerator.swift`)
 - **Motorik Noir** — `20%` of Motorik songs (`substyleRoll < 0.20` in `SongGenerator.swift`)
 - **Motorik Arcade** — `19%` of Motorik songs (`substyleRoll < 0.39` in `SongGenerator.swift`)
 - **Motorik Europe** — `20%` of Motorik songs (the sync roll in `SongGenerator.swift`; base Motorik only,
@@ -159,7 +159,7 @@ Low risk. One new drum rule (KOS-DRUM-007 Loping Groove) and a BPM mode change a
 
 Chill Blues (V1.4) established the sub-style pattern:
 
-- Triggered by `isChillBlues` flag set probabilistically in `ChillMusicalFrameGenerator` (~20% of Chill songs)
+- Triggered by `isChillBlues` flag set probabilistically in `ChillMusicalFrameGenerator` (~25% of Chill songs)
 - Different song form: 16-bar blues (I–IV–V) vs. Chill's verse/chorus/bridge/breakdown
 - Different instrument mix: warm horns and reeds (tenor sax, clarinet, muted trumpet), brushed drums
 - Different bass rule: blues walking bass with B-section variation

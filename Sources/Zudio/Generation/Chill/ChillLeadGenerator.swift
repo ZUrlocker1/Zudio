@@ -5,7 +5,7 @@
 // three Chill styles.
 // Phrases: 2–4 bars with deliberate rests (CHL-RULE-06).
 // Pitch pool: mode pentatonic + occasional blue note (CHL-RULE-07).
-// All notes snapped to scale (CHL-SYNC-001).
+// Notes come from the scale (CHL-SYNC-001); jazz passing tones and enclosures step outside it.
 
 import Foundation
 
@@ -28,8 +28,7 @@ struct ChillLeadGenerator {
         usedRuleIDs: inout Set<String>,
         replayBars reportReplayBars: ((Set<Int>) -> Void)? = nil,
         returns reportReturns: ((Set<Int>) -> Void)? = nil
-    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>,
-          hookTreatments: String?) {
+    ) -> (events: [MIDIEvent], handoffBars: Set<Int>, hookTreatments: String?) {
         // Chill Soho has its own three rules (ChillSohoLeadGenerator.swift). The two base rules it
         // reuses come back through here forced, so the St Germain staccato roll below still draws,
         // at probability 0.
@@ -49,9 +48,7 @@ struct ChillLeadGenerator {
             let (low, high) = register(for: leadInstrument)
             let events = band?.voiceLine(written, structure: structure, scale: frame.scalePCs,
                                          low: low, high: high) ?? written
-            // Build phraseOnsets from the events for Lead 2 call-and-response awareness
-            let onsets = eventsToOnsets(events: events, totalBars: frame.totalBars)
-            return (events, onsets, [], nil)   // staccato already has long silences; no extra handoff
+            return (events, [], nil)   // staccato already has long silences; no extra handoff
         }
 
         // Rule selection is independent of instrument — instrument controls timbre/register,
@@ -92,8 +89,8 @@ struct ChillLeadGenerator {
                              "CHL-LD1-014","CHL-LD1-015"]
             if let forced = forceRuleID, chillPool.contains(forced) {
                 ruleID = forced
-            } else if forceRuleID != nil {
-                ruleID = forceRuleID!   // allow 005 and other overrides to pass through
+            } else if let forced = forceRuleID {
+                ruleID = forced   // allow 005 and other overrides to pass through
             } else if case let j = rng.nextDouble(), j < 0.390 {
                 ruleID = j < 0.183 ? "CHL-LD1-014" : "CHL-LD1-015"
             } else {
@@ -124,11 +121,8 @@ struct ChillLeadGenerator {
         usedRuleIDs.insert(ruleID)
 
         var events: [MIDIEvent] = []
-        var phraseOnsets: [(startBar: Int, endBar: Int)] = []
-
         let scale       = scaleNotes(frame: frame)
         let pentatonic  = pentatonicNotes(frame: frame)
-        let blueNote    = blueNotePC(frame: frame)
         let (regLow, regHigh) = register(for: leadInstrument)
         // Each phrase listens to the band as it is written (ChillClearance): no rub with the Pads
         // and Bass notes already written, no avoid note held over the chord. Soho passes no band.
@@ -161,7 +155,6 @@ struct ChillLeadGenerator {
             let phrase = buildPhrase(frame: frame, bar: bar, bars: bars,
                                leadInstrument: leadInstrument,
                                pentatonic: pentatonic, scale: scale,
-                               blueNotePC: nil,
                                regLow: regLow, regHigh: regHigh,
                                section: label, phraseEndChord: phraseEndChord,
                                phraseStartChord: phraseStartChord,
@@ -272,7 +265,7 @@ struct ChillLeadGenerator {
                     // (a rest can step past the section's first bar). The fragment comes from the
                     // song's opening phrase, or Lead 1's latest notes if it has none yet.
                     if let sec = section, stopTimeSections.insert(sec.startBar).inserted {
-                        var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                        var st = stopTimeRNG(&rng)
                         let motif = melodyPitches(seedPhrases.first ?? Array(events.suffix(6)))
                         events += heard(stopTimeSolo(section: sec, frame: frame, structure: structure,
                                                      motif: motif, regLow: regLow, regHigh: regHigh, rng: &st))
@@ -394,7 +387,6 @@ struct ChillLeadGenerator {
                     // Seed zone: generate normally and store as relative-indexed motif.
                     let phraseNotes = heard(freshPhrase(bar: bar, bars: actualPhraseLen, label: label))
                     events += phraseNotes
-                    phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
                     let offset = bar * 16
                     seedPhrases.append(phraseNotes.map {
                         MIDIEvent(stepIndex: $0.stepIndex - offset, note: $0.note,
@@ -462,7 +454,6 @@ struct ChillLeadGenerator {
                         }
                         if !canReplayOpening { formReturns.insert(bar) }
                         events += heard(replayedNotes)
-                        phraseOnsets.append((startBar: bar, endBar: bar + seedLen))
                         if canReplayOpening { openingReplaysDone += 1 }
                         if canRecap || duePending { pendingRecall = false }
                         lastReturnBar = bar
@@ -480,7 +471,6 @@ struct ChillLeadGenerator {
             // Normal phrase generation (free development zone, or replay fallback).
             let phraseNotes = heard(freshPhrase(bar: bar, bars: actualPhraseLen, label: label))
             events += phraseNotes
-            phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
             bluesLeadHasPlayed = true
 
             bar += actualPhraseLen
@@ -493,7 +483,7 @@ struct ChillLeadGenerator {
         if breakdownStyle == .stopTime {
             for sec in structure.sections where sec.label == .bridge
                 && stopTimeSections.insert(sec.startBar).inserted {
-                var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                var st = stopTimeRNG(&rng)
                 let before = events.filter { $0.stepIndex < sec.startBar * 16 }
                 let motif = melodyPitches(seedPhrases.first ?? Array(before.suffix(6)))
                 events += heard(stopTimeSolo(section: sec, frame: frame, structure: structure,
@@ -503,7 +493,7 @@ struct ChillLeadGenerator {
         reportReplayBars?(replayBars)
         reportReturns?(formReturns)
         // The jazz lick rules' per-song version, named in the log beside the rule.
-        return (events, phraseOnsets, handoffBarSet, jazzState?.variantNote)
+        return (events, handoffBarSet, jazzState?.variantNote)
     }
 
     // MARK: - Lead 2
@@ -512,7 +502,6 @@ struct ChillLeadGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         lead1Instrument: ChillLeadInstrument,
-        lead1Onsets: [(startBar: Int, endBar: Int)],
         lead1Events: [MIDIEvent] = [],
         handoffBars: Set<Int> = [],
         bluesVariation: Bool = false,
@@ -524,12 +513,12 @@ struct ChillLeadGenerator {
     ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
         // Blues never takes shadow hold, too ambient for blues energy. Soho: 75/25 call-and-response.
         // The second voice sounds under the main line a median 17% of the time across the Soho
-        // corpus; a pad-like voice under the melody is the exception. Base Chill: shadow hold 35%
-        // (50% until the answer rules arrived on 2026-11-11).
-        let useShadowHold = bluesVariation ? false : rng.nextDouble() < (sohoVariation ? 0.25 : 0.35)
+        // corpus; a pad-like voice under the melody is the exception. Base Chill: shadow hold 22%
+        // (50% until the answer rules arrived on 2026-11-11, 35% until 2026-11-12).
+        let useShadowHold = bluesVariation ? false : rng.nextDouble() < (sohoVariation ? 0.25 : 0.22)
         if useShadowHold { usedRuleIDs.insert("CHL-LD2-002") }
 
-        // Lead 2 instrument: uniform random from the four L2-appropriate instruments.
+        // Lead 2 instrument: uniform random from the L2-appropriate instruments (three to five).
         // Register separation (below) ensures L2 stays out of L1's range regardless of choice.
         // Soho: what answers the singer in the corpus — a saxophone nearly every time, then synth
         // brass, trombone and vibraphone — never the same instrument as Lead 1.
@@ -576,28 +565,27 @@ struct ChillLeadGenerator {
         }
 
         // CHL-LD2-003 to 006: answers that riff on Lead 1's phrases. Shares of the answer songs:
-        // Tail riff 30, Rhythm trade 25, Bebop enclosure 20, Question and answer 25. See
+        // Tail riff, Rhythm trade, Bebop enclosure and Question and answer 25 each
+        // (30/25/20/25 until 2026-11-12). See
         // jazzAnswers. Chill Soho too since 2026-11-12 (Zack: not the old random walk,
         // CHL-LD2-001, now retired), at the lower answer rates its replies had, A 35% and B 55%,
         // so a sax that answers the singer does not answer everything.
-        do {
-            let ruleID = ["CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006"][
-                rng.weightedPick([0.30, 0.25, 0.20, 0.25])]
-            usedRuleIDs.insert(ruleID)
-            // The answers' register stays inside the instrument's own. A cap at the midpoint
-            // alone can fall below it (a flute under a muted trumpet got 55 to 67, under the flute's 65
-            // floor), and the final register fold then split figures across octaves. An answer
-            // plays in Lead 1's gaps, so where the instrument cannot sit below the middle of Lead
-            // 1's register it takes its own bottom octave and a half instead.
-            let ansHigh = Swift.min(rawHigh2, Swift.max(regMid1 - 2, rawLow2 + 12))
-            let ansLow  = Swift.max(rawLow2, ansHigh - 14)
-            let answers = jazzAnswers(ruleID: ruleID, frame: frame, structure: structure,
-                                      lead1Events: lead1Events, handoffBars: handoffBars,
-                                      bluesVariation: bluesVariation, regLow: ansLow, regHigh: ansHigh,
-                                      answerRates: sohoVariation ? (0.35, 0.55) : (0.50, 0.80),
-                                      band: band, velocityOffset: inst2 == .vibraphone ? 0 : -15, rng: &rng)
-            return (outsideBreakdowns(answers), inst2)
-        }
+        let ruleID = ["CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006"][
+            rng.weightedPick([0.25, 0.25, 0.25, 0.25])]
+        usedRuleIDs.insert(ruleID)
+        // The answers' register stays inside the instrument's own. A cap at the midpoint
+        // alone can fall below it (a flute under a muted trumpet got 55 to 67, under the flute's 65
+        // floor), and the final register fold then split figures across octaves. An answer
+        // plays in Lead 1's gaps, so where the instrument cannot sit below the middle of Lead
+        // 1's register it takes its own bottom octave and a half instead.
+        let ansHigh = Swift.min(rawHigh2, Swift.max(regMid1 - 2, rawLow2 + 12))
+        let ansLow  = Swift.max(rawLow2, ansHigh - 14)
+        let answers = jazzAnswers(ruleID: ruleID, frame: frame, structure: structure,
+                                  lead1Events: lead1Events, handoffBars: handoffBars,
+                                  bluesVariation: bluesVariation, regLow: ansLow, regHigh: ansHigh,
+                                  answerRates: sohoVariation ? (0.35, 0.55) : (0.50, 0.80),
+                                  band: band, velocityOffset: inst2 == .vibraphone ? 0 : -15, rng: &rng)
+        return (outsideBreakdowns(answers), inst2)
     }
 
     /// The next chord-change seam of the 16-bar Blues form after `pos`: IVm7 at 8, V7 at 12, the
@@ -651,9 +639,7 @@ struct ChillLeadGenerator {
         // its instrument's range by octaves (a jazz lick reaching 73 on an alto sax plays at 61),
         // which put a shadow written under the unfolded line above it.
         let lead1 = lead1Events.map { e -> MIDIEvent in
-            var n = Int(e.note)
-            while n > lead1Register.high { n -= 12 }
-            while n < lead1Register.low  { n += 12 }
+            let n = RegisterBounds(low: lead1Register.low, high: lead1Register.high).fold(Int(e.note))
             return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(n), velocity: e.velocity,
                              durationSteps: e.durationSteps)
         }.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
@@ -797,6 +783,11 @@ struct ChillLeadGenerator {
 
     // MARK: - Shared pitch helpers (stop-time solo, Lead 2 answers)
 
+    /// The stream a stop-time breakdown solo draws from, derived from the song's one draw ("STOPTIME").
+    private static func stopTimeRNG(_ rng: inout SeededRNG) -> SeededRNG {
+        SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)
+    }
+
     /// The scale, sorted and without duplicates, for scale-step arithmetic.
     private static func sortedScale(frame: GlobalMusicalFrame) -> [Int] {
         scaleNotes(frame: frame).sorted().reduce(into: [Int]()) { acc, n in
@@ -844,12 +835,8 @@ struct ChillLeadGenerator {
                 if outside(moved) == 0 { return moved }
             }
         }
-        return notes.map { n in
-            var m = n + best
-            while m < regLow { m += 12 }
-            while m > regHigh { m -= 12 }
-            return m
-        }
+        let reg = RegisterBounds(low: regLow, high: regHigh)
+        return notes.map { reg.fold($0 + best) }
     }
 
     // MARK: - Stop-time breakdown solo
@@ -958,10 +945,14 @@ struct ChillLeadGenerator {
 
     /// Lead 1's pitches in time order, one per onset (the highest), for the stop-time fragment.
     private static func melodyPitches(_ events: [MIDIEvent]) -> [Int] {
+        topNotePerOnset(events).map { Int($0.note) }
+    }
+
+    /// One note per onset, the highest, in time order.
+    private static func topNotePerOnset(_ events: [MIDIEvent]) -> [MIDIEvent] {
         var seen = Set<Int>()
         return events.sorted { ($0.stepIndex, -Int($0.note)) < ($1.stepIndex, -Int($1.note)) }
             .filter { seen.insert($0.stepIndex).inserted }
-            .map { Int($0.note) }
     }
 
     // MARK: - CHL-LD2-003 to 006: answers that riff on Lead 1
@@ -1005,9 +996,7 @@ struct ChillLeadGenerator {
 
         // Lead 1 as heard: one note per onset (the highest), grouped into phrases wherever Lead 1
         // has been silent for 10 steps or more.
-        var seen = Set<Int>()
-        let melody = lead1Events.sorted { ($0.stepIndex, -Int($0.note)) < ($1.stepIndex, -Int($1.note)) }
-            .filter { seen.insert($0.stepIndex).inserted }
+        let melody = topNotePerOnset(lead1Events)
         var phrases: [[MIDIEvent]] = []
         var soundingEnd = -100
         for n in melody {
@@ -1151,8 +1140,7 @@ struct ChillLeadGenerator {
                     let down = nearestPC(pitch - 2, tones.subtracting([pitch % 12]))
                     pitch = down >= regLow ? down : nearestPC(pitch + 2, tones.subtracting([pitch % 12]), prefer: 1)
                 }
-                while pitch < regLow { pitch += 12 }
-                while pitch > regHigh { pitch -= 12 }
+                pitch = RegisterBounds(low: regLow, high: regHigh).fold(pitch)
                 let v = velocity + (i == 0 ? 4 : 0) - (isLast ? 4 : 0) + rng.nextInt(upperBound: 6)
                 out.append(MIDIEvent(stepIndex: step, note: UInt8(pitch),
                                      velocity: UInt8(Swift.max(30, Swift.min(110, v))), durationSteps: n.dur))
@@ -1200,11 +1188,9 @@ struct ChillLeadGenerator {
                 s += s % 2
                 guard limit - s >= 8 else { break }
                 let chordAt = structure.chordWindow(atBar: s / 16)?.chordTones ?? []
-                let own = placed.map { MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
-                                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
                 let d = rng.nextDouble() < 0.60 ? "CHL-LD2-003" : devices[rng.nextInt(upperBound: devices.count)]
                 chaining = true
-                placed = place(answer(d, phrase: own, tones: chordAt), start: s, limit: limit,
+                placed = place(answer(d, phrase: placed, tones: chordAt), start: s, limit: limit,
                                velocity: velocity - 3 * answers)
                 events += placed
                 answers += 1
@@ -1288,7 +1274,6 @@ struct ChillLeadGenerator {
         leadInstrument: ChillLeadInstrument,
         pentatonic: [Int],
         scale: [Int],
-        blueNotePC: Int?,
         regLow: Int,
         regHigh: Int,
         section: SectionLabel,
@@ -1354,29 +1339,18 @@ struct ChillLeadGenerator {
 
         // Build an ordered pool from the full scale so adjacent indices are ≤2 semitones apart —
         // guaranteeing ≥55% measured step ratio. Pentatonic character is preserved through
-        // landing-note selection. The blue note (b5), when active, is injected into the pool
-        // so the navigator can land on it naturally.
-        var scaleForPool = scale
-        if let bluePC = blueNotePC {
-            // Insert all octave instances of the blue note within the register
-            var bn = regLow + ((bluePC - (regLow % 12) + 12) % 12)   // first note at or above regLow with the blue pitch class
-            while bn < regLow { bn += 12 }
-            while bn <= regHigh { scaleForPool.append(bn); bn += 12 }
-        }
-        let orderedPool = scaleForPool.filter { $0 >= regLow && $0 <= regHigh }
+        // landing-note selection. (Blue notes are added later, as passing tones, by
+        // addBluePassingTones.)
+        let orderedPool = scale.filter { $0 >= regLow && $0 <= regHigh }
             .sorted().reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
         guard !orderedPool.isEmpty else { return events }
 
         // Blues: strip avoid tones of the active chord from the body pool so body notes
         // don't clash over IV and V bars (e.g. B♮ over Gm7 = tritone against F).
         // orderedPool (full) is kept for phrase-ending chord-tone snapping below.
-        // The blue note (b5 of the key) is out of Dorian, so it counts as an avoid tone; it is kept
-        // over the I chord, where it is the b5 of the tonic's blues scale. Over IV and V it would
-        // sit a semitone above the chord root, so the strip stays.
         var bodyPool = orderedPool
         if let chord = phraseStartChord, !chord.avoidTones.isEmpty {
-            let keepBlue = blueNotePC != nil && chord.chordRoot == "1"
-            let filtered = orderedPool.filter { !chord.avoidTones.contains($0 % 12) || (keepBlue && $0 % 12 == blueNotePC) }
+            let filtered = orderedPool.filter { !chord.avoidTones.contains($0 % 12) }
             if filtered.count >= 3 { bodyPool = filtered }
         }
 
@@ -1858,11 +1832,6 @@ struct ChillLeadGenerator {
         return ((notes + added).sorted { $0.stepIndex < $1.stepIndex }, lick)
     }
 
-    private static func blueNotePC(frame: GlobalMusicalFrame) -> Int {
-        // Blue note = b5 (+6 semitones from root) — spice, not scale degree
-        return (frame.keySemitoneValue + 6) % 12
-    }
-
     /// Blues lead variation: replace the last note of a phrase with the nearest scale note
     /// that resolves in the OPPOSITE direction from the second-to-last note.
     /// The phrase body stays identical; only the tail changes, creating the sense of a
@@ -1935,13 +1904,6 @@ struct ChillLeadGenerator {
         return (bar - anchor) % 16
     }
 
-    private static func snapToRegister(_ note: Int, pool: [Int], regLow: Int, regHigh: Int) -> Int {
-        // Find closest note in pool that is within [regLow, regHigh]
-        let inRange = pool.filter { $0 >= regLow && $0 <= regHigh }
-        guard !inRange.isEmpty else { return Swift.max(regLow, Swift.min(regHigh, note)) }
-        return inRange.min(by: { abs($0 - note) < abs($1 - note) }) ?? note
-    }
-
     /// Blues form position 14: 3–4 note descending figure on beats 1–2 (steps 0–6),
     /// leaving beats 3–4 clear for the drum fill that precedes the turnaround bar.
     /// useChromatic: descend by semitones (chromatic passing tones) instead of scale steps.
@@ -1953,9 +1915,7 @@ struct ChillLeadGenerator {
         useChromatic: Bool = false,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let scale = scaleNotes(frame: frame)
-        let pool = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
-            .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
+        let pool = sortedScale(frame: frame).filter { $0 >= regLow && $0 <= regHigh }
         guard pool.count >= 3 else { return [] }
 
         // Start from upper-mid register and descend toward root
@@ -1996,12 +1956,10 @@ struct ChillLeadGenerator {
                                            breakdownStyle: ChillBreakdownStyle,
                                            rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
-        let scale   = scaleNotes(frame: frame)
         // Mid-high register, instrument-agnostic
         let regLow  = 60 + frame.keySemitoneValue % 12
         let regHigh = regLow + 24
-        let pool    = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
-            .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
+        let pool    = sortedScale(frame: frame).filter { $0 >= regLow && $0 <= regHigh }
         guard pool.count >= 3 else { return events }
 
         // Root note index for tonic-anchoring
@@ -2024,7 +1982,7 @@ struct ChillLeadGenerator {
                     // The same stop-time solo as the other rules (stopTimeSolo), its fragment
                     // taken from the latest staccato notes. Until 2026-11-11, random 2–4 note bursts.
                     if let sec = section, stopTimeSections.insert(sec.startBar).inserted {
-                        var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                        var st = stopTimeRNG(&rng)
                         events += stopTimeSolo(section: sec, frame: frame, structure: structure,
                                                motif: melodyPitches(Array(events.suffix(6))),
                                                regLow: regLow, regHigh: regHigh, rng: &st)
@@ -2110,7 +2068,7 @@ struct ChillLeadGenerator {
             let gapDest = activeEnd + 4 + rng.nextInt(upperBound: 5)
             // Find the start of any section that begins between activeEnd and gapDest
             var nextBoundary = gapDest
-            for b in (activeEnd + 1)..<Swift.min(gapDest, frame.totalBars) {
+            for b in (activeEnd + 1)..<Swift.max(activeEnd + 1, Swift.min(gapDest, frame.totalBars)) {
                 if let sec = structure.section(atBar: b), sec.startBar == b {
                     nextBoundary = b; break
                 }
@@ -2121,7 +2079,7 @@ struct ChillLeadGenerator {
         if breakdownStyle == .stopTime {
             for sec in structure.sections where sec.label == .bridge
                 && stopTimeSections.insert(sec.startBar).inserted {
-                var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                var st = stopTimeRNG(&rng)
                 let before = events.filter { $0.stepIndex < sec.startBar * 16 }
                 events += stopTimeSolo(section: sec, frame: frame, structure: structure,
                                        motif: melodyPitches(Array(before.suffix(6))),
@@ -2157,7 +2115,7 @@ struct ChillLeadGenerator {
         // Strip any existing Lead 2 events from the harmony window
         lead2Events = lead2Events.filter { !harmonyBars.contains($0.stepIndex / 16) }
 
-        let scale = scaleNotes(frame: frame).sorted()
+        let scale = sortedScale(frame: frame)
         guard !scale.isEmpty else { return }
 
         // Gather and sort Lead 1 events within the window
@@ -2228,25 +2186,6 @@ struct ChillLeadGenerator {
         lead2Events.sort { $0.stepIndex < $1.stepIndex }
     }
 
-    /// Convert a flat event list to (startBar, endBar) onset pairs for Lead 2 awareness.
-    private static func eventsToOnsets(events: [MIDIEvent], totalBars: Int) -> [(startBar: Int, endBar: Int)] {
-        guard !events.isEmpty else { return [] }
-        var activeBars = Set<Int>()
-        for ev in events { activeBars.insert(ev.stepIndex / 16) }
-        let sorted = activeBars.sorted()
-        var onsets: [(startBar: Int, endBar: Int)] = []
-        var start = sorted[0]
-        var prev  = sorted[0]
-        for bar in sorted.dropFirst() {
-            if bar > prev + 2 {
-                onsets.append((startBar: start, endBar: prev + 1))
-                start = bar
-            }
-            prev = bar
-        }
-        onsets.append((startBar: start, endBar: prev + 1))
-        return onsets
-    }
 }
 
 // MARK: - Jazz cell rules: CHL-LD1-013 Moanin', CHL-LD1-014 Cantaloupe Island, CHL-LD1-015 Blue Monk
@@ -2443,6 +2382,12 @@ extension ChillLeadGenerator {
     /// bar. The first statement starts where the lick did; the second starts half a phrase later,
     /// on the same grid, lands on a chord tone and holds a little longer. At least half a bar of
     /// rest follows the first. Returns the lick unchanged if the figure would not fit.
+    /// The nearest root, b3, 5 or b7 (in the lick's minor-blues terms) within two octaves.
+    private static func chordToneNear(_ iv: Int) -> Int {
+        (-12...24).filter { [0, 3, 7, 10].contains(($0 % 12 + 12) % 12) }
+            .min { Swift.abs($0 - iv) < Swift.abs($1 - iv) }!
+    }
+
     static func fragmentedLick(_ input: [JazzNote], span: Int, back: Bool, single: Bool = false) -> [JazzNote] {
         let cell = input.sorted { $0.step < $1.step }
         guard cell.count > 12 else { return cell }
@@ -2475,8 +2420,7 @@ extension ChillLeadGenerator {
             // One bar and then air: the figure once, landing on a chord tone and held.
             let last = out.count - 1
             let landing = out[last].iv
-            out[last].iv = (-12...24).filter { [0, 3, 7, 10].contains(($0 % 12 + 12) % 12) }
-                .min { Swift.abs($0 - landing) < Swift.abs($1 - landing) }!
+            out[last].iv = chordToneNear(landing)
             out[last].dur = Swift.max(4, Swift.min(out[last].dur + 4, span - out[last].step))
             return out
         }
@@ -2485,8 +2429,7 @@ extension ChillLeadGenerator {
         // terms; the fitting pass maps them to the mode) and holds a little longer.
         let last = again.count - 1
         let landing = again[last].iv
-        again[last].iv = (-12...24).filter { [0, 3, 7, 10].contains(($0 % 12 + 12) % 12) }
-            .min { Swift.abs($0 - landing) < Swift.abs($1 - landing) }!
+        again[last].iv = chordToneNear(landing)
         again[last].dur = Swift.max(4, Swift.min(again[last].dur + 4, span - again[last].step))
         out += again
         return out
@@ -2816,14 +2759,15 @@ extension ChillLeadGenerator {
          (27, -5, 5)]
 
     /// The B or C lick for a themed rule; `pick` alternates between the two of each.
-    private static func themeLick(ruleID: String, theme: Character, pick: Int) -> [JazzNote] {
-        let banks: [String: [[JazzNote]]] = [
+    private static let themeBanks: [String: [[JazzNote]]] = [
             "CHL-LD1-001B": [chetBalladClimb, chetBalladRepeat], "CHL-LD1-001C": [lostLeap, lostTurn],
             "CHL-LD1-007B": [doodlinRiff, doodlinClimb], "CHL-LD1-007C": [sidewinderHammer, sidewinderRun],
             "CHL-LD1-008B": [stolenHead, stolenSequence], "CHL-LD1-008C": [soWhatSpace, soWhatFall],
             "CHL-LD1-015B": [moodFanfare, moodArpeggio], "CHL-LD1-015C": [madnessRhythm, madnessHammer],
-        ]
-        guard let bank = banks[ruleID + String(theme)] else { return [] }
+    ]
+
+    private static func themeLick(ruleID: String, theme: Character, pick: Int) -> [JazzNote] {
+        guard let bank = themeBanks[ruleID + String(theme)] else { return [] }
         return bank[pick % bank.count]
     }
 
@@ -2875,7 +2819,7 @@ extension ChillLeadGenerator {
         // Themed rules (001, 007, 008, 015): A A B to open, then the song's seed-picked form. The
         // last fifth opens with a plain A before the form resumes.
         var theme: Character = "A"
-        if state.isThemed && k >= 2 && !(late && !state.finalHookDone) {
+        if state.isThemed && k >= 2 && !finalReturn {
             if k == 2 {
                 theme = "B"
             } else {
@@ -3085,8 +3029,7 @@ extension ChillLeadGenerator {
                     pitch = options.first { tones.contains($0 % 12) } ?? options.first ?? pitch
                 }
             }
-            while pitch < regLow  { pitch += 12 }
-            while pitch > regHigh { pitch -= 12 }
+            pitch = RegisterBounds(low: regLow, high: regHigh).fold(pitch)
             let accent = n.step % 4 == 0 ? 4 : 0
             let vel = Swift.max(30, Swift.min(120, velBase + accent + rng.nextInt(upperBound: 9) - 4))
             events.append(MIDIEvent(stepIndex: at, note: UInt8(pitch), velocity: UInt8(vel),
