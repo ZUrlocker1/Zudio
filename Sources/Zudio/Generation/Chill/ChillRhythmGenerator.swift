@@ -48,7 +48,10 @@ struct ChillRhythmGenerator {
             modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allCompingModes,
                                               picker: pickCompingMode, rng: &rng)
         } else {
-            modeA = pickCompingMode(rng: &rng)
+            // St Germain beat: the St Germain comping takes the A section 55% of the time, else the
+            // normal pick; B always differs. In all, about 64% of those songs play it (2026-11-12).
+            let sgBias = beatStyle == .stGermain && rng.nextDouble() < 0.55
+            modeA = sgBias ? .stGermainSyncopated : pickCompingMode(rng: &rng)
             modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allCompingModes,
                                               picker: pickCompingMode, rng: &rng)
         }

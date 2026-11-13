@@ -212,9 +212,11 @@ struct ChillMusicalFrameGenerator {
     }
 
     private static func pickBeatStyle(rng: inout SeededRNG) -> ChillBeatStyle {
-        // All five beat styles equally weighted — no mood bias.
+        // No mood bias. St Germain 13% of base Chill (about 6% of all Chill songs, Zack's target
+        // 5-7%, 2026-11-12); the other four share the rest evenly at 21.75% each.
         let styles: [ChillBeatStyle] = [.electronic, .neoSoul, .brushKit, .stGermain, .hipHopJazz]
-        return styles[rng.nextInt(upperBound: styles.count)]
+        let weights: [Double]        = [0.2175,      0.2175,   0.2175,    0.13,       0.2175]
+        return styles[rng.weightedPick(weights)]
     }
 
     // MARK: - Triangular distribution

@@ -4552,8 +4552,16 @@ struct SongGenerator {
                                            totalBars: drawnFrame.totalBars)
             }
         }
-        let chillProgFamily = baseChill
-            ? ChillStructureGenerator.namedForm(drawn: drawnProgFamily, seed: seed) : drawnProgFamily
+        // The St Germain beat of base Chill plays a vamp: static groove 70%, two-chord pendulum 30%,
+        // never a named form (own derived stream 114; the frame's family draw is still made).
+        let stGermainVamp = baseChill && chillBeatStyle == .stGermain
+        let vampFamily: ChillProgressionFamily = {
+            var r = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 114))
+            return r.nextDouble() < 0.70 ? .static_groove : .two_chord_pendulum
+        }()
+        let structureFamily = stGermainVamp ? vampFamily : drawnProgFamily
+        let chillProgFamily = stGermainVamp ? vampFamily
+            : baseChill ? ChillStructureGenerator.namedForm(drawn: drawnProgFamily, seed: seed) : drawnProgFamily
 
         // Chill Soho drum plan — rule and percussion overlay — from its own derived stream (94),
         // decided here because the breakdown style picked just below depends on it.
@@ -4578,7 +4586,7 @@ struct SongGenerator {
         // The 3.0 chord motion (base Chill B sections, turnarounds, breakdown V7sus4) draws on its
         // own derived stream (99), so the main stream is unchanged for every Chill substyle.
         let (baseStructure, baseChordMotion, baseTurnaroundBars) = ChillStructureGenerator.generateWithChordMotion(
-            frame: frame, chillProgFamily: drawnProgFamily,
+            frame: frame, chillProgFamily: structureFamily,
             mood: frame.mood, breakdownStyle: chillBreakdownStyle,
             noBreakdown: bluesVariation, sohoVariation: sohoVariation,
             motionSeed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 99),
@@ -5865,7 +5873,10 @@ struct SongGenerator {
             }
             formDesc = parts.joined(separator: " - ") + harmonyTag
         } else {
-            formDesc = hasBreakdown ? "Groove - breakdown\(harmonyTag)" : "Groove\(harmonyTag)"
+            // The St Germain beat (drums CHL-DRUM-004, bass CHL-BASS-007) names the form whatever
+            // the lead plays, as Soho names its Latin and Soul grooves.
+            let groove = chillBeatStyle == .stGermain ? "St Germain Groove" : "Groove"
+            formDesc = hasBreakdown ? "\(groove) - breakdown\(harmonyTag)" : "\(groove)\(harmonyTag)"
         }
         log.append(GenerationLogEntry(tag: "Form", description: formDesc))
 

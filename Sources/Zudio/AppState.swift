@@ -1710,7 +1710,7 @@ final class AppState: ObservableObject {
                 bestBass   = nil            // implied by stGermain beat style (CHL-BASS-007)
                 bestDrum   = "CHL-DRUM-004" // stGermain groove → upper-range tempo
                 bestArp    = nil
-                bestLead   = "CHL-LD1-004" // saxophone / blues lead
+                bestLead   = "CHL-LD1-005" // St Germain staccato (the old 004 forced rule never let it play)
                 bestTex    = "forced"       // guarantee a texture on the first song
                 bestPerc   = nil
                 bestBridge = false

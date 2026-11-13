@@ -757,8 +757,8 @@ Chill-specific metadata output:
 - swingFeel: Bool — **as shipped, always false.** True swing (sub-step timing) was never
   implemented anywhere in the engine; see CHILL-RULE-10 above, which documents the originally
   planned mechanism as a still-unbuilt idea, not current behavior.
-- beatStyle: ChillBeatStyle — **as shipped, flat/mood-independent**: equal weight over 5 styles
-  (electronic, neoSoul, brushKit, stGermain, hipHopJazz) for regular songs; Blues songs use a
+- beatStyle: ChillBeatStyle — **as shipped, mood-independent**: since 2026-11-12 stGermain is 13% and
+  electronic, neoSoul, brushKit and hipHopJazz 21.75% each for regular songs (was equal weight); Blues songs use a
   separate flat 4-way pool excluding stGermain. An earlier revision of this generator did weight
   beat style by mood (see the Quality Fix History below) but that was reverted to the current flat
   roll.
@@ -1909,7 +1909,10 @@ modes too. Seed returns and the turnaround lick still apply; the blue-note overl
 
 **Lead 1 shares, as a share of all songs** (the per-rule percentages above are the original
 design and are out of date):
-- Chill: CHL-LD1-005 18 (staccato roll 70% on the St Germain beat, 5% on the other beats),
+- On the St Germain beat of base Chill (13% of base songs, 2026-11-12): CHL-LD1-005 staccato 40,
+  CHL-LD1-007 25, CHL-LD1-014 20, CHL-LD1-008 15; chords are a static groove 70% or a two-chord
+  pendulum 30%, never a named form. Other beats keep a 5% staccato roll.
+- Chill, before that change: CHL-LD1-005 18 (staccato roll 70% on the St Germain beat, 5% on the other beats),
   015 17, 001 17, 014 15, 007 13, 008 13, 009 7. CHL-LD1-002, CHL-LD1-003 and CHL-LD1-004 play in
   Chill Blues only (Soho still reuses 004 and 001).
 - Chill Blues: 002 20, 004 20, 013 20, 003 15, 009 13, 014 12.

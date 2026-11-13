@@ -39,9 +39,21 @@ struct ChillLeadGenerator {
         }
         // CHL-LD1-005: St Germain staccato style — suppressed in blues (blues needs sustained phrases).
         let forceNonStaccato = bluesVariation || (forceRuleID != nil && forceRuleID != "CHL-LD1-005")
-        // 70% on the St Germain beat, 5% on the other four: about 18% of Chill songs (was 85/15, 29%).
-        let staccatoProb: Double = forceNonStaccato ? 0.0 : (beatStyle == .stGermain ? 0.70 : 0.05)
-        if rng.nextDouble() < staccatoProb {
+        // 40% on the St Germain beat (with the lead pick below), 5% on the other four.
+        // On the St Germain beat of base Chill the same one roll also picks the lead (2026-11-12):
+        // staccato 40, Horace hook 25, Cantaloupe 20, Blues bossa 15. A forced rule
+        // (the best first song forces 005) skips the pick. Same single draw, so no other song moves.
+        let stGermainBeat = beatStyle == .stGermain && !bluesVariation
+        let staccatoProb: Double = forceNonStaccato ? 0.0
+            : forceRuleID == "CHL-LD1-005" ? 1.0
+            : (stGermainBeat ? 0.40 : 0.05)
+        let staccatoRoll = rng.nextDouble()
+        var forceRuleID = forceRuleID
+        if stGermainBeat, forceRuleID == nil, staccatoRoll >= staccatoProb {
+            let r = staccatoRoll
+            forceRuleID = r < 0.65 ? "CHL-LD1-007" : r < 0.85 ? "CHL-LD1-014" : "CHL-LD1-008"
+        }
+        if staccatoRoll < staccatoProb {
             usedRuleIDs.insert("CHL-LD1-005")
             let written = stGermainStaccato(frame: frame, structure: structure,
                                             breakdownStyle: breakdownStyle, rng: &rng)
