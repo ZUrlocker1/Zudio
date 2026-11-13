@@ -248,7 +248,6 @@ struct StatusBoxView: View {
         let descColor      = NSColor(Color.white.opacity(0.85))
         let descTitleColor = NSColor(Color.yellow.opacity(0.95))
         let errorColor     = NSColor(Color.red.opacity(0.95))
-        let starColor      = NSColor(Color.green)
         #else
         let uiFont     = UIFont.monospacedSystemFont(ofSize: fontBody, weight: .regular)
         let uiFontBold = UIFont.monospacedSystemFont(ofSize: fontBody, weight: .bold)
@@ -257,17 +256,19 @@ struct StatusBoxView: View {
         let descColor      = UIColor(Color.white.opacity(0.85))
         let descTitleColor = UIColor(Color.yellow.opacity(0.95))
         let errorColor     = UIColor(Color.red.opacity(0.95))
-        let starColor      = UIColor(Color.green)
         #endif
 
         for (i, entry) in entries.enumerated() {
-            // A testing star ("* " from testingMarkedRules) moves up beside the rule ID, in bright
-            // green, so it stands out: "CHL-LD2-004 *   Rhythm trade". The saved file keeps it
+            // A testing star ("* " from testingMarkedRules) moves up beside the rule ID, one space
+            // after it and in the same green: "CHL-LD2-004 *  Rhythm trade". The saved file keeps it
             // in the description.
             let starred = !entry.isTitle && entry.description.hasPrefix("* ")
             let description = starred ? String(entry.description.dropFirst(2)) : entry.description
-            let tag = (starred ? entry.tag + " " : entry.tag)
-                .padding(toLength: tagWidth - (starred ? 1 : 0), withPad: " ", startingAt: 0)
+            // Starred: rule ID, one space, "*", then padding to the description column.
+            let tag = starred
+                ? entry.tag + " "
+                : entry.tag.padding(toLength: tagWidth, withPad: " ", startingAt: 0)
+            let starPad = String(repeating: " ", count: max(1, tagWidth - tag.count - 1))
             let font = entry.isTitle ? uiFontBold : uiFont
 
             var tagAttr = AttributedString(tag)
@@ -286,9 +287,12 @@ struct StatusBoxView: View {
             attrStr += tagAttr
             if starred {
                 var star = AttributedString("*")
-                star.font = uiFontBold
-                star.foregroundColor = starColor
+                star.font = uiFont
+                star.foregroundColor = tagColor
                 attrStr += star
+                var pad = AttributedString(starPad)
+                pad.font = uiFont
+                attrStr += pad
             }
             attrStr += descAttr
         }
