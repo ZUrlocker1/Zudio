@@ -363,6 +363,16 @@ struct KosmicLeadGenerator {
         events += generateBridgeAltLead2(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
                                          xFilesBars: xFilesBars)
 
+        // Rhythm and Lead 1 notes sounding in each bar, for the echo reply's clash check.
+        var bandByBar: [Int: [(start: Int, end: Int, note: Int)]] = [:]
+        for ev in rhythmEvents + lead1Events {
+            let end = ev.stepIndex + max(1, ev.durationSteps)
+            for b in (ev.stepIndex / 16)...((end - 1) / 16) {
+                bandByBar[b, default: []].append((ev.stepIndex, end, Int(ev.note)))
+            }
+        }
+        var lastReply: (note: Int, offset: Int)? = nil
+
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
             // Lead 2 silent in A-1 and melody bridges; bridgeAlt handled above
@@ -375,7 +385,9 @@ struct KosmicLeadGenerator {
                 let lead2High = section.intensity == .low ? 67 : 80
                 let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
                                                       low: 55, high: lead2High)
-                events += spaceEchoReplyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
+                events += spaceEchoReplyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes,
+                                            chordTones: entry.chordWindow.chordTones,
+                                            band: bandByBar[bar] ?? [], lastReply: &lastReply, rng: &rng)
             }
         }
 
@@ -1499,26 +1511,57 @@ struct KosmicLeadGenerator {
     // Kosmic Space Lead 2. The Echo melody cycle two bars later, so its phrase falls where Echo
     // melody rests: a held note in bars 3 and 4 of each 8-bar cycle, started a diatonic third above
     // the register's lowest scale note, then the same two notes a third lower in bars 7 and 8.
+    // The held note counts scale steps and ignores the chord, so it could land a semitone under a
+    // chord tone the pads hold for the whole bar (G#3 under the pad's A3 over F# minor, Orpheon II).
+    // A note a semitone from a chord tone, or within a semitone (or a major 7th or minor 9th) of a
+    // Rhythm or Lead 1 note in the same bar, moves to the nearest clear scale note. The second note
+    // of a pair keeps the first note's move, so the two-note step survives (G#–A becomes A–B).
 
     private static func spaceEchoReplyBar(
-        barStart: Int, bar: Int, scaleNotes: [Int], rng: inout SeededRNG
+        barStart: Int, bar: Int, scaleNotes: [Int], chordTones: Set<Int>,
+        band: [(start: Int, end: Int, note: Int)], lastReply: inout (note: Int, offset: Int)?,
+        rng: inout SeededRNG
     ) -> [MIDIEvent] {
         guard !scaleNotes.isEmpty else { return [] }
         let cycle = (bar + 6) % 8
-        // Phrase: bars 0–1 of the shifted cycle
+        // Phrase: bars 0–1 of the shifted cycle. Echo: bars 4–5, a diatonic third below.
+        let base: Int
+        let vel: UInt8
         if cycle < 2 {
-            let phraseNote = scaleNotes[Swift.min(cycle + 2, scaleNotes.count - 1)]
-            let vel = UInt8(55 + rng.nextInt(upperBound: 18))
-            return [MIDIEvent(stepIndex: barStart, note: UInt8(phraseNote), velocity: vel, durationSteps: 14)]
+            base = cycle + 2
+            vel = UInt8(55 + rng.nextInt(upperBound: 18))
+        } else if cycle >= 4 && cycle < 6 {
+            base = cycle - 4
+            vel = UInt8(45 + rng.nextInt(upperBound: 18))
+        } else {
+            return []
         }
-        if cycle < 4 { return [] }
-        // Echo: always a diatonic third below the phrase
-        if cycle < 6 {
-            let echoNote = scaleNotes[Swift.min(cycle - 4, scaleNotes.count - 1)]
-            let vel = UInt8(45 + rng.nextInt(upperBound: 18))
-            return [MIDIEvent(stepIndex: barStart, note: UInt8(echoNote), velocity: vel, durationSteps: 14)]
+        let duration = 14
+        func clear(_ n: Int) -> Bool {
+            if !chordTones.contains(n % 12) {
+                for c in chordTones where [1, 11].contains(((n - c) % 12 + 12) % 12) { return false }
+            }
+            for x in band where x.start < barStart + duration && x.end > barStart
+                && [1, 11, 13].contains(abs(n - x.note)) { return false }
+            return true
         }
-        return []
+        // The second bar of a pair (cycle 1 or 5) tries the first bar's move first, and never
+        // repeats the first bar's note.
+        let secondOfPair = cycle == 1 || cycle == 5
+        let prior = secondOfPair ? lastReply : nil
+        var offsets = [0, 1, -1, 2, -2]
+        if let k = prior?.offset, k != 0 { offsets.insert(k, at: 0) }
+        let plain = Swift.min(base, scaleNotes.count - 1)
+        var chosen = (note: scaleNotes[plain], offset: 0)
+        for k in offsets {
+            let i = base + k
+            guard i >= 0, i < scaleNotes.count else { continue }
+            let n = scaleNotes[i]
+            if let p = prior, n == p.note { continue }
+            if clear(n) { chosen = (n, k); break }
+        }
+        lastReply = chosen
+        return [MIDIEvent(stepIndex: barStart, note: UInt8(chosen.note), velocity: vel, durationSteps: duration)]
     }
 
     // MARK: - KOS-LD1-006: JMJ Phrase Loop

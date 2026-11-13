@@ -188,10 +188,13 @@ struct LeadGenerator {
                 entryBar: entryBar, restBars: ld1RestBars.union(breakdownBars),
                 register: kRegisterBounds[kTrackLead1]!,
                 maxGapBars: noirVariation ? nil : Self.maxLead1SilentBars, rng: &rng)
-            return (events, .none)
+            return (MotorikClearance.clear(events, tonalMap: tonalMap), .none)
         }
 
         var events: [MIDIEvent] = []
+        // MOT-LD1-005 is Zack's standing rule, and MOT-LD1-012 Chromatic Descent is chromatic by
+        // design: Motorik clearance leaves their bars alone.
+        var clearanceSkipBars: Set<Int> = []
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar),
@@ -429,6 +432,7 @@ struct LeadGenerator {
             }
 
             events += barEvents
+            if ruleID == "MOT-LD1-005" || ruleID == "MOT-LD1-012" { clearanceSkipBars.insert(bar) }
             if !barEvents.isEmpty, ruleID == "MOT-LD1-004" || ruleID == "MOT-LD1-005" { lastGatedBar = bar }
 
             // D: Update prevNote from the last event in this bar
@@ -463,7 +467,7 @@ struct LeadGenerator {
             events = (events + reprise.events).sorted { $0.stepIndex < $1.stepIndex }
             solo.short = reprise.ranges
         }
-        return (events, solo)
+        return (MotorikClearance.clear(events, tonalMap: tonalMap, skipBars: clearanceSkipBars), solo)
     }
 
     /// The most bars LD1-004 or LD1-005 stay silent from their phrase and bar gates. Those gates are
@@ -1927,12 +1931,17 @@ struct LeadGenerator {
         case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
         default:                            thirdSemis = 3
         }
-        // Rotate base pitch class every 8 bars (root → 3rd → 5th) to prevent long same-chord-window runs.
-        let baseShifts = [0, thirdSemis, 7]
-        let basePC = (rootPC + baseShifts[(bar / 8) % 3]) % 12
-        // 4-note call figure — ascending arc from rotated base
-        let callOffsets: [Int] = [0, thirdSemis, 7, 12]
-        let callPCs = callOffsets.map { (basePC + $0) % 12 }
+        // Rotate the starting chord tone every 8 bars (root → 3rd → 5th) to prevent long
+        // same-chord-window runs. The call is the chord itself from that tone: root position, then
+        // first and second inversion. It used to build a triad on the 3rd and the 5th, which put
+        // out-of-key notes on every beat (an Ab major triad over E in E Mixolydian, Vienna), and
+        // the harmonic filter then cut half of them. The 3rd is the chord's own where it has one.
+        let tones = entry.chordWindow.chordTones
+        let third = tones.contains((rootPC + 4) % 12) ? 4 : tones.contains((rootPC + 3) % 12) ? 3 : thirdSemis
+        let chord = [0, third, 7]
+        let r = (bar / 8) % 3
+        // 4-note call figure — ascending arc from the rotated chord tone
+        let callPCs = [chord[r], chord[(r + 1) % 3], chord[(r + 2) % 3], chord[r]].map { (rootPC + $0) % 12 }
         let callNotes: [UInt8] = callPCs.enumerated().map { i, pc in
             nearestMIDI(pc: pc, bounds: bounds, prevNote: i > 0 ? nearestMIDI(pc: callPCs[i-1], bounds: bounds, prevNote: nil) : nil)
         }
@@ -3043,4 +3052,69 @@ struct LeadGenerator {
         return shapePhraseEndings(events, rng: &rng, low: low, high: high)
     }
 
+}
+
+// MARK: - Motorik clearance
+
+/// Keeps Motorik's leads off a semitone from the chord the band holds. Motorik sits on one chord
+/// for long stretches, and a scale note a semitone from a chord tone, held on a beat, rubs against
+/// the pads for as long as it lasts (Sud Munchen: Lead 1's B4 under the pad's C5; C Pulse: Lead 2's
+/// D3 under the pad's Eb3). Such a note moves to the nearest scale note that is clear, a chord tone
+/// on a tie. Short notes off the beat and short passing notes keep their pitch: they are colour.
+/// Lead 1 is written before Bass and Pads, so it is checked against the chord's tones; Lead 2 is
+/// written last, so it is also checked against the notes already sounding. No random draws.
+enum MotorikClearance {
+
+    /// `pitch` is outside the chord and a semitone from one of its tones.
+    static func rubsChord(_ pitch: Int, _ chordTones: Set<Int>) -> Bool {
+        let pc = ((pitch % 12) + 12) % 12
+        guard !chordTones.contains(pc) else { return false }
+        return chordTones.contains { [1, 11].contains(((pc - $0) % 12 + 12) % 12) }
+    }
+
+    /// `events` with every clashing held note moved. A note counts when it lasts an 8th or more
+    /// and starts on a beat, or lasts a beat or more. `band` is what already sounds (Pads, Bass,
+    /// Rhythm, Lead 1 for Lead 2): a note within a semitone, a major 7th or a minor 9th of one of
+    /// them, overlapping an 8th or more, also moves.
+    static func clear(_ events: [MIDIEvent], tonalMap: TonalGovernanceMap,
+                      band: [MIDIEvent] = [], skipBars: Set<Int> = []) -> [MIDIEvent] {
+        let sorted = events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
+        var held: [Int: [(start: Int, end: Int, pitch: Int)]] = [:]
+        for e in band {
+            let end = e.stepIndex + Swift.max(1, e.durationSteps)
+            for b in (e.stepIndex / 16)...((end - 1) / 16) {
+                held[b, default: []].append((e.stepIndex, end, Int(e.note)))
+            }
+        }
+        var out = sorted
+        for i in sorted.indices {
+            let e = sorted[i]
+            let start = e.stepIndex, end = start + e.durationSteps
+            guard e.durationSteps >= 2, start % 4 == 0 || e.durationSteps >= 4 else { continue }
+            guard !skipBars.contains(start / 16), !ChillClearance.isPassing(i, in: sorted) else { continue }
+            let bars = Array((start / 16)...((end - 1) / 16))
+            let windows = bars.compactMap { tonalMap.entry(atBar: $0)?.chordWindow }
+            guard let first = windows.first else { continue }
+            func clear(_ p: Int) -> Bool {
+                if windows.contains(where: { rubsChord(p, $0.chordTones) }) { return false }
+                for b in bars {
+                    for h in held[b] ?? [] where Swift.min(end, h.end) - Swift.max(start, h.start) >= 2
+                        && [1, 11, 13].contains(abs(p - h.pitch)) { return false }
+                }
+                return true
+            }
+            let p = Int(e.note)
+            guard !clear(p) else { continue }
+            let scale = first.chordTones.union(first.scaleTensions)
+            let candidates = (Swift.max(0, p - 4)...Swift.min(127, p + 4))
+                .filter { $0 != p && scale.contains($0 % 12) && clear($0) }
+            func rank(_ c: Int) -> (Int, Int, Int) {
+                (abs(c - p), first.chordTones.contains(c % 12) ? 0 : 1, c)
+            }
+            guard let best = candidates.min(by: { rank($0) < rank($1) }) else { continue }
+            out[i] = MIDIEvent(stepIndex: start, note: UInt8(best), velocity: e.velocity,
+                               durationSteps: e.durationSteps)
+        }
+        return out
+    }
 }

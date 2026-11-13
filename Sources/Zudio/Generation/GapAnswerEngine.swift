@@ -214,6 +214,7 @@ enum GapAnswerEngine {
         blockedBars requestedBars: Set<Int>,
         soloBars: Set<Int> = [],
         pads: [MIDIEvent],
+        band: [MIDIEvent] = [],
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var r = SeededRNG(seed: rng.next() ^ 0x4741_5041_4E53_5752)   // "GAPANSWR"
@@ -756,11 +757,14 @@ enum GapAnswerEngine {
         // One octave decision for the whole part, as the Lead 1 hooks get. Lifting answer by
         // answer put one echo above Lead 1 and its repeat two bars later a sixth below it. The
         // bed is bounded by its own ceiling, so it is never lifted out of 50 to 60.
-        return HarmonicFilter.filterLead(events, track: kTrackLead2, pads: pads,
-                                         frame: frame, structure: structure,
-                                         bounds: kosmic ? (cellRole ? kosmicCellRegister : kosmicRegister)
-                                             : ruleID == lowBed ? bedRegister : register,
-                                         uniformLift: true)
+        let placed = HarmonicFilter.filterLead(events, track: kTrackLead2, pads: pads,
+                                               frame: frame, structure: structure,
+                                               bounds: kosmic ? (cellRole ? kosmicCellRegister : kosmicRegister)
+                                                   : ruleID == lowBed ? bedRegister : register,
+                                               uniformLift: true)
+        // Motorik: a held answer note a semitone from the chord, or from a note the Pads, Bass,
+        // Rhythm or Lead 1 already sound, moves to the nearest clear scale note. Kosmic unchanged.
+        return kosmic ? placed : MotorikClearance.clear(placed, tonalMap: tonalMap, band: pads + lead1 + band)
     }
 
     // MARK: - Harmony and bed

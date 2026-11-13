@@ -52,6 +52,7 @@ It measures two things. **Strong clashes:** on a beat or overlapping a beat, mor
 
 - Glaring: the two notes are within an octave of each other, either a semitone (B against Bb) or a major 7th with the outside note below. A minor 9th held two beats or more with both notes at C3 or above also counts as glaring. A minor 9th held one beat that steps on is mild. Example: Quantique Minipod's lead plays E, G#, A over E major, with the A against the pad's G#3, then moves to B.
 - Mild: everything else. That covers notes two or more octaves apart (a low bass note under the pad's octave) and a minor 9th that is short or has one note in the bass register. Quantique Minipod's D# in the bass two octaves under the pad's E is mild.
+- The scanner measures MIDI note length, not what you hear. On a patch that fades fast, a held note's clash is shorter than its length (Zack on Orpheon II's Lead 2, 2026-11-13). The same goes for a plucked or muted Rhythm patch. A fast decay is no reason to skip a glaring clash, though. The same rule plays on other patches from its pool, and some of them sustain (Zack, 2026-11-13). Fix glaring clashes at the rule whatever the patch. The instrument only explains why one song sounds milder than the numbers.
 - A strong clash is graded by its own interval. A persistent run is glaring when the glaring rubs alone make a run of more than 4 bars.
 
 A song is a problem when either measure fires on glaring clashes. Songs flagged only by mild ones are reported separately as mild-only: worth fixing when a fix is cheap and keeps the flavour, but they are not urgent. `--worst N` also lists the worst songs and the longest persistent runs per substyle, each marked glaring or mild.
@@ -123,9 +124,30 @@ Done 2026-11-13, uncommitted. The walk is top, mid, low on a locked 16th grid (O
 - Hear: Thunder in the Lobby (chill_4619e5dbcbf5514c) bars 2–13.
 - Also in Soho: CHL-PAD-008 Half-bar pad (Sloane Square Morning, chill_5c2472e5f9e65abf, bars 38–68; Denmark Street, chill_74e69a5d0dd27a65, persistent rub bars 66–78) and CHL-BASS-015 (persistent rubs: Small Hours on a Wednesday, chill_8aa4248c8857f9a4, bars 89–98; Denmark Street bars 23–27, 65–70). Look at these in the same session.
 
-### 5. Motorik leads: a clearance pass for Motorik
+### 5. Motorik leads: a clearance pass for Motorik (done in code 2026-11-13, uncommitted, not heard)
 
-The biggest group of rules. Motorik base is 72% problem songs, mostly Lead 1 and Lead 2.
+Done: `MotorikClearance` (end of `LeadGenerator.swift`; it isn't a new file because the Xcode project lists files by name). A lead note that lasts an 8th or more and starts on a beat, or lasts a beat or more, moves when it is outside the chord and a semitone from a chord tone. It moves to the nearest clear scale note, a chord tone on a tie, almost always one semitone. Short notes off the beat and short passing notes (`ChillClearance.isPassing`) keep their pitch. No random draws.
+
+- Lead 1 is written before Bass and Pads, so it is checked against the chord's tones, at the end of `generateLead1` and on the hook rules' output. MOT-LD1-005 (Zack's standing rule) and MOT-LD1-012 Chromatic Descent are skipped; they are the only Motorik lead rules still over 15% glaring (005 29%, 012 57%). Propose before touching either.
+- Lead 2 gap answers (MOT-LD2-001 to 004, 006) are also checked against the Pads, Bass, Rhythm and Lead 1 notes already sounding (a semitone, major 7th or minor 9th). This happens at the end of `GapAnswerEngine.generate`, Motorik only; Kosmic's gap rules are unchanged. Both call sites pass `band:`.
+- MOT-LD1-016 Machine Answer bug: every 8 bars its call starts on the chord's root, then 3rd, then 5th. It built a triad on that note with the key's 3rd, so out-of-key notes landed on every beat (an Ab major triad over E in Vienna). Pass A of the harmonic filter then cut about half of them, leaving two or three notes a bar, one out of key. The call is now the chord itself from that note (root position, then the inversions), so Vienna's Lead 1 goes from 181 to 252 notes, four chord tones a bar as designed.
+- Measured on 500 Motorik seeds (Rhythm fix in both runs). About 8% of Lead 1 notes moved, almost all by a semitone, and about 7% of Lead 2 notes. Glaring problem songs: base 52% to 13%, Europe 17% to 4%, Arcade 10% to 3%, Noir 27% to 18%. Noir's Rhythm count rose 107 to 153 only because of attribution (a clash with both notes outside the chord counts against the later note). Noir's total glaring clashes fell 506 to 290. Kosmic unchanged.
+- Marked F: MOT-LD1-004, 009, 010, 011, 013, 014, 016 to 020 (001 to 003 and 006 to 008, and the Lead 2 gap rules, already carry the testing star).
+- Hear: `~/Downloads/Zudio Motorik clash demos/` (before is MIDI only). Sud Munchen bars 17–19 (B4 under the pad's C5 now C5: E–D–C–A). C Pulse bars 15 and 17 (Lead 2's Ab3 held 2 beats under the pad's G4 now G3). Vienna bars 12, 20, 28 (Machine Answer complete).
+
+MOT-LD1-012 Chromatic Descent, checked 2026-11-13 (Zack asked whether its clashes are real): **they are real, and glaring.**
+
+- It plays only in Noir: 7 of 500 Motorik seeds, glaring in 4.
+- Lead 1 is a sustaining saw lead (program 81). The descent holds each chromatic step for 3 to 4 beats, nearly a bar, a semitone from a note the Pads or Rhythm hold in the same octave.
+- E Tone (motorik_75cfef7f85616709, E harmonic minor, 24 glaring): Bb4 for 3¼ beats over the pad's A3 and the Rhythm's A4, bar 16; B4 for 3¾ beats under the pad's C5, bar 28.
+- Tone Rad (motorik_59a071a9c984e3cd, E Phrygian, 10): F#4 for 4 beats over the pad's F4, bars 17, 18, 30; Bb4 over the pad's A4, bar 14.
+- Dunkel Dusseldorf (motorik_8e469e6f14388e02, A Aeolian, 11): F#4 and Bb4 held 3 to 3½ beats a minor 9th over the Rhythm's F3 and A3, bars 16, 19, 20, 23.
+- Not fixed yet. It is chromatic by design, so the general clearance would turn the descent into repeated notes. Options for Zack, not yet chosen:
+  1. Hold only notes that are clear of the chord, with the chromatic step between them as a short off-beat passing note. This keeps the chromatic colour within the ground rules: off the beat, up to 6 a song, or 12 if musical.
+  2. Keep the held chromatic steps but shorten each to a beat, so the clash lasts a beat instead of a bar.
+  3. Descend through the scale instead of chromatically wherever a step would land a semitone from the chord, keeping chromatic steps only where they are clear.
+
+Original notes: the biggest group of rules. Motorik base is 72% problem songs, mostly Lead 1 and Lead 2.
 
 - Lead 1: MOT-LD1-012 Chromatic Descent (7 of 7 songs, median 14), MOT-LD1-016 Machine Answer (73%), MOT-LD1-013 Slow arc (71%), MOT-LD1-004 Stepwise sequence (66%), MOT-LD1-007 Vanishing solo (62%), MOT-LD1-003 Tour de France riff (57%), and MOT-LD1-008, 011, 005, 014 at 40–48%.
 - Lead 2: MOT-LD2-003 Hook fragment (52%), MOT-LD2-001 Echo answer (48%), MOT-LD2-006 (43%).
@@ -134,7 +156,11 @@ The biggest group of rules. Motorik base is 72% problem songs, mostly Lead 1 and
 - Never replace MOT-LD1-005 (Zack's standing rule); clearance that moves a note is fine, but propose it.
 - Hear: Nord Leipzig (motorik_de98ae789a2ac845, Arcade) bars 33–40; Spur Radler (motorik_c18caf101da8886a, Arcade) bars 33–38, 57–58.
 
-### 6. Motorik Rhythm, MOT-RTHM-004 2-bar Melodic Riff
+### 6. Motorik Rhythm, MOT-RTHM-004 2-bar Melodic Riff (done in code 2026-11-13, uncommitted, not heard)
+
+Done: the riff counts intervals from the chord root and ignored the chord, so a 2nd over a minor chord or a 4th over a major one sat a semitone from the pad's 3rd. Bewegt Bahn (motorik_0d15bba5325737a8) played A4 under the pad's Bb4 over G minor on beats 3 and 4, 34 times. Such a note now moves to the nearest chord root (`clearOfChordTones` in `RhythmGenerator.swift`). The first version moved it to the nearest clear scale note, which gave Bewegt Bahn C–Bb–Bb–Bb; Zack: "3 Bb in a row doesn't sound very musical", so it now plays C–Bb–G–Bb. No new draws. Marked F. Measured on 500 Motorik seeds: only Rhythm changed. Motorik base Rhythm glaring clashes 641 to 97, Europe 168 to 61; MOT-RTHM-004 no longer in the list. Zack (2026-11-13): fix glaring clashes even on a fast-decay patch like this one's muted guitar, because the pool has patches that sustain. Hear: `~/Downloads/Zudio Motorik clash demos/` Bewegt Bahn bars 11–12.
+
+Original notes:
 
 - 52% of its songs, median 10, up to 123. The worst song in Motorik base and Europe.
 - Investigate: a melodic riff over a fixed chord; likely fixed intervals that land a semitone from the pad or bass. Fix in the pattern if so, or add Rhythm to the clearance from item 5.
@@ -142,7 +168,10 @@ The biggest group of rules. Motorik base is 72% problem songs, mostly Lead 1 and
 
 ### 7. Kosmic leads and Rhythm
 
-- Lead 2: KOS-LD2-005 Space echo reply (78% of 60 songs, median 11).
+- Lead 2: KOS-LD2-005 Space echo reply (done in code 2026-11-13, uncommitted, not heard). Its held note counted scale steps up from the bottom of the register and ignored the chord, so it landed a semitone from a pad note. Example: Orpheon II (kosmic_7464fed5d7788341) held G#3 for 3 to 3½ beats under the pad's A3 over F# minor, in bars 7, 15, 23, 79 and 87. Zack didn't hear it as a problem (quiet: pad velocity 31, Lead 2 41 in bar 7), but it was a same-octave semitone, so it was fixed.
+  - Fix (`spaceEchoReplyBar` in `CosmicLeadGenerator.swift`): a held note a semitone from a chord tone, or within a semitone, major 7th or minor 9th of a Rhythm or Lead 1 note in the bar, moves to the nearest clear scale note (0, +1, -1, +2, -2 steps). The second note of each pair tries the first note's move and never repeats it, so the two-note step survives: Orpheon II's G#–A becomes A–B. The pads are written after Lead 2, so the chord's tones stand in for them. No new draws. Marked F.
+  - Measured on 500 Kosmic seeds: only Lead 2 changed, in all 60 songs on this rule. Glaring Lead 2 clashes 557 to 12; songs over 4 from 45 to 0. Kosmic Space glaring problem songs 48% to 33%.
+  - Hear: `~/Downloads/Zudio glaring clash check/` has Orpheon II.MID (before) and the `Orpheon II after` folder, bars 7–8 and 15–16.
 - Rhythm: KOS-RTHM-021 Oxygene 8 Offbeat Pedal (60%), KOS-RTHM-005 JMJ dual arpeggio (56%), KOS-RTHM-007, 002, 006 at 20–26%.
 - Lead 1: KOS-LD1-013, 015, 018, 006, 007, 014, 016 at 33–50%.
 - Proposed approach: reuse the clearance from item 5 for Kosmic leads. For the Rhythm rules, check first whether the arpeggio notes are fixed intervals (pattern fix) or follow the chord (then the clash is with a pad or lead and clearance applies).

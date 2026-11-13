@@ -168,8 +168,16 @@ struct RhythmGenerator {
                         guard i < riffSlice.count else { continue }
                         guard rng.nextDouble() < density else { continue }
                         let rawTarget = Int(pitches.root) + riffSlice[i]
-                        let note = nearestScaleMIDI(target: rawTarget, scalePCs: riffScalePCs,
-                                                    low: 45, high: 76)
+                        // The riff counts intervals from the chord root and ignores the chord, so a
+                        // 2nd over a minor chord or a 4th over a major one lands a semitone from the
+                        // pad's 3rd (Bewegt Bahn: A4 under the pad's Bb4 over G minor, ¾ of a beat
+                        // on beats 3 and 4). Such a note moves to the nearest chord root: the nearest
+                        // clear note was often the neighbour already sounding, and C–Bb–Bb–Bb
+                        // didn't sound musical (Zack, 2026-11-13).
+                        let note = clearOfChordTones(
+                            nearestScaleMIDI(target: rawTarget, scalePCs: riffScalePCs, low: 45, high: 76),
+                            chordTones: entry.chordWindow.chordTones, rootPC: Int(pitches.root) % 12,
+                            low: 45, high: 76)
                         let vel = UInt8(step == 0 ? 85 : 65 + rng.nextInt(upperBound: 12))
                         events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                                 velocity: vel, durationSteps: 3))
@@ -537,6 +545,19 @@ struct RhythmGenerator {
         let candidates = (low...high).filter { scalePCs.contains($0 % 12) }
         guard !candidates.isEmpty else { return UInt8(clamping: target) }
         return UInt8(clamping: candidates.min(by: { abs($0 - target) < abs($1 - target) }) ?? low)
+    }
+
+    /// `note` if it is a chord tone or not a semitone from one; otherwise the chord root in
+    /// [low, high] nearest to it (lower on a tie). A semitone from a chord tone, held on a beat,
+    /// rubs against the pads, which hold the chord.
+    private static func clearOfChordTones(_ note: UInt8, chordTones: Set<Int>, rootPC: Int,
+                                          low: Int, high: Int) -> UInt8 {
+        let n = Int(note)
+        guard !chordTones.contains(n % 12),
+              chordTones.contains(where: { [1, 11].contains(((n - $0) % 12 + 12) % 12) }) else { return note }
+        let roots = (low...high).filter { $0 % 12 == rootPC }
+        guard let best = roots.min(by: { (abs($0 - n), $0) < (abs($1 - n), $1) }) else { return note }
+        return UInt8(best)
     }
 
     // MARK: - Kraftwerk sync rhythm

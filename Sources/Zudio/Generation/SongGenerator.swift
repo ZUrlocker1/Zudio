@@ -336,7 +336,8 @@ struct SongGenerator {
             trackEvents[kTrackLead2] = GapAnswerEngine.generate(
                 ruleID: gapRule, lead1: lead1Heard, lead1RuleIDs: lead1Rules,
                 frame: frame, structure: structure, tonalMap: tonalMap,
-                blockedBars: blocked, soloBars: soloBars, pads: trackEvents[kTrackPads], rng: &lead2RNG)
+                blockedBars: blocked, soloBars: soloBars, pads: trackEvents[kTrackPads],
+                band: trackEvents[kTrackBass] + trackEvents[kTrackRhythm], rng: &lead2RNG)
         }
 
         for track in [kTrackLead1, kTrackLead2, kTrackRhythm] {
@@ -1906,7 +1907,8 @@ struct SongGenerator {
                         ruleID: gapRule, lead1: songState.trackEvents[kTrackLead1],
                         lead1RuleIDs: currentMotorikLead1Rules(songState.generationLog),
                         frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap,
-                        blockedBars: blocked, soloBars: soloBars, pads: songState.trackEvents[kTrackPads], rng: &rng)
+                        blockedBars: blocked, soloBars: soloBars, pads: songState.trackEvents[kTrackPads],
+                        band: songState.trackEvents[kTrackBass] + songState.trackEvents[kTrackRhythm], rng: &rng)
                 }
             }
         case kTrackRhythm:

@@ -28,7 +28,10 @@ struct GenerationLogEntry: Sendable {
     /// before the build ships; the "* " marks stay (Zack, 2026-11-13).
     static let fixMarkedRules: Set<String> = [
         "CHL-BASS-001", "CHL-BASS-003", "CHL-BASS-004", "CHL-BASS-009", "CHL-BASS-010", "CHL-BASS-011",
-        "CHL-BASS-012", "KOS-BASS-018",
+        "CHL-BASS-012", "KOS-BASS-018", "KOS-LD2-005", "MOT-RTHM-004",
+        // Motorik clearance (Lead 1 and the Lead 2 gap answers); 016 also had its call rewritten.
+        "MOT-LD1-004", "MOT-LD1-009", "MOT-LD1-010", "MOT-LD1-011", "MOT-LD1-013", "MOT-LD1-014",
+        "MOT-LD1-016", "MOT-LD1-017", "MOT-LD1-018", "MOT-LD1-019", "MOT-LD1-020",
     ]
 
     /// The testing markers a description can start with.
