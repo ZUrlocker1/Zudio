@@ -524,13 +524,14 @@ struct ChillPadsGenerator {
             let velLow  = UInt8(42 + rng.nextInt(upperBound: 14))  // 42–55
             let velHigh = UInt8(Swift.max(1, Int(velLow) - 8))     // 5–8 softer on top
 
-            // Blues: a root a semitone above Rhythm's major 7th (a bVIImaj7 rooted high) drops an octave.
-            if bluesShell {
-                let rhythm = ChillRhythmGenerator.bluesVoicing(frame: frame, rootPC: rawRootPC,
-                                                               type: chord?.chordType ?? .min7,
-                                                               baseRegister: 52, snapTable: snapTable)
-                if rhythm.contains(where: { abs($0 - noteLow) == 1 || abs($0 - noteLow) == 13 }) { noteLow -= 12 }
-            }
+            // Blues: Rhythm's voicing for this chord (always built from MIDI 52). The pad keeps clear
+            // of it by more than a semitone and a minor 9th. A root a semitone above Rhythm's major
+            // 7th (a bVIImaj7 rooted high) drops an octave.
+            let bluesType = chord?.chordType ?? .min7
+            let rhythm = bluesShell ? ChillRhythmGenerator.bluesVoicing(frame: frame, rootPC: rawRootPC, type: bluesType,
+                                                                        baseRegister: 52, snapTable: snapTable) : []
+            func rubs(_ n: Int, _ others: [Int]) -> Bool { others.contains { abs($0 - n) == 1 || abs($0 - n) == 13 } }
+            if bluesShell, rubs(noteLow, rhythm) { noteLow -= 12 }
 
             events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(noteLow),
                                     velocity: velLow,  durationSteps: holdSteps))
@@ -538,20 +539,14 @@ struct ChillPadsGenerator {
                 // Close shell: root, 3rd (4th for a sus) and 7th. The 3rd used to sit an octave
                 // above the 7th, where in Im7 it rubbed a semitone above Rhythm's 9th in Lead 1's
                 // octave (Zack, 2026-11-12: prevent pad clashes). Each note then keeps clear of
-                // Rhythm's voicing for this chord (always built from MIDI 52) by more than a
-                // semitone and a minor 9th, moving an octave if it must, or dropping out.
-                let type = chord?.chordType ?? .min7
-                let (seventh, third) = (type.chillSeventh, type.chillThird)
-                let rhythm = ChillRhythmGenerator.bluesVoicing(frame: frame, rootPC: rawRootPC, type: type,
-                                                               baseRegister: 52, snapTable: snapTable)
+                // Rhythm's voicing and the notes placed so far, moving an octave if it must, or
+                // dropping out.
+                let (seventh, third) = (bluesType.chillSeventh, bluesType.chillThird)
                 var placed = [noteLow]
-                func rubs(_ n: Int) -> Bool {
-                    (rhythm + placed).contains { abs($0 - n) == 1 || abs($0 - n) == 13 }
-                }
                 for interval in [third, seventh] {
                     let raw = noteLow + interval
                     let note = raw - raw % 12 + snapTable[raw % 12]
-                    guard let n = [note, note - 12, note + 12].first(where: { (45...76).contains($0) && !rubs($0) && !placed.contains($0) })
+                    guard let n = [note, note - 12, note + 12].first(where: { (45...76).contains($0) && !rubs($0, rhythm + placed) && !placed.contains($0) })
                     else { continue }
                     placed.append(n)
                     events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(n),

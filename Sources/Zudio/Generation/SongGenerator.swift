@@ -1571,7 +1571,15 @@ struct SongGenerator {
     /// (ChillClearance), as generation passes them: the stored tracks stand in for the ones
     /// generation had written at that point. Draws nothing.
     private static func regenChillBand(_ songState: SongState, _ tracks: [Int]) -> ChillClearance {
-        ChillClearance(tracks.map { songState.trackEvents[$0] })
+        ChillClearance(tracks.map { songState.trackEvents[$0] },
+                       structure: songState.structure, scale: songState.frame.scalePCs)
+    }
+
+    /// The tracks a Chill lead listens to as it is written (ChillClearance): Lead 1 to the Pads
+    /// and Bass, Lead 2 to those and Lead 1. Soho writes Rhythm before the leads, so both leads
+    /// also hear it there. Generation and regen share it.
+    private static func chillLeadBandTracks(lead2: Bool, soho: Bool) -> [Int] {
+        [kTrackPads, kTrackBass] + (lead2 ? [kTrackLead1] : []) + (soho ? [kTrackRhythm] : [])
     }
 
     /// Regenerates a single track without touching any other track or the global seed.
@@ -1795,8 +1803,7 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
-                    band: regenChillBand(songState, [kTrackPads, kTrackBass]
-                                         + (songState.chillSohoVariation ? [kTrackRhythm] : [])),
+                    band: regenChillBand(songState, chillLeadBandTracks(lead2: false, soho: songState.chillSohoVariation)),
                     rng: &rng, usedRuleIDs: &usedRules, returns: { chillLead1Returns = $0 })
             } else {
                 // The breakdown windows as generation hands them to Lead 1, so hooks and solo
@@ -1867,8 +1874,7 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
-                    band: regenChillBand(songState, [kTrackPads, kTrackBass]
-                                         + (songState.chillSohoVariation ? [kTrackRhythm] : [])),
+                    band: regenChillBand(songState, chillLeadBandTracks(lead2: false, soho: songState.chillSohoVariation)),
                     rng: &lead1RNG, usedRuleIDs: &lead1Rules).handoffBars
                 events = ChillLeadGenerator.generateLead2(
                     frame: songState.frame, structure: songState.structure,
@@ -1877,8 +1883,7 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
                     keepInstrument: songState.chillLead2Instrument,
-                    band: regenChillBand(songState, [kTrackPads, kTrackBass, kTrackLead1]
-                                         + (songState.chillSohoVariation ? [kTrackRhythm] : [])),
+                    band: regenChillBand(songState, chillLeadBandTracks(lead2: true, soho: songState.chillSohoVariation)),
                     rng: &rng, usedRuleIDs: &usedRules).events
             } else if motNoir {
                 // Noir has no Lead 2 (regen and Evolve's first pass gave it one until 2026-11-11).
@@ -2093,32 +2098,24 @@ struct SongGenerator {
         // when an absent bass or drum track is added to an evolve pass.
         var grooveFixupRegen: String? = nil
         if isChill, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
-            events = chillLeadSkippingBarZero(events, structure: songState.structure)
-            let grooveBars = grooveBarSet(songState.structure)
-            let pulse = grooveStepSupport(drums: songState.trackEvents[kTrackDrums],
-                                          bass: songState.trackEvents[kTrackBass], bars: grooveBars)
-            let before = events
-            events = grooveFixup(events, support: pulse, bars: grooveBars)
-            if !before.isEmpty {
+            // Then the harmonic filter and the register fold, as a generated song's leads get.
+            // Without them a regenerated lead skipped the clash guard, the lift above the pads
+            // and the velocity arc (found 2026-10-16).
+            let finished = finishedChillLead(
+                events, track: trackIndex,
+                lift: !(trackIndex == kTrackLead2 && usedRules.contains("CHL-LD2-002")),
+                bounds: chillLeadRegister(trackIndex == kTrackLead1 ? songState.chillLeadInstrument
+                                                                    : songState.chillLead2Instrument),
+                band: songState.trackEvents, frame: songState.frame, structure: songState.structure)
+            events = finished.events
+            if finished.count > 0 {
                 // L1 always first, so the row reads the same way as the generation log's.
-                let n    = adjustedNoteCount(before: before, after: events)
-                let mine = "\(n)/\(before.count)"
+                let n    = finished.moved
+                let mine = "\(n)/\(finished.count)"
                 let l1   = trackIndex == kTrackLead1 ? mine : "N/A"
                 let l2   = trackIndex == kTrackLead1 ? "N/A" : mine
                 grooveFixupRegen = n == 0 ? "No changes!" : "L1: \(l1), L2: \(l2) fixes"
             }
-            // Then the harmonic filter and the register fold, as a generated song's leads get.
-            // Without them a regenerated lead skipped the clash guard, the lift above the pads
-            // and the velocity arc (found 2026-10-16).
-            let bounds = chillLeadRegister(trackIndex == kTrackLead1 ? songState.chillLeadInstrument
-                                                                     : songState.chillLead2Instrument)
-            events = HarmonicFilter.filterLead(events, track: trackIndex,
-                                               pads: songState.trackEvents[kTrackPads],
-                                               frame: songState.frame, structure: songState.structure,
-                                               bounds: bounds,
-                                               lift: !(trackIndex == kTrackLead2
-                                                       && usedRules.contains("CHL-LD2-002")))
-            events = foldedIntoRegister(events, bounds)
         }
 
         if isSpace && trackIndex != kTrackDrums {
@@ -2484,6 +2481,30 @@ struct SongGenerator {
     }
 
     /// A Chill lead with bar 0 removed when the song has no intro — see generateChill.
+    /// A Chill lead as it will sound: out of bar 0 when there is no intro, pulled onto the groove
+    /// (read from `band`'s Drums and Bass), through the harmonic filter (clash guard, the lift
+    /// above `band`'s Pads unless `lift` is off, the velocity arc) and folded into `bounds`.
+    /// Generation runs it on each lead as soon as it is written, so Lead 2 and Rhythm hear Lead 1
+    /// as it will sound; regen runs it on a regenerated lead. `moved` of `count` notes were
+    /// moved by the groove fixup. Draws nothing.
+    private static func finishedChillLead(_ lead: [MIDIEvent], track: Int, lift: Bool, bounds: RegisterBounds,
+                                          band: [[MIDIEvent]], frame: GlobalMusicalFrame,
+                                          structure: SongStructure) -> (events: [MIDIEvent], moved: Int, count: Int) {
+        let before = chillLeadSkippingBarZero(lead, structure: structure)
+        let grooveBars = grooveBarSet(structure)
+        let pulse = grooveStepSupport(drums: band[kTrackDrums], bass: band[kTrackBass], bars: grooveBars)
+        let grooved = grooveFixup(before, support: pulse, bars: grooveBars)
+        let filtered = HarmonicFilter.filterLead(grooved, track: track, pads: band[kTrackPads],
+                                                 frame: frame, structure: structure,
+                                                 bounds: bounds, lift: lift)
+        return (foldedIntoRegister(filtered, bounds), adjustedNoteCount(before: before, after: grooved), before.count)
+    }
+
+    /// A Chill lead sits out bar 0 when there is no intro: a lead entering on the very first
+    /// downbeat lands with no runway (Zack, 2026-10-13). Applied to the finished lead rather than
+    /// in the lead generators, because three paths write these notes (Soho's own rules, the base
+    /// rules Soho reuses, Lead 2's call-and-response). Chill only: Ambient drifting in with no
+    /// runway is what that style is.
     static func chillLeadSkippingBarZero(_ events: [MIDIEvent], structure: SongStructure) -> [MIDIEvent] {
         let hasIntroBars = structure.sections.contains { $0.label == .intro && $0.lengthBars > 0 }
         return hasIntroBars ? events : events.filter { $0.stepIndex >= 16 }
@@ -4699,8 +4720,11 @@ struct SongGenerator {
         // The soloists listen to the band as they write (ChillClearance): Lead 1 to the Pads and
         // Bass, Lead 2 to those and Lead 1. In Soho, Rhythm is written first, so both leads also
         // listen to it.
-        let padsAndBass = ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass]]
-                                         + (sohoVariation ? [trackEvents[kTrackRhythm]] : []))
+        func chillBand(lead2: Bool) -> ChillClearance {
+            ChillClearance(chillLeadBandTracks(lead2: lead2, soho: sohoVariation).map { trackEvents[$0] },
+                           structure: structure, scale: frame.scalePCs)
+        }
+        let padsAndBass = chillBand(lead2: false)
         var lead1Rules: Set<String> = []
         var lead1Returns = Set<Int>()
         let (lead1Events, lead1HandoffBars, hookTreatments) = ChillLeadGenerator.generateLead1(
@@ -4710,15 +4734,19 @@ struct SongGenerator {
             band: padsAndBass,
             rng: &lead1RNG, usedRuleIDs: &lead1Rules, returns: { lead1Returns = $0 }
         )
-        trackEvents[kTrackLead1] = lead1Events
+        // Lead 1 as it will sound (groove, harmonic filter, register), so Lead 2's band and
+        // Rhythm hear the notes the listener hears. Lead 2's rules still read the line as written.
+        let lead1Finished = finishedChillLead(lead1Events, track: kTrackLead1, lift: true,
+                                              bounds: chillLeadRegister(chillLeadInstrument),
+                                              band: trackEvents, frame: frame, structure: structure)
+        trackEvents[kTrackLead1] = lead1Finished.events
 
         var lead2Rules: Set<String> = []
         let (lead2Events, chillLead2Instrument) = ChillLeadGenerator.generateLead2(
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
             lead1Events: lead1Events, handoffBars: lead1HandoffBars,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation,
-            band: ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass], lead1Events]
-                                 + (sohoVariation ? [trackEvents[kTrackRhythm]] : [])),
+            band: chillBand(lead2: true),
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
         var lead2EventsFinal = lead2Events
@@ -4805,67 +4833,31 @@ struct SongGenerator {
                 }
             }
         }
-        trackEvents[kTrackLead2] = lead2EventsFinal
+        // Lead 2 as it will sound, as Lead 1 above. A song with no intro starts on the groove,
+        // and a lead entering on its very first downbeat lands with no runway (Zack, 2026-10-13),
+        // so both leads sit out bar 0 there; the groove fixup then pulls them onto the song's own
+        // drums and bass, in every Chill song (2026-10-14); then the harmonic filter and register
+        // fold. All in `finishedChillLead`, which regen shares.
+        let lead2Finished = finishedChillLead(lead2EventsFinal, track: kTrackLead2,
+                                              lift: !lead2Rules.contains("CHL-LD2-002"),
+                                              bounds: chillLeadRegister(chillLead2Instrument),
+                                              band: trackEvents, frame: frame, structure: structure)
+        trackEvents[kTrackLead2] = lead2Finished.events
 
-        // A Chill song with no intro starts on the groove, and a lead entering on its very first
-        // downbeat lands with no runway at all (Zack, 2026-10-13). Give the band a bar: both
-        // leads sit out bar 0 when there is no intro to have arrived through.
-        //
-        // Applied here rather than in the lead generators because three paths can produce these
-        // notes — Soho's own rules, the base Chill rules Soho reuses (which is where it actually
-        // came from, CHL-LD1-001 and 004 bypassing Soho's own bar-0 guard), and Lead 2's
-        // call-and-response. One rule in one place cannot be half-applied.
-        //
-        // Chill only. Ambient reaches its first bar with no intro in 40% of songs and a lead
-        // already sounding in most of those — drifting in with no runway is what that style is.
-        for lead in [kTrackLead1, kTrackLead2] {
-            trackEvents[lead] = chillLeadSkippingBarZero(trackEvents[lead], structure: structure)
-        }
-
-        // Groove fixup — pull the leads onto the groove. See fixupLeadsToGroove.
-        //
-        // Runs for EVERY Chill song (2026-10-14, Zack), not just the Latin Soho grooves it was
-        // built for. The two passes read the song's own drums and bass, so they adapt to
-        // whatever the rhythm section is doing: nothing about them assumes a Latin pulse.
+        // Recorded here and logged after buildChillLog, which runs later.
         var grooveFixupSummary: String? = nil
         do {
-            let grooveBars = grooveBarSet(structure)
-            let pulse = grooveStepSupport(drums: trackEvents[kTrackDrums],
-                                          bass: trackEvents[kTrackBass], bars: grooveBars)
-            var adjusted: [Int: (changed: Int, total: Int)] = [:]
-            for lead in [kTrackLead1, kTrackLead2] {
-                let before = trackEvents[lead]
-                trackEvents[lead] = grooveFixup(trackEvents[lead], support: pulse, bars: grooveBars)
-                adjusted[lead] = (adjustedNoteCount(before: before, after: trackEvents[lead]),
-                                  before.count)
+            func fixupShare(_ label: String, _ f: (events: [MIDIEvent], moved: Int, count: Int)) -> String {
+                f.count > 0 ? "\(label): \(f.moved)/\(f.count)" : "\(label): N/A"
             }
-            // Recorded here and logged after buildChillLog, which runs later. The row is only
-            // emitted when the pass actually runs, so its presence confirms the Latin gate
-            // fired and its absence is not ambiguous.
-            func fixupShare(_ label: String, _ track: Int) -> String {
-                guard let a = adjusted[track], a.total > 0 else { return "\(label): N/A" }
-                return "\(label): \(a.changed)/\(a.total)"
-            }
-            let totalChanged = adjusted.values.reduce(0) { $0 + $1.changed }
-            grooveFixupSummary = totalChanged == 0 ? "No changes!"
-                : fixupShare("L1", kTrackLead1) + ", "
-                + fixupShare("L2", kTrackLead2) + " fixes" 
+            grooveFixupSummary = lead1Finished.moved + lead2Finished.moved == 0 ? "No changes!"
+                : fixupShare("L1", lead1Finished) + ", " + fixupShare("L2", lead2Finished) + " fixes"
         }
 
-        // Step 7 — Rhythm (Rhodes active comping), voiced around the leads as they will sound:
-        // the harmonic filter and register fold below can still drop a lead note or move it an
-        // octave, so Rhythm hears the leads through the same two steps (deterministic; nothing
-        // is stored).
+        // Step 7 — Rhythm (Rhodes active comping), voiced around the leads as they will sound.
         if !sohoVariation {
-            let heardLeads = [(kTrackLead1, chillLeadInstrument), (kTrackLead2, chillLead2Instrument)].map { track, inst in
-                foldedIntoRegister(
-                    HarmonicFilter.filterLead(trackEvents[track], track: track, pads: trackEvents[kTrackPads],
-                                              frame: frame, structure: structure,
-                                              bounds: chillLeadRegister(inst),
-                                              lift: track == kTrackLead1 || !lead2Rules.contains("CHL-LD2-002")),
-                    chillLeadRegister(inst))
-            }
-            writeRhythm(melody: ChillClearance(heardLeads))
+            writeRhythm(melody: ChillClearance([trackEvents[kTrackLead1], trackEvents[kTrackLead2]],
+                                               structure: structure, scale: frame.scalePCs))
         }
 
         // Texture track: audio-only for base Chill and Blues — no MIDI events generated here.
@@ -4960,10 +4952,9 @@ struct SongGenerator {
             kTrackLead1: chillLeadRegister(chillLeadInstrument),
             kTrackLead2: chillLeadRegister(chillLead2Instrument),
         ]
+        // The leads were filtered as they were written (`finishedChillLead`).
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame,
-                                           structure: structure,
-                                           registerOverrides: leadRegisters,
-                                           liftLead2: !lead2Rules.contains("CHL-LD2-002"))
+                                           structure: structure, filterLeads: false)
         // Belt and braces: fold anything still outside its instrument's register back in by
         // octaves. Nothing should reach here out of range, but a future pass that moves a lead
         // note would otherwise break the register silently, and the symptom — a sax playing above

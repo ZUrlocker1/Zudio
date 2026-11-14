@@ -78,13 +78,7 @@ struct KosmicPadsGenerator {
                 let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
                 let thirdRaw = (rootPC + entry.sectionMode.intervals[2]) % 12
-                let thirdPC  = scalePCs.contains(thirdRaw) ? thirdRaw : {
-                    for d in 1...6 {
-                        if scalePCs.contains((thirdRaw + d) % 12) { return (thirdRaw + d) % 12 }
-                        if scalePCs.contains((thirdRaw - d + 12) % 12) { return (thirdRaw - d + 12) % 12 }
-                    }
-                    return thirdRaw
-                }()
+                let thirdPC  = snapToScale(thirdRaw, scalePCs: scalePCs)
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 let third  = noteInPadsRegister(pc: thirdPC, targetOct: 2)
@@ -138,13 +132,7 @@ struct KosmicPadsGenerator {
                 let scalePCs = frame.scalePCs
                 let mode     = entry.sectionMode
                 let m3raw    = (rootPC + mode.nearestInterval(3)) % 12
-                let m3pc     = scalePCs.contains(m3raw) ? m3raw : {
-                    for d in 1...6 {
-                        if scalePCs.contains((m3raw + d) % 12) { return (m3raw + d) % 12 }
-                        if scalePCs.contains((m3raw - d + 12) % 12) { return (m3raw - d + 12) % 12 }
-                    }
-                    return m3raw
-                }()
+                let m3pc     = snapToScale(m3raw, scalePCs: scalePCs)
                 let root   = noteInPadsRegister(pc: rootPC,                                              targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 let octave = noteInPadsRegister(pc: rootPC,                                              targetOct: 3)
@@ -393,17 +381,11 @@ struct KosmicPadsGenerator {
         let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let scalePCs  = frame.scalePCs
         // Scale-snap root to avoid out-of-scale notes from borrowed chord roots
-        let rootPC    = scalePCs.contains(rawRootPC) ? rawRootPC : snapToScale(rawRootPC, scalePCs: scalePCs)
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
         // Snap third to scale — avoids out-of-scale notes when chord is non-tonic.
         let mode          = frame.mode
         let thirdRaw      = (rootPC + mode.nearestInterval(4)) % 12
-        let thirdPC       = scalePCs.contains(thirdRaw) ? thirdRaw : {
-            for d in 1...6 {
-                if scalePCs.contains((thirdRaw + d) % 12) { return (thirdRaw + d) % 12 }
-                if scalePCs.contains((thirdRaw - d + 12) % 12) { return (thirdRaw - d + 12) % 12 }
-            }
-            return thirdRaw
-        }()
+        let thirdPC       = snapToScale(thirdRaw, scalePCs: scalePCs)
         let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
         let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
         let octave    = noteInPadsRegister(pc: rootPC, targetOct: 3)
@@ -555,7 +537,7 @@ struct KosmicPadsGenerator {
         // The chord's own 3rd, if it has one. Rhythm, Bass and leads play it. Over a major 3rd the
         // suspension takes the 2nd, because the 4th sat a semitone above the 3rd (Slow Nimbus,
         // E Mixolydian: A3 over the Rhythm's G#3); the resolution plays the 3rd itself.
-        let chordThird = entry.chordWindow.chordType.intervals.first { $0 == 3 || $0 == 4 }
+        let chordThird = entry.chordWindow.chordType.third
 
         if cycle < 3 {
             // sus4: root + fourth + fifth (snap all intervals to scale); sus2 over a major 3rd
@@ -573,13 +555,7 @@ struct KosmicPadsGenerator {
             // nearestInterval(3) ties 2 and 4 in a major-3rd mode and picks the 2nd, so the
             // resolution never resolved there; a chord with a 3rd now resolves to it.
             let m3raw    = (rootPC + (chordThird ?? frame.mode.nearestInterval(3))) % 12
-            let m3pc     = scalePCs.contains(m3raw) ? m3raw : {
-                for d in 1...6 {
-                    if scalePCs.contains((m3raw + d) % 12) { return (m3raw + d) % 12 }
-                    if scalePCs.contains((m3raw - d + 12) % 12) { return (m3raw - d + 12) % 12 }
-                }
-                return m3raw
-            }()
+            let m3pc     = snapToScale(m3raw, scalePCs: scalePCs)
             let minor3rd = noteInPadsRegister(pc: m3pc, targetOct: 2)
             let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
             let fifth    = noteInPadsRegister(pc: fifthPC, targetOct: 2)
@@ -627,7 +603,7 @@ struct KosmicPadsGenerator {
         let b7raw    = (rootPC + 10) % 12
         let b7pc     = scalePCs.contains(b7raw) ? b7raw : fifthPC
         let fourthRaw = (rootPC + 5) % 12
-        let fourthClear = scalePCs.contains(fourthRaw) && !entry.chordWindow.chordType.intervals.contains(4)
+        let fourthClear = scalePCs.contains(fourthRaw) && entry.chordWindow.chordType.third != 4
         let fourthPC = fourthClear ? fourthRaw : snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
 
         var root   = noteInPadsRegister(pc: rootPC,   targetOct: 2)

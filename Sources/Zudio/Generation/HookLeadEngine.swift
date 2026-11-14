@@ -567,6 +567,7 @@ enum HookLeadEngine {
         restBars: Set<Int>,
         register: RegisterBounds,
         maxGapBars: Int? = nil,
+        chordClearance: Bool = false,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var r = SeededRNG(seed: rng.next() ^ 0x484F_4F4B_4C45_4144)   // "HOOKLEAD"
@@ -798,7 +799,7 @@ enum HookLeadEngine {
         for (i, st) in statements.enumerated() {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
                               tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps,
-                              susOverMajor: rule.susOverMajor, rng: &r)
+                              susOverMajor: rule.susOverMajor, chordClearance: chordClearance, rng: &r)
             // The bar after a statement: silence, or about three times in ten the tail.
             guard let tail = rule.tail, !st.isFragment else { continue }
             let tailBar = st.endBar
@@ -807,13 +808,14 @@ enum HookLeadEngine {
                 let t = Statement(startBar: tailBar, bars: [tail], barShift: [0], callCount: 1)
                 events += realise(t, base: base, tonicPC: tonicPC, structure: structure,
                                   tonalMap: tonalMap, register: register, legato: false,
-                                  scaleSteps: rule.scaleSteps, susOverMajor: rule.susOverMajor, rng: &r)
+                                  scaleSteps: rule.scaleSteps, susOverMajor: rule.susOverMajor,
+                                  chordClearance: chordClearance, rng: &r)
             }
         }
         if let st = outroStatement {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
                               tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps,
-                              susOverMajor: rule.susOverMajor, rng: &r)
+                              susOverMajor: rule.susOverMajor, chordClearance: chordClearance, rng: &r)
         }
         return events.filter { $0.stepIndex >= 0 && $0.stepIndex < frame.totalBars * 16 }
     }
@@ -903,7 +905,7 @@ enum HookLeadEngine {
         _ st: Statement, base: Int, tonicPC: Int,
         structure: SongStructure, tonalMap: TonalGovernanceMap,
         register: RegisterBounds, legato: Bool = true, scaleSteps: Bool = false,
-        susOverMajor: Bool = false, rng: inout SeededRNG
+        susOverMajor: Bool = false, chordClearance: Bool = false, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         struct Placed { var step: Int; var pitch: Int; var len: Int; var vel: Int; let bar: Int }
         var notes: [Placed] = []
@@ -914,7 +916,7 @@ enum HookLeadEngine {
             let shift = st.shift + (bi < st.barShift.count ? st.barShift[bi] : 0)
             // The chord's major third and second, for a rule that keeps the sus colour.
             var majorThirdPC: Int? = nil, secondPC = 0
-            if susOverMajor, entry.chordWindow.chordType.intervals.contains(4) {
+            if susOverMajor, entry.chordWindow.chordType.third == 4 {
                 let rootPC = (tonicPC + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 majorThirdPC = (rootPC + 4) % 12
                 secondPC = scale.contains((rootPC + 2) % 12) ? 2 : 4
@@ -968,8 +970,23 @@ enum HookLeadEngine {
             notes[i].pitch += delta
         }
 
-        return notes.map { n in
-            let pitch = register.fold(n.pitch + blockShift)
+        // Motorik (`chordClearance`): a held note a semitone from a tone of the chord moves to the
+        // nearest clear scale note, a chord tone on a tie (MotorikClearance). Checked on the
+        // statement's notes as they will sound; short passing notes keep their pitch.
+        var sounding = notes.map { register.fold($0.pitch + blockShift) }
+        if chordClearance {
+            let line = notes.indices.map {
+                MIDIEvent(stepIndex: notes[$0].step, note: UInt8(sounding[$0]), velocity: 0,
+                          durationSteps: Swift.max(1, notes[$0].len))
+            }
+            let none = MotorikClearance.heldBand([])
+            for i in line.indices {
+                if let p = MotorikClearance.clearPitch(i, in: line, tonalMap: tonalMap, held: none) { sounding[i] = p }
+            }
+        }
+
+        return notes.indices.map { i in
+            let n = notes[i], pitch = sounding[i]
             let intensity = structure.section(atBar: n.bar)?.subPhaseIntensity(atBar: n.bar) ?? .medium
             let vel = n.vel + st.velOffset + intensity.velocityLift + rng.nextInt(upperBound: 7) - 3
             return MIDIEvent(stepIndex: n.step, note: UInt8(pitch),

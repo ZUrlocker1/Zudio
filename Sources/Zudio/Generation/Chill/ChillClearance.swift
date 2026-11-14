@@ -19,51 +19,25 @@
 import Foundation
 
 struct ChillClearance {
-    private struct Held { let start: Int; let end: Int; let pitch: Int }
-    private var byBar: [Int: [Held]] = [:]
+    private var held = HeldNotes(intervals: [1, 13, 25, 37], skipPassing: true)
+    private let structure: SongStructure
+    private let scale: Set<Int>
 
-    static func rubs(_ a: Int, _ b: Int) -> Bool { [1, 13, 25, 37].contains(abs(a - b)) }
-
-    /// The held notes of `tracks`; each track's own short passing notes are left out.
-    init(_ tracks: [[MIDIEvent]] = []) {
-        for t in tracks { add(t) }
+    /// The held notes of `tracks`; each track's own short passing notes are left out. `structure`
+    /// and `scale` (the song's scale pitch classes) are what `voiceLine` checks a moved note against.
+    init(_ tracks: [[MIDIEvent]], structure: SongStructure, scale: Set<Int>) {
+        self.structure = structure
+        self.scale = scale
+        for t in tracks { held.add(t) }
     }
 
-    mutating func add(_ events: [MIDIEvent]) {
-        let sorted = events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
-        for i in sorted.indices where !Self.isPassing(i, in: sorted) {
-            let e = sorted[i]
-            let h = Held(start: e.stepIndex, end: e.stepIndex + Swift.max(1, e.durationSteps), pitch: Int(e.note))
-            for bar in (h.start / 16)...((h.end - 1) / 16) { byBar[bar, default: []].append(h) }
-        }
-    }
-
-    /// `sorted[i]` is a short passing note: two steps or less, and some note of the line's next
-    /// onset starts within two steps of its end, a semitone or a whole tone away.
-    static func isPassing(_ i: Int, in sorted: [MIDIEvent]) -> Bool {
-        let e = sorted[i]
-        guard e.durationSteps <= 2 else { return false }
-        let end = e.stepIndex + e.durationSteps
-        guard let next = sorted[(i + 1)...].first(where: { $0.stepIndex > e.stepIndex })?.stepIndex,
-              next <= end + 2 else { return false }
-        return sorted[(i + 1)...].prefix { $0.stepIndex == next }
-            .contains { (1...2).contains(abs(Int($0.note) - Int(e.note))) }
-    }
+    mutating func add(_ events: [MIDIEvent]) { held.add(events) }
 
     /// True when `pitch`, sounding over `start..<end`, rubs a held note for two steps or more.
-    func clashes(_ pitch: Int, start: Int, end: Int) -> Bool {
-        guard end - start >= 2 else { return false }
-        for bar in (start / 16)...((end - 1) / 16) {
-            for h in byBar[bar] ?? [] where Swift.min(end, h.end) - Swift.max(start, h.start) >= 2
-                && Self.rubs(pitch, h.pitch) {
-                return true
-            }
-        }
-        return false
-    }
+    func clashes(_ pitch: Int, start: Int, end: Int) -> Bool { held.clashes(pitch, start: start, end: end) }
 
     /// A semitone above a tone of any chord sounding over `start..<end`, and not itself one.
-    static func isAvoidNote(_ pitch: Int, start: Int, end: Int, structure: SongStructure) -> Bool {
+    private static func isAvoidNote(_ pitch: Int, start: Int, end: Int, structure: SongStructure) -> Bool {
         let pc = pitch % 12
         for bar in (start / 16)...((end - 1) / 16) {
             guard let w = structure.chordWindow(atBar: bar) else { continue }
@@ -79,12 +53,11 @@ struct ChillClearance {
     /// none, the note stays as written. With `avoidRepeat` (Soho's hooks), a moved note doesn't
     /// land on the note before or after it unless the line repeated there, and a written repeat
     /// follows the previous note's move.
-    func voiceLine(_ line: [MIDIEvent], structure: SongStructure, scale: Set<Int>,
-                   low: Int, high: Int, avoidRepeat: Bool = false) -> [MIDIEvent] {
+    func voiceLine(_ line: [MIDIEvent], low: Int, high: Int, avoidRepeat: Bool = false) -> [MIDIEvent] {
         let order = line.indices.sorted { (line[$0].stepIndex, line[$0].note) < (line[$1].stepIndex, line[$1].note) }
         let sorted = order.map { line[$0] }
         var out = line
-        for (k, idx) in order.enumerated() where !Self.isPassing(k, in: sorted) {
+        for (k, idx) in order.enumerated() where !Clearance.isPassing(k, in: sorted) {
             let e = sorted[k]
             let written = e.stepIndex + Swift.max(1, e.durationSteps)
             let held = written - e.stepIndex >= 2
@@ -92,7 +65,8 @@ struct ChillClearance {
             // can move an onset a step and join a note legato to the next one (up to three steps
             // longer), so the check covers a step either side and, where the next onset is two
             // steps or less after the note, through to a step past it.
-            let nextOnset = sorted[(k + 1)...].first { $0.stepIndex > e.stepIndex }?.stepIndex
+            let nextEvent = sorted[(k + 1)...].first { $0.stepIndex > e.stepIndex }
+            let nextOnset = nextEvent?.stepIndex
             let joined = nextOnset.map { $0 - written <= 2 && $0 >= written ? $0 + 1 : written } ?? written
             let start = Swift.max(0, e.stepIndex - 1), end = Swift.max(written, joined) + 1
             // The harmonic filter may lift a lead an octave in a window that sits under the pads,
@@ -104,7 +78,7 @@ struct ChillClearance {
             let p0 = Int(e.note)
             guard !ok(p0) else { continue }
             let tones = structure.chordWindow(atBar: e.stepIndex / 16)?.chordTones ?? []
-            let next = sorted[(k + 1)...].first { $0.stepIndex > e.stepIndex }.map { Int($0.note) }
+            let next = nextEvent.map { Int($0.note) }
             let toward = (next ?? p0) >= p0 ? 1 : -1
             var candidates = (1...4).flatMap { [p0 + $0 * toward, p0 - $0 * toward] }
                 .filter { $0 >= low && $0 <= high && scale.contains($0 % 12) && ok($0) }
@@ -127,15 +101,16 @@ struct ChillClearance {
 
     /// One bar of accompaniment as it is written, voiced around the melody held here. A note that
     /// rubs a melody note (and is not itself a short passing note) moves down an octave where
-    /// that clears it and stays at or above `floor`; otherwise it is left out, as a pianist leaves
-    /// the melody's neighbour out of the chord under it.
-    func voiceComping(_ bar: [MIDIEvent], floor: Int) -> [MIDIEvent] {
+    /// that clears it and stays at or above A2 (MIDI 45); otherwise it is left out, as a pianist
+    /// leaves the melody's neighbour out of the chord under it.
+    func voiceComping(_ bar: [MIDIEvent]) -> [MIDIEvent] {
+        let floor = 45
         let sorted = bar.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
         var out: [MIDIEvent] = []
         for (k, e) in sorted.enumerated() {
             let start = e.stepIndex, end = e.stepIndex + Swift.max(1, e.durationSteps)
             let p = Int(e.note)
-            if Self.isPassing(k, in: sorted) || !clashes(p, start: start, end: end) {
+            if Clearance.isPassing(k, in: sorted) || !clashes(p, start: start, end: end) {
                 out.append(e)
             } else if p - 12 >= floor, !clashes(p - 12, start: start, end: end),
                       !sorted.contains(where: { $0.stepIndex == start && Int($0.note) == p - 12 }) {

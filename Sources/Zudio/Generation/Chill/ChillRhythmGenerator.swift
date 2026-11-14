@@ -372,7 +372,7 @@ struct ChillRhythmGenerator {
             defer {
                 if let melody, events.count > barStart {
                     let written = Array(events[barStart...])
-                    events.replaceSubrange(barStart..., with: melody.voiceComping(written, floor: 45))
+                    events.replaceSubrange(barStart..., with: melody.voiceComping(written))
                 }
             }
             let section = structure.section(atBar: bar)

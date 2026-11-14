@@ -38,13 +38,16 @@ struct HarmonicFilter {
         uniformLead1Lift: Bool = false,
         // Chill's CHL-LD2-002 Shadow hold is an inner voice written below Lead 1 note by note;
         // Pass B lifting it above the pads put it above Lead 1 instead.
-        liftLead2: Bool = true
+        liftLead2: Bool = true,
+        // Chill filters each lead as it is written (`finishedChillLead`), so the leads it hands
+        // in are already filtered; running them again would apply the velocity arc twice.
+        filterLeads: Bool = true
     ) -> [[MIDIEvent]] {
         var events = trackEvents
         // Each lead is filtered on its own (Passes A, B and C below, in `filterLead`), reading the
         // pads' pitches before Pass C touches the pads' velocities — so a regenerated lead can be
         // put through exactly the same passes without running them over the other tracks again.
-        for track in [kTrackLead1, kTrackLead2] {
+        for track in [kTrackLead1, kTrackLead2] where filterLeads {
             events[track] = filterLead(events[track], track: track, pads: events[kTrackPads],
                                        frame: frame, structure: structure,
                                        skipClashFilter: track == kTrackLead1 && skipLead1ClashFilter,

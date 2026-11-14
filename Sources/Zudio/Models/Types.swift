@@ -289,6 +289,10 @@ enum ChordType: String, Codable, Sendable {
     // Pitch classes (mod 12)
     var pitchClasses: Set<Int> { Set(intervals.map { $0 % 12 }) }
 
+    /// The chord's own 3rd: 4 (major), 3 (minor), or nil for a chord without one (sus, power,
+    /// quartal). No chord type holds both.
+    var third: Int? { intervals.first { $0 == 3 || $0 == 4 } }
+
     /// The 3rd Chill voices for this chord: major for the major family, the 4th for a sus4,
     /// minor otherwise. Pads and bass share it so the bass's 3rd is the one the pads hold.
     var chillThird: Int {

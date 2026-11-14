@@ -921,8 +921,7 @@ struct KosmicBassGenerator {
     private static func walkDegrees(_ steps: [Int], root: Int, tones: Set<Int>,
                                     scalePCs: Set<Int>) -> [Int] {
         func rubs(_ degree: Int) -> Bool {
-            let pc = scaleStep(root, by: degree, scalePCs: scalePCs) % 12
-            return !tones.contains(pc) && (tones.contains((pc + 1) % 12) || tones.contains((pc + 11) % 12))
+            Clearance.rubsChord(scaleStep(root, by: degree, scalePCs: scalePCs), tones)
         }
         var d = steps
         if d[1] == 5 || d[1] == 6, rubs(d[1]), !rubs(11 - d[1]) { d[1] = 11 - d[1] }
@@ -1766,7 +1765,7 @@ struct KosmicBassGenerator {
         let root = bassRoot(entry: entry, frame: frame)
         // The key's 3rd above the chord root. The tonic's 3rd put an out-of-key note over other
         // roots (B natural over Ab in C Aeolian, under the pads' and Rhythm's C).
-        let thirdOffset = frame.scalePCs.contains((Int(root) + 3) % 12) ? 3 : 4
+        let thirdOffset = keyThirdAbove(Int(root), scalePCs: frame.scalePCs)
         let fifthOffset = 7
         let b7Offset    = 10
 
@@ -1878,7 +1877,7 @@ struct KosmicBassGenerator {
         // The key's 3rd above the root. Where it is minor, the 2nd takes it: the 2nd sat a semitone
         // under the minor 3rd the pads and Rhythm hold, for a beat, every bar. A sus2 chord keeps
         // the 2nd, which the Rhythm plays.
-        let third = frame.scalePCs.contains((Int(root) + 3) % 12) ? 3 : 4
+        let third = keyThirdAbove(Int(root), scalePCs: frame.scalePCs)
         let takeThird = third == 3 && entry.chordWindow.chordType != .sus2
 
         return cell.enumerated().map { (i, pair) in

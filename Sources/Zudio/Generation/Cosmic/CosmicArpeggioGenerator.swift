@@ -425,9 +425,7 @@ struct KosmicArpeggioGenerator {
             let pedal = spaceSequencerRoot(entry, frame: frame)
             let tones = entry.chordWindow.chordTones
             let scale = spaceChordScale(chordTones: tones, frame: frame)
-            func rubs(_ p: Int) -> Bool {
-                !tones.contains(p % 12) && (tones.contains((p + 1) % 12) || tones.contains((p + 11) % 12))
-            }
+            func rubs(_ p: Int) -> Bool { Clearance.rubsChord(p, tones) }
             func note(_ steps: Int) -> Int {
                 let p = scaleStep(pedal, by: steps, scalePCs: scale)
                 guard steps > 0, rubs(p) else { return p }
@@ -975,18 +973,15 @@ struct KosmicArpeggioGenerator {
             // The chord's own 3rd (nearestInterval(3) ties 2 and 4 in a major-3rd mode and picked
             // the 2nd). Over a major 3rd the 4th, held about a bar, sat a semitone above it, so it
             // takes the 6th (Void Perihelion, A Mixolydian: D held over the pads' C#).
-            let chordThird = entry.chordWindow.chordType.intervals.first { $0 == 3 || $0 == 4 }
+            let chordThird = entry.chordWindow.chordType.third
             let third      = chordThird ?? mode.nearestInterval(3)
             let fourth     = chordThird == 4 ? 9 : 5
             let flat7      = mode.nearestInterval(10)
 
-            // Build a 2-octave scale pool in MIDI 58–82
+            // The scale pool: one octave, MIDI 60–71 (each pitch class snapped, above middle C)
             var pool: [Int] = []
-            for pc in [0, 2, third, fourth, 7, flat7, 12, 12 + third, 12 + 7] {
-                let snapped = pc == 12 || pc == 12 + third || pc == 12 + 7
-                    ? snapToScale(rootPC + (pc % 12), scalePCs: scalePCs)
-                    : snapToScale(rootPC + pc, scalePCs: scalePCs)
-                let m = clampToRegister(60 + snapped, low: 58, high: 82)
+            for pc in [0, 2, third, fourth, 7, flat7] {
+                let m = 60 + snapToScale(rootPC + pc, scalePCs: scalePCs)
                 if !pool.contains(m) { pool.append(m) }
             }
             pool.sort()

@@ -58,8 +58,7 @@ struct ChillLeadGenerator {
             let written = stGermainStaccato(frame: frame, structure: structure,
                                             breakdownStyle: breakdownStyle, rng: &rng)
             let (low, high) = register(for: leadInstrument)
-            let events = band?.voiceLine(written, structure: structure, scale: frame.scalePCs,
-                                         low: low, high: high) ?? written
+            let events = band?.voiceLine(written, low: low, high: high) ?? written
             return (events, [], nil)   // staccato already has long silences; no extra handoff
         }
 
@@ -137,10 +136,9 @@ struct ChillLeadGenerator {
         let pentatonic  = pentatonicNotes(frame: frame)
         let (regLow, regHigh) = register(for: leadInstrument)
         // Each phrase listens to the band as it is written (ChillClearance): no rub with the Pads
-        // and Bass notes already written, no avoid note held over the chord. Soho passes no band.
+        // and Bass notes already written, no avoid note held over the chord.
         func heard(_ line: [MIDIEvent]) -> [MIDIEvent] {
-            band?.voiceLine(line, structure: structure, scale: frame.scalePCs,
-                            low: regLow, high: regHigh) ?? line
+            band?.voiceLine(line, low: regLow, high: regHigh) ?? line
         }
 
         // Blues: 60% of songs have a soloist who uses the blue note (the b5 of the key), the rest
@@ -565,8 +563,7 @@ struct ChillLeadGenerator {
                                   lead1Events: lead1Events, lead1Register: (regLow1, regHigh1),
                                   regLow: rawLow2, regHigh: rawHigh2, rng: &rng)
             // Written as one line; it listens to the band and Lead 1 (ChillClearance).
-            let events = band?.voiceLine(line, structure: structure, scale: frame.scalePCs,
-                                         low: rawLow2, high: rawHigh2) ?? line
+            let events = band?.voiceLine(line, low: rawLow2, high: rawHigh2) ?? line
             return (sohoVariation ? capNotesPerBar(events, 2) : outsideBreakdowns(events), inst2)
         }
 
@@ -1152,8 +1149,7 @@ struct ChillLeadGenerator {
                                      velocity: UInt8(Swift.max(30, Swift.min(110, v))), durationSteps: n.dur))
             }
             // The answer listens to the band and to Lead 1 as it is placed (ChillClearance).
-            return band?.voiceLine(out, structure: structure, scale: frame.scalePCs,
-                                   low: regLow, high: regHigh) ?? out
+            return band?.voiceLine(out, low: regLow, high: regHigh) ?? out
         }
 
         var events: [MIDIEvent] = []

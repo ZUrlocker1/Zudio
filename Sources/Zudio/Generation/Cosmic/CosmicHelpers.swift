@@ -23,6 +23,11 @@ func snapToScale(_ rawPC: Int, scalePCs: Set<Int>) -> Int {
     return pc
 }
 
+// The key's 3rd above `root`, in semitones: 3 where the scale holds the minor 3rd, 4 otherwise.
+func keyThirdAbove(_ root: Int, scalePCs: Set<Int>) -> Int {
+    scalePCs.contains((root + 3) % 12) ? 3 : 4
+}
+
 // Apply random velocity jitter centred on `base`. `range` is the full spread (default 8).
 // Result is clamped to 20…127.
 func jitteredVelocity(_ base: Int, range: Int = 8, rng: inout SeededRNG) -> UInt8 {

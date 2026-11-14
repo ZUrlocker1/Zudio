@@ -44,6 +44,7 @@
 		AA0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000HOOK1 /* HookLeadEngine.swift */; };
 		AA0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000GAPA1 /* GapAnswerEngine.swift */; };
 		AA000000000000000000023 /* HarmonicFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000025 /* HarmonicFilter.swift */; };
+		AA0000000000000000000CD /* Clearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000CD /* Clearance.swift */; };
 		AA000000000000000000024 /* PatternEvolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000026 /* PatternEvolver.swift */; };
 		AA000000000000000000025 /* DrumVariationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000027 /* DrumVariationEngine.swift */; };
 		AA000000000000000000028 /* assets/images/zudio-icon.icns in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000028 /* assets/images/zudio-icon.icns */; };
@@ -144,6 +145,7 @@
 		IS0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000HOOK1 /* HookLeadEngine.swift */; };
 		IS0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000GAPA1 /* GapAnswerEngine.swift */; };
 		IS000000000000000000025 /* HarmonicFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000025 /* HarmonicFilter.swift */; };
+		IS0000000000000000000CD /* Clearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000CD /* Clearance.swift */; };
 		IS000000000000000000026 /* PatternEvolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000026 /* PatternEvolver.swift */; };
 		IS000000000000000000027 /* DrumVariationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000027 /* DrumVariationEngine.swift */; };
 		IS000000000000000000030 /* CosmicMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000030 /* CosmicMusicalFrameGenerator.swift */; };
@@ -287,6 +289,7 @@
 		BB0000000000000000HOOK1 /* HookLeadEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookLeadEngine.swift; sourceTree = "<group>"; };
 		BB0000000000000000GAPA1 /* GapAnswerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GapAnswerEngine.swift; sourceTree = "<group>"; };
 		BB000000000000000000025 /* HarmonicFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarmonicFilter.swift; sourceTree = "<group>"; };
+		BB0000000000000000000CD /* Clearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Clearance.swift; sourceTree = "<group>"; };
 		BB000000000000000000026 /* PatternEvolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternEvolver.swift; sourceTree = "<group>"; };
 		BB000000000000000000027 /* DrumVariationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumVariationEngine.swift; sourceTree = "<group>"; };
 		BB000000000000000000028 /* assets/images/zudio-icon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = "assets/images/zudio-icon.icns"; sourceTree = "<group>"; };
@@ -464,6 +467,7 @@
 				BB0000000000000000HOOK1 /* HookLeadEngine.swift */,
 				BB0000000000000000GAPA1 /* GapAnswerEngine.swift */,
 				BB000000000000000000025 /* HarmonicFilter.swift */,
+				BB0000000000000000000CD /* Clearance.swift */,
 				BB000000000000000000026 /* PatternEvolver.swift */,
 				BB000000000000000000027 /* DrumVariationEngine.swift */,
 				BB00000000000000000000F /* StructureGenerator.swift */,
@@ -914,6 +918,7 @@
 				AA0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */,
 				AA0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */,
 				AA000000000000000000023 /* HarmonicFilter.swift in Sources */,
+				AA0000000000000000000CD /* Clearance.swift in Sources */,
 				AA000000000000000000024 /* PatternEvolver.swift in Sources */,
 				AA000000000000000000025 /* DrumVariationEngine.swift in Sources */,
 				AA00000000000000000000F /* StructureGenerator.swift in Sources */,
@@ -1019,6 +1024,7 @@
 				IS0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */,
 				IS0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */,
 				IS000000000000000000025 /* HarmonicFilter.swift in Sources */,
+				IS0000000000000000000CD /* Clearance.swift in Sources */,
 				IS000000000000000000026 /* PatternEvolver.swift in Sources */,
 				IS000000000000000000027 /* DrumVariationEngine.swift in Sources */,
 				IS00000000000000000000F /* StructureGenerator.swift in Sources */,

@@ -1538,9 +1538,7 @@ struct KosmicLeadGenerator {
         }
         let duration = 14
         func clear(_ n: Int) -> Bool {
-            if !chordTones.contains(n % 12) {
-                for c in chordTones where [1, 11].contains(((n - c) % 12 + 12) % 12) { return false }
-            }
+            if Clearance.rubsChord(n, chordTones) { return false }
             for x in band where x.start < barStart + duration && x.end > barStart
                 && [1, 11, 13].contains(abs(n - x.note)) { return false }
             return true

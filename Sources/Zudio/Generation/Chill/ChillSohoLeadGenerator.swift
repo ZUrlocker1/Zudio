@@ -96,7 +96,7 @@ extension ChillLeadGenerator {
         // note keeps the hook moving rather than repeat its neighbour (Zack, 2026-11-14). No draws.
         func voiced(_ line: [MIDIEvent]) -> [MIDIEvent] {
             let (low, high) = register(for: leadInstrument)
-            return band?.voiceLine(line, structure: structure, scale: frame.scalePCs, low: low, high: high,
+            return band?.voiceLine(line, low: low, high: high,
                                    avoidRepeat: true) ?? line
         }
         var hookTreatments: String? = nil

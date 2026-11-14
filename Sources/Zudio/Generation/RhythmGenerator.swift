@@ -553,8 +553,7 @@ struct RhythmGenerator {
     private static func clearOfChordTones(_ note: UInt8, chordTones: Set<Int>, rootPC: Int,
                                           low: Int, high: Int) -> UInt8 {
         let n = Int(note)
-        guard !chordTones.contains(n % 12),
-              chordTones.contains(where: { [1, 11].contains(((n - $0) % 12 + 12) % 12) }) else { return note }
+        guard Clearance.rubsChord(n, chordTones) else { return note }
         let roots = (low...high).filter { $0 % 12 == rootPC }
         guard let best = roots.min(by: { (abs($0 - n), $0) < (abs($1 - n), $1) }) else { return note }
         return UInt8(best)
