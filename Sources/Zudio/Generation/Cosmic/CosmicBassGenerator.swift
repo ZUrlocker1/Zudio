@@ -1764,7 +1764,9 @@ struct KosmicBassGenerator {
         velBase: Int, useVariation: Bool, varType: Int = 0
     ) -> [MIDIEvent] {
         let root = bassRoot(entry: entry, frame: frame)
-        let thirdOffset = (frame.mode == .Mixolydian || frame.mode == .Ionian) ? 4 : 3
+        // The key's 3rd above the chord root. The tonic's 3rd put an out-of-key note over other
+        // roots (B natural over Ab in C Aeolian, under the pads' and Rhythm's C).
+        let thirdOffset = frame.scalePCs.contains((Int(root) + 3) % 12) ? 3 : 4
         let fifthOffset = 7
         let b7Offset    = 10
 

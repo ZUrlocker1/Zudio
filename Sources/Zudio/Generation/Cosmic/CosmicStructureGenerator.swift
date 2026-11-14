@@ -405,6 +405,7 @@ struct KosmicStructureGenerator {
                && section.label == .B && type == .minor {
                 type = rng.nextDouble() < 0.60 ? .sus2 : .power
             }
+            type = keyThird(type, root: root, mode: effectiveMode)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
@@ -419,6 +420,21 @@ struct KosmicStructureGenerator {
             bar += length
         }
         return windows
+    }
+
+    /// Clash fix: a minor or major chord takes the key's own 3rd on its root. The pickers draw
+    /// "minor" regardless of degree (the tonic in Mixolydian, IV in Dorian, bVII in Mixolydian).
+    /// The pads voice the key's 3rd, but Rhythm and Bass follow the type, so they played the
+    /// out-of-key 3rd against it (Solaxe V, E Mixolydian: F natural under the pads' F# over D).
+    /// A root outside the key is left alone.
+    private static func keyThird(_ type: ChordType, root: String, mode: Mode) -> ChordType {
+        let r = degreeSemitone(root)
+        let scale = mode.intervals
+        func inKey(_ i: Int) -> Bool { scale.contains((r + i) % 12) }
+        guard inKey(0) else { return type }
+        if type == .minor && !inKey(3) && inKey(4) { return .major }
+        if type == .major && !inKey(4) && inKey(3) { return .minor }
+        return type
     }
 
     private static func pickKosmicChordRoot(

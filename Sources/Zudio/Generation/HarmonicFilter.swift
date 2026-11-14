@@ -60,7 +60,7 @@ struct HarmonicFilter {
     }
 
     /// The harmonic filter for one lead track, as `apply` runs it:
-    /// Pass A — remove out-of-scale notes on strong beats (unless `skipClashFilter`; LD1-012
+    /// Pass A — remove out-of-scale notes on strong beats (unless `skipClashFilter`; MOT-LD1-028
     /// Chromatic Descent uses chromatic passing tones on purpose);
     /// Pass B — push the lead above the pads' median in each 8-bar window;
     /// Pass C — the song's velocity arc.

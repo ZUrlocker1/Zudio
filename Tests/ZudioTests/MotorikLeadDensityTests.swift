@@ -5,11 +5,11 @@
 //
 // WHY THIS EXISTS
 // Most long-running Lead 1 rules are sparse, and there the length is the gesture rather than a
-// fault: Noir's Chromatic Descent runs about 19 bars at 1.6 notes a bar, which is a slow
-// descent. Arcade is relentless by design. Those are deliberately left alone.
+// fault. Arcade is relentless by design. Those are deliberately left alone.
 //
-// Two rules combine length with density. Melodic Spiral (Noir) is the densest rule in Motorik
-// at 6.8 notes a bar and Octave Bounce (Arcade) is close behind at 6.1, and both used to hold
+// Two rules combine length with density. MOT-LD1-011 (Noir, Melodic Spiral until 2026-11-14 and
+// now No Birds turn, with the same beat melody over a drone on the ands) is the densest rule in
+// Motorik at 6.8 notes a bar and Octave Bounce (Arcade) is close behind at 6.1, and both used to hold
 // that for twenty bars and occasionally nearly forty — a stream of sixteenths with no air in
 // it. They are capped by cutting rests into the stretch rather than by rewriting the rules, so
 // each keeps its own density and only the tail cases change.
@@ -73,24 +73,5 @@ import Foundation
             #expect(perBar >= 5.0,
                     "\(rule) fell to \(perBar) notes a bar — the cap should remove bars, not notes")
         }
-    }
-
-    /// The sparse long-running rules are deliberately NOT capped, and this records that so the
-    /// cap is not widened to them by someone reading only the first test.
-    @Test func sparseLongRulesAreLeftAlone() throws {
-        var worst = 0
-        var seen = 0
-        for seed in UInt64(1)...1500 {
-            let song = SongGenerator.generate(seed: seed, style: .motorik)
-            guard song.trackEvents[kTrackLead1].count > 20,
-                  let rule = song.generationLog.first(where: { $0.tag.hasPrefix("MOT-LD1-") })?.tag,
-                  rule == "MOT-LD1-012"      // Chromatic Descent — 1.6 notes a bar
-            else { continue }
-            seen += 1
-            worst = Swift.max(worst, longestStretch(song))
-        }
-        #expect(seen >= 5, "not enough Chromatic Descent songs sampled: \(seen)")
-        #expect(worst > 20,
-                "Chromatic Descent no longer runs past 20 bars — a slow descent is its character, so the cap should not have reached it")
     }
 }

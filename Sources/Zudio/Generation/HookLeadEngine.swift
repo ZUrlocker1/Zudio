@@ -15,6 +15,10 @@
 // MOT-LD1-002 Radioactive riff    — Kraftwerk, Radioactivity (1975), the key-synth riff
 // MOT-LD1-006 Model riff          — Kraftwerk, The Model (1978), synth riff and vocal line
 // MOT-LD1-003 Tour de France riff — Kraftwerk, Tour de France (1983), the guitar theme
+// Motorik Noir (2026-11-14), from Zack's Guitar Pro tabs:
+// MOT-LD1-012 Tear Us Apart hook  — Joy Division, Love Will Tear Us Apart (1980), the Arp synth line
+// MOT-LD1-013 Transmission figure — Joy Division, Transmission (1979), guitar 1 and the chorus chant
+// MOT-LD1-014 Albatross guitar    — Public Image Ltd, Albatross (1979), Keith Levene's guitar
 
 /// One note of a hook cell. `step` is the onset within its bar (negative for a pickup into the
 /// bar), `deg` is semitones from the song tonic in the source's terms (14 is the ninth an octave
@@ -66,6 +70,12 @@ struct HookRule: Sendable {
     var sequenceUpChance = 0.70
     /// The song register the hook sits in, where it differs from Lead 1's.
     var register: RegisterBounds? = nil
+    /// Over a chord with a major third, a note on that third steps down to the chord's second, so
+    /// the hook takes the Rhythm's sus colour instead of turning into a major tune. Bleak C Signal
+    /// put the Tear Us Apart hook on Db major in C Phrygian for 48 bars: F, Ab and Db held over
+    /// it sounded "too happy", where Space Takt's sus2 chords kept the same hook dark (Zack,
+    /// 2026-11-14).
+    var susOverMajor = false
 
     /// True when each weight list is as long as the list it weights. A mismatch would pick the
     /// wrong entry, or none, without any error, so the rule tables are checked as they are built.
@@ -159,7 +169,108 @@ enum HookLeadEngine {
         ]
     )
 
-    static let motorikRules = rulesByID([hallogallo, radioactive, model, tourDeFrance])
+    // MARK: - Motorik Noir rule data
+    //
+    // Noir is minor (Aeolian, Dorian, Phrygian, harmonic minor), so these sources are read in
+    // their own minor key: a degree's semitones are from the source's minor tonic. Simple,
+    // repetitive figures with long notes, not long-running tunes. Every note sits on the 8th grid,
+    // and the one note outside the chord on a minor tonic, the b6 neighbour in the Tear Us Apart
+    // hook, is an off-beat 8th that steps straight back.
+
+    /// The register for the Noir hooks written high on the record (the Arp synth, Levene's
+    /// guitar): the figure sits a few notes above Lead 1's usual middle.
+    static let noirHighRegister = RegisterBounds(low: 55, high: 81)
+
+    /// Love Will Tear Us Apart, the Arp Omni 2 synth (track 6, bars 8 to 15), read in B minor: the
+    /// fourth held a bar, a turn 5 b6 5 4 b3, the tonic held into a b3 pickup, then the flat
+    /// seventh held a bar. The record plays the four bars twice; here the second time comes home
+    /// to the tonic, and the literal repeat is the source variant. The record's G sits on beat 2
+    /// over its own E minor chord; over a Zudio minor tonic it is the b6, a semitone over the
+    /// fifth, so it moves to the "and" of 2 as an 8th neighbour. The tail is the synth's low
+    /// interlude, b3 then b7 in half notes.
+    static let tearUsApart = HookRule(
+        id: "MOT-LD1-012",
+        call:   [[n(0, 5, 16, 80)],
+                 [n(0, 7, 6, 84), n(6, 8, 2, 76), n(8, 7, 2, 80), n(10, 5, 2, 76), n(12, 3, 4, 82)],
+                 [n(0, 0, 14, 84), n(14, 3, 2, 72)],
+                 [n(0, -2, 16, 78)]],
+        answer: [[n(0, 5, 16, 78)],
+                 [n(0, 7, 6, 82), n(6, 8, 2, 74), n(8, 7, 2, 78), n(10, 5, 2, 74), n(12, 3, 4, 80)],
+                 [n(0, 0, 14, 82), n(14, 3, 2, 70)],
+                 [n(0, -2, 8, 76), n(8, 0, 8, 80)]],
+        sourceVariants: [
+            // The record's second time, ending open on the flat seventh again.
+            HookSourceVariant(answer: [[n(0, 5, 16, 78)],
+                                       [n(0, 7, 6, 82), n(6, 8, 2, 74), n(8, 7, 2, 78), n(10, 5, 2, 74), n(12, 3, 4, 80)],
+                                       [n(0, 0, 14, 82), n(14, 3, 2, 70)],
+                                       [n(0, -2, 16, 76)]]),
+        ],
+        tail: [n(0, 3, 8, 58), n(8, -2, 8, 56)],
+        // One change per cell; never a moved onset or a swap, which would put the b6 on a beat.
+        gentle: true, homageWeights: [0.40, 0.30, 0, 0, 0.30],
+        statementCounts: [3, 4], statementCountWeights: [0.50, 0.50],
+        // The head of this hook is one held note, so the short forms are the answer alone and
+        // varied statements; a sequence makes it 12 bars long and is rare.
+        formWeights: [0, 0, 0.40, 0.10, 0.50],
+        register: noirHighRegister,
+        susOverMajor: true
+    )
+
+    /// Transmission, guitar 1 (track 2, bars 16 to 21): a pickup into a figure that rocks a whole
+    /// step, root and second, 1 2 1 2, then 2 1 2 2 1, played twice over the record's D and C bass.
+    /// Here it rocks between the fourth and the fifth, the same whole steps a fourth higher. Over a
+    /// minor chord the record's second sits a semitone under the minor third, and Phrygian's bII
+    /// chord rubs the root itself; the fourth is clear of every Noir chord. The pickup becomes a dip
+    /// to the minor third as an off-beat 8th: 4 b3 4 5 4 5, then 5 4 5 5 4. The restatement is the
+    /// chorus chant, "dance, dance, dance to the radio" (track 0, bars 80 to 82): the fifth
+    /// repeated in a 3+3+2 rhythm, a drop to the root, then 5 4 4 held. The variant answer comes
+    /// home down 4 b3 1.
+    static let transmission = HookRule(
+        id: "MOT-LD1-013",
+        call:   [[n(0, 5, 2, 80), n(2, 3, 2, 74), n(4, 5, 4, 86), n(8, 7, 4, 84), n(12, 5, 2, 78), n(14, 7, 4, 82)],
+                 [n(2, 5, 2, 76), n(4, 7, 4, 84), n(8, 7, 4, 80), n(12, 5, 4, 82)]],
+        answer: [[n(0, 5, 2, 78), n(2, 3, 2, 72), n(4, 5, 4, 84), n(8, 7, 4, 82), n(12, 5, 2, 76), n(14, 7, 4, 80)],
+                 [n(2, 5, 2, 74), n(4, 7, 4, 82), n(8, 7, 4, 78), n(12, 5, 4, 80)]],
+        restatement: [[n(0, 7, 6, 84), n(6, 7, 6, 80), n(12, 7, 4, 82)],
+                      [n(2, 7, 6, 80), n(8, 7, 4, 82), n(12, 7, 2, 76), n(14, 0, 2, 74)],
+                      [n(0, 7, 2, 82), n(2, 5, 2, 78), n(4, 5, 12, 80)]],
+        sourceVariants: [
+            HookSourceVariant(answer: [[n(0, 5, 2, 78), n(2, 3, 2, 72), n(4, 5, 4, 84), n(8, 7, 4, 82), n(12, 5, 2, 76), n(14, 7, 4, 80)],
+                                       [n(2, 5, 2, 74), n(4, 3, 4, 80), n(8, 0, 8, 82)]]),
+        ],
+        // A swap or a moved onset would break the whole-step rock.
+        homageWeights: [0.30, 0.35, 0, 0, 0.35],
+        statementCounts: [4, 5, 6], statementCountWeights: [0.30, 0.40, 0.30],
+        // Lead 1's middle put the figure around A3, inside the Rhythm's octave; a fourth or so up
+        // it sits above the band.
+        register: RegisterBounds(low: 57, high: 79)
+    )
+
+    /// Albatross, Keith Levene's guitar (track 2), read in E: the call rocks 5 1 b3 1 b3 (bar 15)
+    /// and holds 1 b3 1 (bar 18); the answer jumps an octave to the sigh b7 1 b7 6 that enters on
+    /// beat 2 (bar 19) and comes to rest on the fifth. The restatement is the three-note loop
+    /// b7 b3 1 in straight 8ths (bar 26), which crosses the 4/4 bar, closing on the tonic.
+    static let albatross = HookRule(
+        id: "MOT-LD1-014",
+        call:   [[n(0, -5, 2, 78), n(2, 0, 2, 80), n(4, 3, 4, 86), n(8, 0, 4, 80), n(12, 3, 4, 84)],
+                 [n(0, 0, 6, 82), n(6, 3, 6, 80), n(12, 0, 4, 76)]],
+        answer: [[n(4, 10, 2, 80), n(6, 12, 4, 88), n(10, 10, 4, 82), n(14, 9, 2, 74)],
+                 [n(0, 7, 12, 80)]],
+        restatement: [[n(0, 10, 2, 82), n(2, 3, 2, 76), n(4, 0, 2, 80), n(6, 10, 2, 78),
+                       n(8, 3, 2, 76), n(10, 0, 2, 78), n(12, 10, 2, 80), n(14, 3, 2, 76)],
+                      [n(0, 0, 2, 80), n(2, 10, 2, 76), n(4, 3, 4, 80), n(8, 0, 8, 82)]],
+        sourceVariants: [
+            // The sigh without the octave leap: b3 4 b3 1 under the call.
+            HookSourceVariant(answer: [[n(4, 3, 2, 78), n(6, 5, 4, 84), n(10, 3, 4, 80), n(14, 2, 2, 72)],
+                                       [n(0, 0, 12, 80)]]),
+        ],
+        homageWeights: [0.30, 0.30, 0, 0.10, 0.30],
+        statementCounts: [4, 5], statementCountWeights: [0.50, 0.50],
+        register: noirHighRegister
+    )
+
+    static let motorikRules = rulesByID([hallogallo, radioactive, model, tourDeFrance,
+                                         tearUsApart, transmission, albatross])
 
     /// The rules keyed by ID, each checked for weight lists that don't match their values.
     private static func rulesByID(_ rules: [HookRule]) -> [String: HookRule] {
@@ -686,7 +797,8 @@ enum HookLeadEngine {
         var events: [MIDIEvent] = []
         for (i, st) in statements.enumerated() {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
-                              tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps, rng: &r)
+                              tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps,
+                              susOverMajor: rule.susOverMajor, rng: &r)
             // The bar after a statement: silence, or about three times in ten the tail.
             guard let tail = rule.tail, !st.isFragment else { continue }
             let tailBar = st.endBar
@@ -695,12 +807,13 @@ enum HookLeadEngine {
                 let t = Statement(startBar: tailBar, bars: [tail], barShift: [0], callCount: 1)
                 events += realise(t, base: base, tonicPC: tonicPC, structure: structure,
                                   tonalMap: tonalMap, register: register, legato: false,
-                                  scaleSteps: rule.scaleSteps, rng: &r)
+                                  scaleSteps: rule.scaleSteps, susOverMajor: rule.susOverMajor, rng: &r)
             }
         }
         if let st = outroStatement {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
-                              tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps, rng: &r)
+                              tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps,
+                              susOverMajor: rule.susOverMajor, rng: &r)
         }
         return events.filter { $0.stepIndex >= 0 && $0.stepIndex < frame.totalBars * 16 }
     }
@@ -789,7 +902,8 @@ enum HookLeadEngine {
     private static func realise(
         _ st: Statement, base: Int, tonicPC: Int,
         structure: SongStructure, tonalMap: TonalGovernanceMap,
-        register: RegisterBounds, legato: Bool = true, scaleSteps: Bool = false, rng: inout SeededRNG
+        register: RegisterBounds, legato: Bool = true, scaleSteps: Bool = false,
+        susOverMajor: Bool = false, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         struct Placed { var step: Int; var pitch: Int; var len: Int; var vel: Int; let bar: Int }
         var notes: [Placed] = []
@@ -798,12 +912,20 @@ enum HookLeadEngine {
             guard let entry = tonalMap.entry(atBar: barIdx) else { continue }
             let scale = scalePCs(entry.sectionMode, tonicPC: tonicPC)
             let shift = st.shift + (bi < st.barShift.count ? st.barShift[bi] : 0)
+            // The chord's major third and second, for a rule that keeps the sus colour.
+            var majorThirdPC: Int? = nil, secondPC = 0
+            if susOverMajor, entry.chordWindow.chordType.intervals.contains(4) {
+                let rootPC = (tonicPC + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                majorThirdPC = (rootPC + 4) % 12
+                secondPC = scale.contains((rootPC + 2) % 12) ? 2 : 4
+            }
             for n in barNotes {
                 // A scale-step rule moves from the tonic by steps; the others map a semitone.
-                let p = scaleSteps
+                var p = scaleSteps
                     ? scaleShift(base, by: n.deg + shift, in: scale)
                     : scaleShift(pitch(for: n.deg, base: base, mode: entry.sectionMode, scale: scale),
                                  by: shift, in: scale)
+                if let third = majorThirdPC, ((p % 12) + 12) % 12 == third { p -= secondPC }
                 notes.append(Placed(step: barIdx * 16 + n.step, pitch: p,
                                     len: n.len, vel: n.vel, bar: barIdx))
             }

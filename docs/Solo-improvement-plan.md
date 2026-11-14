@@ -459,6 +459,9 @@ Checks stay light:
 - **Files, outside the repo and never committed:** `~/Downloads/solo-improvement-midi/`, with
   audition excerpts in `excerpts/`. `tools/fetch_solo_midi.py` fetches from BitMidi. The mining
   tool is `python3 -I tools/midi_phrase_mine.py FILE TRACK CHANNEL [--top N] [--dump A-B]`.
+- **Motorik Noir (2026-11-14):** MOT-LD1-011 to 014 were rebuilt from Zack's Guitar Pro tabs of Joy
+  Division and PiL (`~/Documents/Guitar Pro Tabs/`), read with `python3 -I tools/gp_dump.py FILE [TRACK A-B]`.
+  The retired Noir rules are MOT-LD1-027 to 030. Details and measurements are in `motorik-noir-plan.md`.
 - **Not ours:** `tools/eno_analyze.py` and `tools/fetch_eno_midi.py` belong to the Ambient Zen
   work and are not committed here.
 

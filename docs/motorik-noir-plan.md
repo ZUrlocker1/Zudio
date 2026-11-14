@@ -204,37 +204,59 @@ Deep E1-register (MIDI 28–40) 8th-note ostinato. Pattern: root–root–P5–r
 
 ### Lead rules
 
+The four rules that played random or scale-run lines (Melodic Spiral, Chromatic Descent, Slow arc, Rising phrase) were replaced on 2026-11-14 by rules built from real lines in Zack's Guitar Pro tabs (`~/Documents/Guitar Pro Tabs/Joy Division` and `Public Image Ltd`). See MOT-LD1-011 to 014 below.
+
 **MOT-LD1-009 "Cold Chord"**
 Single-pitch texture hold. Picks root or P5 (75%/25%) at the start of each 4–8 bar window and holds that pitch throughout, velocity 38–52. 30% chance to add P5 as a 2-note cluster. 25% chance of a quiet re-attack at beat 3 (the "guitar chug" cue). No melodic movement between notes. Register MIDI 60–72. Noir lead pool weight: 10%.
 
 **MOT-LD1-010 "Pendulum"**
 Two-note quarter alternation across a 4–8 bar window. Root on beats 1–4, lower note (P5 below, or P4 below on 30% of windows) on the off-beats — strict quarter-note rhythm, no 8ths, no syncopation. The window length is seed-determined and consistent within a section. 20% chance of a soft root echo on the "and" of beat 1 or 2. The effect is a textural rocking rather than melody. Register MIDI 52–79. Reference: "Disorder" guitar texture (Joy Division, 1979). Noir lead pool weight: 14%.
 
-**MOT-LD1-011 "Melodic Spiral"**
-Scale tones on each beat (quarter-note melody, stepping through the scale starting from a bar-offset position), with a fixed lower pitch sustaining on each "and" between beats. The melody moves; the anchor drone does not. The bar-offset advances by 1 scale step every 4 bars, so the melody slowly rotates without repeating identically. Register MIDI 52–79. Reference: "No Birds" guitar texture (PiL, 1979). Log: "Melodic Spiral". Noir lead pool weight: 16%.
+**MOT-LD1-011 "No Birds turn"** (replaced Melodic Spiral 2026-11-14)
+From Zack's Guitar Pro tab of PiL's "No Birds" (track 0, bars 17 to 22). The record's guitar turns around one pitch on the beats while that pitch sounds an octave lower on every "and": F# G A F#, G A B G, A B G A over a G drone, a three-bar cycle that climbs a step and turns back. Here the pivot is the chord's third, near MIDI 70, and the turn moves through the notes that don't rub the chord: its tones and the scale notes that aren't a semitone from one of them (over a minor chord, the minor pentatonic). The drone on the ands is the pivot an octave down. A four-bar phrase plays the three bars of the cycle, then the first again. The gates, density by intensity, anchor dropout and late reprise are Melodic Spiral's, with the same draws, and the 20-bar dense cap still applies. Log: "No Birds turn".
 
-**MOT-LD1-012 "Chromatic Descent"**
-Slow descending chromatic line — steps downward by semitone or diatonic step across a 4–8 bar window. Notes are long (half-note or quarter-note duration), velocity 42–58. Silence gates are generous: ~40% of bars rest. The effect is a cold, slow melodic fade — a line disappearing rather than arriving. Noir only. Log: "Chromatic Descent". Noir lead pool weight: 10%.
+**MOT-LD1-012 "Tear Us Apart hook"** (replaced Chromatic Descent 2026-11-14)
+A transcription hook (HookLeadEngine), from the Arp Omni 2 synth line of Joy Division's "Love Will Tear Us Apart" (track 6, bars 8 to 15), read in B minor: the fourth held a bar, a turn 5 b6 5 4 b3, the tonic held into a b3 pickup, then the flat seventh held a bar. The record plays the four bars twice; here the second time comes home b7 to 1, and the literal repeat is the source variant. The record's G falls on beat 2 over its own E minor chord; over a Zudio minor tonic it is the b6, so it moved to the "and" of 2 as an 8th neighbour. The tail is the synth's low interlude, b3 then b7 in half notes. Register MIDI 55 to 81. 3 or 4 statements a song. Log: "Tear Us Apart hook".
 
-**MOT-LD1-013 "Slow arc"**
-Wide-range melodic phrase built by the shared phrase-builder engine (slow, step-wise movement, long note durations). Phrases are 4–8 bars long with generous silence between them. The arc spans a wide register (up to 2 octaves) and resolves downward at phrase end. Noir only. Log: "Slow arc". Noir lead pool weight: 13%.
+Over a chord with a major third, a hook note on that third steps down to the chord's second (`HookRule.susOverMajor`, this rule only). Bleak C Signal (C Phrygian) sat on Db major for 48 bars: F, Ab and Db held over it turned the hook into a Db major tune, which Zack heard as "too happy". With the third gone, the A section plays only Db, Eb, Ab and Bb, the Rhythm's own notes. Over minor and sus chords nothing changes, and Zack found the hook right there (Space Takt, Bleak E Drift). Zack, 2026-11-14: Noir solos should be repetitive and machine-like, short fragments repeated, never long fluid major or pentatonic tunes. 013 and 014 were judged a good fit as they are, so they don't take the flag.
 
-**MOT-LD1-014 "Rising phrase"**
-High-register melodic phrase with offbeat entry — the phrase starts on the "and" of beat 1 rather than the downbeat, giving an unsettled, arriving quality. Faster note movement than LD1-013, higher register (MIDI 65–79). Silence blends shorter as the song progresses so the line becomes more present in the second half. Uses the same phrase-builder engine as LD1-013. Noir only. Log: "Rising phrase". Noir lead pool weight: 14%.
+**MOT-LD1-013 "Transmission figure"** (replaced Slow arc 2026-11-14)
+A transcription hook, from Joy Division's "Transmission": guitar 1 (track 2, bars 16 to 21) alternating with the chorus chant "dance, dance, dance to the radio" (track 0, bars 80 to 82) as its restatement. The record's figure rocks a whole step between the root and the second. In minor the second sits a semitone under the minor third, and Phrygian's bII chord rubs the root, so the figure moved up a fourth: 4 b3 4 5 4 5, then 5 4 5 5 4, the same whole steps. The fourth is clear of every Noir chord. The first version kept the record's pickup, 6 b7, which put the 6th on beat 1 a semitone from the Rhythm on half the chords (130 glaring clashes in 150 songs, 40 after both changes). The chant is the fifth repeated in a 3+3+2 rhythm, a drop to the root, then 5 4 4 held. The variant answer comes home down 4 b3 1. Register MIDI 57 to 79, above the Rhythm. 4 to 6 statements. Log: "Transmission figure".
+
+**MOT-LD1-014 "Albatross guitar"** (replaced Rising phrase 2026-11-14)
+A transcription hook, from Keith Levene's guitar on PiL's "Albatross" (track 2), read in E: the call rocks 5 1 b3 1 b3 (bar 15) and holds 1 b3 1 (bar 18). The answer jumps an octave to the sigh b7 1 b7 6, which enters on beat 2 (bar 19) and comes to rest on the fifth. The restatement is the three-note loop b7 b3 1 in straight 8ths (bar 26), which crosses the 4/4 bar, closing on the tonic. The variant answer is the sigh without the leap, b3 4 b3 2 1. Register MIDI 55 to 81. 4 or 5 statements. Log: "Albatross guitar".
+
+**Noir hooks and silence.** Noir Lead 1 has no silence limit, but a hook states itself a few times and is silent in between. Without a limit the new hooks' longest silence ran 20 to 26 bars, against the 3 to 8 bar rests in the records, so a Noir hook rule fills any silence over 16 bars with fragments of the hook (`LeadGenerator.noirHookMaxSilentBars`). This also applies to MOT-LD1-001 and 006 when Noir draws them.
+
+**Retired 2026-11-14.** The rules these four replaced are out of every pool. Their code stays under new numbers, so a forced rule can A/B them: MOT-LD1-027 Melodic Spiral (was 011), MOT-LD1-028 Chromatic Descent (was 012), MOT-LD1-029 Slow arc (was 013), MOT-LD1-030 Rising phrase (was 014). Chromatic Descent's filter exemptions (clearance skip, harmonic filter Pass A skip, isolated-phrase cleanup) moved with it to 028. A saved song that forces 011 to 014 now gets the new rule.
+
+Why they went: Slow arc and Rising phrase drew a random start, shape, step, length and gap for every phrase, with no phrase ever returning and onsets on arbitrary 16ths. Melodic Spiral played four rising scale notes each bar. Chromatic Descent marched down in semitones, and its source, the Love Will Tear Us Apart synth, plays a tune it never used.
+
+**Measured (2026-11-14, 150 Noir seeds, each rule forced on all of them, tools/clash_scan.py).** Glaring Lead 1 clashes, old rule then new rule. Most problem songs are flagged for other tracks; the Lead 1 problem-song counts are lower.
+- 011: 27 then 17; Lead 1 problem songs 2 and 2
+- 012: 128 then 25; Lead 1 problem songs 8 then 1
+- 013: 21 then 40; Lead 1 problem songs 0 then 1, all-track problem songs 7% then 3%. What's left is mostly the held fifth or third against a Chord Chug root-plus-fourth dyad that isn't in the chord; Lead 1 is written before the Rhythm and can't see it, the same limit clash-fix records for Dunkel Dusseldorf.
+- 014: 18 then 19; no Lead 1 problem songs in either
+- Coverage: the hooks sound in a median 20 to 32% of bars, the old rules in 40 to 57%. Longest silence median 14 bars, against 5 to 8 for the old phrase rules.
 
 ### Lead pool weights (Noir)
 
 - MOT-LD1-010 Pendulum: 17%
-- MOT-LD1-011 Melodic Spiral: 17%
-- MOT-LD1-014 Rising phrase: 15%
-- MOT-LD1-013 Slow arc: 14%
+- MOT-LD1-011 No Birds turn: 17%
+- MOT-LD1-014 Albatross guitar: 15%
+- MOT-LD1-013 Transmission figure: 14%
 - MOT-LD1-009 Cold Chord: 11%
-- MOT-LD1-012 Chromatic Descent: 10%
-- MOT-LD1-006 Long Arc Solo: 4%
+- MOT-LD1-012 Tear Us Apart hook: 10%
+- MOT-LD1-006 Model riff: 4%
 - MOT-LD1-008 Visiting Solo: 4%
-- MOT-LD1-001 Neu! Motif First: 4%
+- MOT-LD1-001 Hallogallo hook: 4%
 - MOT-LD1-005 Call and Answer: 4%
+- Hook rules (001, 006, 012, 013, 014) together: 47%. MOT-LD1-027 to 030 are retired and in no pool.
 - ~~MOT-LD1-007 Vanishing Solo~~ — excluded from Noir. Its melodic arc was written for a major-key context; minor-scale adjustment corrects the notes but not the optimistic resolved character of the phrase, which clashes with the Noir aesthetic. 
+
+### Bass register fix (2026-11-14)
+
+MOT-BASS-016 to 021 built the root as 24 plus the pitch class, then clamped it to MIDI 28. A root on C, Db, D or Eb landed on E1, so Bleak C Signal's Db chord got E and A in the bass, with Bb and B on the walk. Roots now wrap by octave into E1 to Eb2 (`noirDeepRoot`). The notes above the root (fifth, seventh, octave) were clamped at 42 and now allow up to 52. Before this, MOT-BASS-017's octave and seventh sat on F#2 for any root from G1 up, and MOT-BASS-016's B-section seventh was pinned too.
 
 ### Rhythm rules
 
@@ -325,10 +347,11 @@ Listen for:
 - Rhythm (RTHM-013): Levene Drop — isolated staccato notes on off-beats only (steps 2,6,10,14), 30% of bars silent; should sound like guitar figures dropping in from nowhere and disappearing
 - Lead (LD1-009): Cold Chord — should feel like a held tone with occasional re-attacks, not a melodic line
 - Lead (LD1-010): Pendulum — root and lower note rocking back and forth on quarter notes for 4–8 bars; texturally similar to Cold Chord but with two-pitch motion rather than static hold; no 8th-note activity
-- Lead (LD1-011): Melodic Spiral — melody moves on the beats, lower drone sustains on the ands; the moving and fixed voices should be clearly audible as distinct layers
-- Lead (LD1-012): Chromatic Descent — slow downward chromatic line with long notes and generous silence; should feel like a fading line rather than an active melody
-- Lead (LD1-013): Slow arc — wide-range slow phrase with step-wise movement and long notes; resolves downward at phrase end
-- Lead (LD1-014): Rising phrase — high-register phrase with offbeat entry on "and of 1"; faster and brighter than Slow arc, becomes more present in the second half of the song
+- Lead (MOT-LD1-011): No Birds turn — a three-bar turn around the chord's third on the beats, the same pitch an octave down on the ands; it should sound like the same small figure circling, not a scale
+- Lead (MOT-LD1-012): Tear Us Apart hook — four bars you could hum: a held fourth, a turn, the tonic, a held flat seventh; stated 3 or 4 times with fragments between
+- Lead (MOT-LD1-013): Transmission figure — a whole-step rock between the fourth and fifth, alternating with the repeated-note chant; simple and insistent
+- Lead (MOT-LD1-014): Albatross guitar — a low 1–b3 rock answered by a high sigh an octave up; the restatement's three-note loop should cross the bar line
+- A/B: the songs in ~/Downloads/Zudio Noir lead demos/ come in pairs, the new rule and the retired one forced on the same seed
 - Bass (019): Religion Groove — three root hits cluster hard at the top of the bar, then the m3 steps in and the bar opens up; the front-loading is the character
 - Bass (020): Shadowplay Pulse — root ostinato with a consistent gap at step 2; bar A and bar B should sound clearly different in density
 - Bass (021): No Birds Walk — P4 suspension dominates bar A; bar B's tritone passing note on the ascent to P5 should be the most dissonant moment in the bar

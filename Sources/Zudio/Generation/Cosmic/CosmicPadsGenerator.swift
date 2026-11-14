@@ -552,10 +552,14 @@ struct KosmicPadsGenerator {
         let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)  // snap borrowed/chromatic roots
         let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
         let cycle     = bar % 4
+        // The chord's own 3rd, if it has one. Rhythm, Bass and leads play it. Over a major 3rd the
+        // suspension takes the 2nd, because the 4th sat a semitone above the 3rd (Slow Nimbus,
+        // E Mixolydian: A3 over the Rhythm's G#3); the resolution plays the 3rd itself.
+        let chordThird = entry.chordWindow.chordType.intervals.first { $0 == 3 || $0 == 4 }
 
         if cycle < 3 {
-            // sus4: root + fourth + fifth (snap all intervals to scale)
-            let fourthPC = snapToScale((rootPC + 5) % 12, scalePCs: scalePCs)
+            // sus4: root + fourth + fifth (snap all intervals to scale); sus2 over a major 3rd
+            let fourthPC = snapToScale((rootPC + (chordThird == 4 ? 2 : 5)) % 12, scalePCs: scalePCs)
             let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
             let fourth   = noteInPadsRegister(pc: fourthPC, targetOct: 2)
             let fifth    = noteInPadsRegister(pc: fifthPC,  targetOct: 2)
@@ -566,7 +570,9 @@ struct KosmicPadsGenerator {
             ]
         } else {
             // minor resolution: root + minor third + fifth (snap all intervals to scale)
-            let m3raw    = (rootPC + frame.mode.nearestInterval(3)) % 12
+            // nearestInterval(3) ties 2 and 4 in a major-3rd mode and picks the 2nd, so the
+            // resolution never resolved there; a chord with a 3rd now resolves to it.
+            let m3raw    = (rootPC + (chordThird ?? frame.mode.nearestInterval(3))) % 12
             let m3pc     = scalePCs.contains(m3raw) ? m3raw : {
                 for d in 1...6 {
                     if scalePCs.contains((m3raw + d) % 12) { return (m3raw + d) % 12 }
@@ -614,12 +620,15 @@ struct KosmicPadsGenerator {
         // The fourths stay in the key. Where a fourth above leaves it, the stack builds down from
         // the root instead: the b7 becomes the 5th (a fourth below the root), and where the 4th is
         // out too, the 4th becomes the 9th (a fourth below the 5th). Snapping them up gave the
-        // major 7th and the #4, a semitone under the root and the 5th the band plays.
+        // major 7th and the #4, a semitone under the root and the 5th the band plays. Over a chord
+        // with a major 3rd the 4th also becomes the 9th: it sat a semitone above the 3rd the Rhythm
+        // plays (Formless Expanse, D Dorian: F over C major against the Rhythm's E).
         let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
         let b7raw    = (rootPC + 10) % 12
         let b7pc     = scalePCs.contains(b7raw) ? b7raw : fifthPC
         let fourthRaw = (rootPC + 5) % 12
-        let fourthPC = scalePCs.contains(fourthRaw) ? fourthRaw : snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
+        let fourthClear = scalePCs.contains(fourthRaw) && !entry.chordWindow.chordType.intervals.contains(4)
+        let fourthPC = fourthClear ? fourthRaw : snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
 
         var root   = noteInPadsRegister(pc: rootPC,   targetOct: 2)
         var fourth = noteInPadsRegister(pc: fourthPC, targetOct: 2)

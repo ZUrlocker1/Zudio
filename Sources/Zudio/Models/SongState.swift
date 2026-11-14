@@ -21,6 +21,9 @@ struct GenerationLogEntry: Sendable {
         "CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-013", "CHL-LD1-014", "CHL-LD1-015",
         "CHL-LD2-002", "CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006",
         "CHL-PAD-004",
+        // Motorik Noir Lead 1 from transcriptions (2026-11-14): No Birds turn, Tear Us Apart hook,
+        // Transmission figure, Albatross guitar.
+        "MOT-LD1-011", "MOT-LD1-012", "MOT-LD1-013", "MOT-LD1-014",
     ]
 
     /// TESTING ONLY. Existing rules changed to stop clashing with the band (docs/clash-fix.md),
@@ -30,14 +33,19 @@ struct GenerationLogEntry: Sendable {
         "CHL-BASS-001", "CHL-BASS-003", "CHL-BASS-004", "CHL-BASS-009", "CHL-BASS-010", "CHL-BASS-011",
         "CHL-BASS-012", "KOS-BASS-018", "KOS-LD2-005", "MOT-RTHM-004",
         // Motorik clearance (Lead 1 and the Lead 2 gap answers); 016 also had its call rewritten.
-        "MOT-LD1-004", "MOT-LD1-009", "MOT-LD1-010", "MOT-LD1-011", "MOT-LD1-013", "MOT-LD1-014",
+        // 011 to 014 were replaced by new Noir rules on 2026-11-14 and carry "* " instead.
+        "MOT-LD1-004", "MOT-LD1-009", "MOT-LD1-010",
         "MOT-LD1-016", "MOT-LD1-017", "MOT-LD1-018", "MOT-LD1-019", "MOT-LD1-020",
-        "MOT-LD1-012",   // Chromatic Descent: clear held notes, chromatic step as an off-beat 8th
         "CHL-LD1-010", "CHL-LD1-011", "CHL-LD1-012",   // Soho Lead 1 under ChillClearance
         "KOS-RTHM-021", "KOS-RTHM-005",   // notes a semitone from a chord tone step off it
         "KOS-PADS-005",   // fourths that leave the key stack down from the root instead
         "KOS-BASS-016",   // the BoC cell's 2nd takes the key's minor 3rd
         "MOT-LD1-005",    // the call climbs 1, b3, 4, 5 over a minor chord
+        "KOS-BASS-014",   // the arpeggio's 3rd is the key's 3rd above the chord root
+        "KOS-RTHM-002",   // Space: the hook takes chord tones and the chord's thirds (the V's leading tone)
+        "KOS-PADS-004", "KOS-RTHM-008",   // the 3rd follows the chord; over a major 3rd the 4th steps aside
+        // Noir bass roots on C, Db, D or Eb were clamped to E1 (Bleak C Signal, 2026-11-14).
+        "MOT-BASS-016", "MOT-BASS-017", "MOT-BASS-018", "MOT-BASS-019", "MOT-BASS-020", "MOT-BASS-021",
     ]
 
     /// The testing markers a description can start with.

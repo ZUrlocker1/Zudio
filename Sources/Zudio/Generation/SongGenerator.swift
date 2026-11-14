@@ -289,9 +289,9 @@ struct SongGenerator {
         }
 
         // Step 11 — Harmonic filter: clash guard, register separation, velocity arc.
-        // LD1-012 (Chromatic Descent) bypasses Pass A: its chromatic passing tones are
-        // intentional and would be wiped by the avoidTones filter in chromatic chord contexts.
-        let isLD1012 = lead1Rules.contains("MOT-LD1-012")
+        // MOT-LD1-028 Chromatic Descent (retired, forced only) bypasses Pass A: its chromatic
+        // passing tones are intentional and would be wiped by the avoidTones filter.
+        let isLD1012 = lead1Rules.contains("MOT-LD1-028")
         // Hook rules skip Pass A as well: their held notes are already moved off avoid tones, and
         // the clash guard would cut notes out of the hook, such as Hallogallo's opening fourth.
         let isHookRule = lead1Rules.contains(where: HookLeadEngine.isMotorikHookRule)
@@ -299,8 +299,8 @@ struct SongGenerator {
                                            skipLead1ClashFilter: isLD1012 || isHookRule,
                                            uniformLead1Lift: isHookRule)
 
-        // Step 11.5 — LD1-012 phrase cleanup: rest windows can strand a single held note
-        // between silences. Threshold is 2 (not 3) because LD1-012 phrases can be legitimately
+        // Step 11.5 — MOT-LD1-028 phrase cleanup: rest windows can strand a single held note
+        // between silences. Threshold is 2 (not 3) because its phrases can be legitimately
         // short once HarmonicFilter no longer strips their chromatic notes.
         if isLD1012 {
             trackEvents[kTrackLead1] = removeIsolatedPhrases(
@@ -2027,7 +2027,7 @@ struct SongGenerator {
             }
             switch trackIndex {
             case kTrackLead1:
-                let isLD1012 = usedRules.contains("MOT-LD1-012")
+                let isLD1012 = usedRules.contains("MOT-LD1-028")
                 events = filteredLead(simplified(events), track: kTrackLead1,
                                       hook: usedRules.contains(where: HookLeadEngine.isMotorikHookRule),
                                       skipClash: isLD1012)
@@ -3161,10 +3161,10 @@ struct SongGenerator {
         case "MOT-LD1-008": return "Visiting solo"
         case "MOT-LD1-009": return "Cold descent"
         case "MOT-LD1-010": return "Pendulum arc"
-        case "MOT-LD1-011": return "Melodic Spiral"
-        case "MOT-LD1-012": return "Chromatic Descent"
-        case "MOT-LD1-013": return "Slow arc"
-        case "MOT-LD1-014": return "Rising phrase"
+        case "MOT-LD1-011": return "No Birds turn"
+        case "MOT-LD1-012": return "Tear Us Apart hook"
+        case "MOT-LD1-013": return "Transmission figure"
+        case "MOT-LD1-014": return "Albatross guitar"
         case "MOT-LD1-015": return "Arcade Riff"
         case "MOT-LD1-016": return "Machine Answer"
         case "MOT-LD1-017": return "Pentatonic Blitz"
@@ -3173,6 +3173,11 @@ struct SongGenerator {
         case "MOT-LD1-020": return "Synth Hook"
         case "MOT-LD1-021": return "Short Statement"
         case "MOT-LD1-022": return "Long Run"
+        // Retired 2026-11-14, out of every pool; forced only, to A/B against their replacements.
+        case "MOT-LD1-027": return "Melodic Spiral"
+        case "MOT-LD1-028": return "Chromatic Descent"
+        case "MOT-LD1-029": return "Slow arc"
+        case "MOT-LD1-030": return "Rising phrase"
         case "MOT-LD1-001": return "Hallogallo hook"
         case "MOT-LD1-002": return "Radioactive riff"
         case "MOT-LD1-006": return "Model riff"

@@ -8,8 +8,12 @@
 // MOT-LD1-007 Vanishing Solo — 10-bar pentatonic guitar-style solo, with shorter returns
 // MOT-LD1-008 Visiting Solo — 9-bar Dorian moog-style solo with octave arpeggios, with shorter returns
 //   (Lead 2 plays with both: only the gap-answer rule MOT-LD2-002 Low bed keeps the solo bars to itself)
-// Lead 1, Noir: MOT-LD1-009 Cold descent, 010 Pendulum arc, 011 Melodic Spiral,
-//   012 Chromatic Descent, 013 Slow arc, 014 Rising phrase
+// Lead 1, Noir: MOT-LD1-009 Cold descent, 010 Pendulum arc, 011 No Birds turn, and the
+//   transcription hooks 012 Tear Us Apart hook, 013 Transmission figure and 014 Albatross guitar
+//   written by HookLeadEngine
+// Lead 1, retired 2026-11-14 and out of every pool, kept so a forced rule can A/B them:
+//   MOT-LD1-027 Melodic Spiral, 028 Chromatic Descent, 029 Slow arc, 030 Rising phrase
+//   (they were 011, 012, 013 and 014)
 // Lead 1, Arcade: MOT-LD1-015 Arcade Riff, 016 Machine Answer, 017 Pentatonic Blitz,
 //   018 Octave Bounce, 019 Triad Climb, 020 Synth Hook
 // Lead 1, Kraftwerk sync: MOT-LD1-021 Short Statement, 022 Long Run
@@ -25,7 +29,7 @@ struct LeadGenerator {
         var bar: Int; var step: Int; var scaleIdx: Int; var dur: Int; var velBase: Int
     }
 
-    // Phrase note for LD1-013/014 melodic phrase engine — stores the resolved MIDI note directly.
+    // Phrase note for the MOT-LD1-029/030 melodic phrase engine — stores the resolved MIDI note directly.
     private struct MelodicNote {
         var barOff: Int; var step: Int; var midi: Int; var dur: Int; var vel: Int
     }
@@ -37,6 +41,12 @@ struct LeadGenerator {
     /// rules with short returns, and the arrangement filter won't rest a block that would open
     /// one (Zack, 2026-11-11).
     static let maxLead1SilentBars = 24
+
+    /// The same limit for a Noir hook rule. Noir is otherwise exempt, but a hook states itself a
+    /// few times and is silent between, and without a limit its longest silence ran 20 to 26
+    /// bars against the 3 to 8 bar rests of the Joy Division and PiL records; fragments of the
+    /// hook fill the rest (2026-11-14).
+    static let noirHookMaxSilentBars = 16
 
     static func generateLead1(
         frame: GlobalMusicalFrame,
@@ -136,16 +146,16 @@ struct LeadGenerator {
         // Persists across episodes so each repeat mutates slightly from the previous.
         var pendulumPhraseData: [PendulumNote] = []
 
-        // L: LD1-012 Chromatic Descent — slow descending line, Noir only
+        // L: MOT-LD1-028 Chromatic Descent (retired) — slow descending line
         var chromaDescNote:      UInt8? = nil
         var chromaDescStepUntil: Int    = -1
         var chromaArcMode:       Bool   = false
         var chromaAscending:     Bool   = false
         var chromaArcFastFired:  Bool   = false
         var chromaArcPeak:       UInt8  = 0
-        var chromaPassCount      = 0     // LD1-012 off-beat chromatic passing notes, 12 a song
+        var chromaPassCount      = 0     // MOT-LD1-028 off-beat chromatic passing notes, 12 a song
 
-        // M: LD1-013 Slow Arc — melodic phrase generator, Noir only
+        // M: MOT-LD1-029 Slow arc (retired) — melodic phrase generator
         var dronePhraseData: [MelodicNote] = []
         var dronePhraseBarStart: Int    = -1
         var droneActiveEnd:      Int    = -1
@@ -154,7 +164,7 @@ struct LeadGenerator {
         var droneDirUp:          Bool   = true
         var droneDirCount:       Int    = 0
 
-        // N: LD1-014 Semitone Stab — high-register phrase generator, Noir only
+        // N: MOT-LD1-030 Rising phrase (retired) — high-register phrase generator
         var stabPhraseData: [MelodicNote] = []
         var stabPhraseBarStart: Int    = -1
         var stabPhraseEnd:      Int    = -1
@@ -163,7 +173,8 @@ struct LeadGenerator {
         var stabDirUp:          Bool   = true
         var stabDirCount:       Int    = 0
 
-        // O: LD1-011 Melodic Spiral — phrase silence gate + consecutive-active counter (Noir thinning)
+        // O: MOT-LD1-011 No Birds turn and MOT-LD1-027 Melodic Spiral — phrase silence gate +
+        //    consecutive-active counter (Noir thinning)
         var baPhraseSilent: Bool = false
         var baConsecutiveActive: Int = 0
 
@@ -188,12 +199,12 @@ struct LeadGenerator {
                 rule: hook, frame: frame, structure: structure, tonalMap: tonalMap,
                 entryBar: entryBar, restBars: ld1RestBars.union(breakdownBars),
                 register: kRegisterBounds[kTrackLead1]!,
-                maxGapBars: noirVariation ? nil : Self.maxLead1SilentBars, rng: &rng)
+                maxGapBars: noirVariation ? Self.noirHookMaxSilentBars : Self.maxLead1SilentBars, rng: &rng)
             return (MotorikClearance.clear(events, tonalMap: tonalMap), .none)
         }
 
         var events: [MIDIEvent] = []
-        // MOT-LD1-005 is Zack's standing rule, and MOT-LD1-012 Chromatic Descent is chromatic by
+        // MOT-LD1-005 is Zack's standing rule, and MOT-LD1-028 Chromatic Descent is chromatic by
         // design: Motorik clearance leaves their bars alone.
         var clearanceSkipBars: Set<Int> = []
 
@@ -252,12 +263,13 @@ struct LeadGenerator {
             }
 
             // I: Structured rest window — silent for pre-computed 4–8 bar stretches (all non-solo rules)
-            // LD1-011, LD1-013 and LD1-014 manage their own phrase silences; skip to preserve solo presence.
-            // LD1-010 and LD1-011 reprise zone (final 25%) bypasses ld1RestBars so the return-to-form fires.
-            let ld1RepriseBypass = (ruleID == "MOT-LD1-010" || ruleID == "MOT-LD1-011")
+            // MOT-LD1-029 and 030 manage their own phrase silences; skip to preserve solo presence.
+            // The reprise zone (final 25%) of MOT-LD1-010, 011 and 027 bypasses ld1RestBars so the
+            // return-to-form fires.
+            let ld1RepriseBypass = ["MOT-LD1-010", "MOT-LD1-011", "MOT-LD1-027"].contains(ruleID)
                                     && bar >= frame.totalBars * 3 / 4
             if !isIntroOutro && ld1RestBars.contains(bar)
-                && ruleID != "MOT-LD1-013" && ruleID != "MOT-LD1-014"
+                && ruleID != "MOT-LD1-029" && ruleID != "MOT-LD1-030"
                 && !ld1RepriseBypass {
                 prevNote = nil
                 continue
@@ -349,6 +361,15 @@ struct LeadGenerator {
 
             case "MOT-LD1-011":
                 if !isIntroOutro {
+                    barEvents = lead1NoBirdsTurn(
+                        barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity, baPhraseSilent: &baPhraseSilent,
+                        baConsecutiveActive: &baConsecutiveActive,
+                        rng: &rng)
+                }
+
+            case "MOT-LD1-027":
+                if !isIntroOutro {
                     barEvents = lead1BeatAnchor(
                         barStart: barStart, bar: bar, entry: entry, frame: frame,
                         intensity: intensity, baPhraseSilent: &baPhraseSilent,
@@ -356,7 +377,7 @@ struct LeadGenerator {
                         rng: &rng)
                 }
 
-            case "MOT-LD1-012":
+            case "MOT-LD1-028":
                 if !isIntroOutro {
                     barEvents = lead1ChromaticDescent(
                         barStart: barStart, bar: bar, entry: entry, frame: frame,
@@ -366,7 +387,7 @@ struct LeadGenerator {
                         chromaPassCount: &chromaPassCount, rng: &rng)
                 }
 
-            case "MOT-LD1-013":
+            case "MOT-LD1-029":
                 if !isIntroOutro {
                     barEvents = lead1DroneHold(
                         barStart: barStart, bar: bar, entry: entry, frame: frame,
@@ -378,7 +399,7 @@ struct LeadGenerator {
                         rng: &rng)
                 }
 
-            case "MOT-LD1-014":
+            case "MOT-LD1-030":
                 if !isIntroOutro {
                     let stabPos = Double(max(0, bar - entryBar))
                                 / Double(max(1, frame.totalBars - 8 - entryBar))
@@ -433,7 +454,7 @@ struct LeadGenerator {
             }
 
             events += barEvents
-            if ruleID == "MOT-LD1-005" || ruleID == "MOT-LD1-012" { clearanceSkipBars.insert(bar) }
+            if ruleID == "MOT-LD1-005" || ruleID == "MOT-LD1-028" { clearanceSkipBars.insert(bar) }
             if !barEvents.isEmpty, ruleID == "MOT-LD1-004" || ruleID == "MOT-LD1-005" { lastGatedBar = bar }
 
             // D: Update prevNote from the last event in this bar
@@ -444,16 +465,15 @@ struct LeadGenerator {
 
         // Cap the two rules that combine length with density.
         //
-        // Most long-running Lead 1 rules are sparse, and there the length IS the gesture: Noir's
-        // Chromatic Descent runs 19 bars at 1.6 notes a bar, which is a slow descent, not a
-        // fault. Arcade is relentless by design. These two are different — Melodic Spiral is
-        // the densest rule in Motorik at 6.8 notes a bar and Octave Bounce is close behind at
-        // 6.2, and both hold that for twenty bars and occasionally forty. A stream of
-        // sixteenths with no air in it stops reading as a line.
+        // Most long-running Lead 1 rules are sparse, and there the length IS the gesture. Arcade
+        // is relentless by design. These are different — Melodic Spiral (now MOT-LD1-027) was
+        // the densest rule in Motorik at 6.8 notes a bar, No Birds turn keeps its texture, and
+        // Octave Bounce is close behind at 6.2, and all hold that for twenty bars and
+        // occasionally forty. A stream of notes with no air in it stops reading as a line.
         //
         // Rests are cut into the stretch rather than the rule being rewritten, so each keeps
         // its own character and only the tail cases change.
-        let dense: Set<String> = ["MOT-LD1-011", "MOT-LD1-018"]
+        let dense: Set<String> = ["MOT-LD1-011", "MOT-LD1-027", "MOT-LD1-018"]
         if dense.contains(aRule) || dense.contains(bRule) {
             events = capUnbrokenStretch(events, maxBars: 20, totalBars: frame.totalBars, rng: &rng)
         }
@@ -1243,7 +1263,8 @@ struct LeadGenerator {
         return UInt8(pool[pool.count / 2])   // pick the middle candidate for smoothest voice leading
     }
 
-    // MARK: - LD1-011: Melodic Spiral — No Birds beat-melody over sustained lower drone, Noir only
+    // MARK: - MOT-LD1-027: Melodic Spiral (retired, was MOT-LD1-011) — rising scale steps on the
+    // beats over a sustained lower drone
     //
     // Variations added:
     //   1. Phrase silence gate  — 30% of 4-bar cycles completely silent
@@ -1345,7 +1366,99 @@ struct LeadGenerator {
         return events
     }
 
-    // MARK: - LD1-012: Chromatic Descent — slow descending line, Noir only
+    // MARK: - MOT-LD1-011: No Birds turn — PiL, No Birds (1979), Keith Levene's guitar, Noir only
+    //
+    // From Zack's Guitar Pro tab (track 0, bars 17 to 22). The guitar turns around one pitch on
+    // the beats while that pitch sounds an octave lower on every "and": F# G A F#, G A B G,
+    // A B G A over a G drone, a three-bar cycle that climbs a step and turns back. The record's
+    // pivot is the minor third.
+    //
+    // Here the pivot is the chord's third, and the turn moves through the notes that don't rub the
+    // chord: its tones and the scale notes that are not a semitone from one of them (over a minor
+    // chord, the minor pentatonic). Every melody note lands on a beat, so none of them may rub, and
+    // the drone is the pivot itself. A four-bar phrase plays the three bars of the cycle, then the
+    // first again. The gates, density by intensity, anchor dropout and late reprise are the
+    // retired MOT-LD1-027 Melodic Spiral's, with the same draws.
+
+    private static func lead1NoBirdsTurn(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity,
+        baPhraseSilent: inout Bool,
+        baConsecutiveActive: inout Int,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let bounds = kRegisterBounds[kTrackLead1]!
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let isReprise = bar >= (frame.totalBars * 3 / 4)
+
+        // Phrase silence gate, as in MOT-LD1-027: 50% of 4-bar cycles rest, and three active
+        // cycles in a row force a rest. The reprise bypasses it.
+        if bar % 4 == 0 {
+            let roll = rng.nextDouble()
+            if isReprise {
+                baPhraseSilent      = false
+                baConsecutiveActive = 0
+            } else {
+                let forceRest  = baConsecutiveActive >= 3
+                baPhraseSilent = forceRest || roll < 0.50
+                if baPhraseSilent { baConsecutiveActive = 0 } else { baConsecutiveActive += 1 }
+            }
+        }
+        if baPhraseSilent { return [] }
+
+        // Drop out 2 bars before a long chord change (skipped in the reprise).
+        let chordLen     = entry.chordWindow.endBar - entry.chordWindow.startBar
+        let barsToChange = entry.chordWindow.endBar - bar
+        if !isReprise && chordLen >= 16 && barsToChange <= 2 { return [] }
+
+        // The ladder of clear notes: chord tones and scale notes no semitone from one.
+        let tones = entry.chordWindow.chordTones
+        guard !tones.isEmpty else { return [] }
+        let clearPCs = tones.union(frame.scalePCs.filter { !MotorikClearance.rubsChord($0, tones) })
+        let ladder = (bounds.low...bounds.high).filter { clearPCs.contains($0 % 12) }
+        let pivotPC = [3, 4].map { (rootPC + $0) % 12 }.first(where: tones.contains) ?? rootPC
+        // The pivot sits near MIDI 70 on every chord, so the figure stays in one octave band.
+        guard let pivot = ladder.filter({ $0 % 12 == pivotPC }).min(by: { abs($0 - 70) < abs($1 - 70) }),
+              let pivotIdx = ladder.firstIndex(of: pivot) else { return [] }
+
+        // The record's three bars, as ladder steps from the pivot; the fourth bar is the first again.
+        let cycle = [[-1, 0, 1, -1], [0, 1, 2, 0], [1, 2, 0, 1]]
+        let cell  = cycle[[0, 1, 2, 0][bar % 4]]
+        let melodyNotes = cell.map { UInt8(ladder[Swift.max(0, Swift.min(ladder.count - 1, pivotIdx + $0))]) }
+        let anchorMIDI  = UInt8(pivot - 12 >= bounds.low ? pivot - 12 : pivot)
+
+        // Density by intensity: low beats 1 and 3, medium 1, 3 and 4, high all four; the reprise
+        // always all four.
+        let melodySteps: [Int]
+        if isReprise {
+            melodySteps = [0, 4, 8, 12]
+        } else {
+            switch intensity {
+            case .low:    melodySteps = [0, 8]
+            case .medium: melodySteps = [0, 8, 12]
+            case .high:   melodySteps = [0, 4, 8, 12]
+            }
+        }
+
+        // Anchor dropout: 20% of active bars drop the drone (never in the reprise).
+        let dropAnchorRoll = rng.nextDouble()
+        let dropAnchor     = isReprise ? false : dropAnchorRoll < 0.20
+
+        var events: [MIDIEvent] = []
+        for step in melodySteps {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: melodyNotes[step / 4],
+                                    velocity: step == 0 ? 80 : 70, durationSteps: 3))
+        }
+        if !dropAnchor {
+            for step in [2, 6, 10, 14] {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: anchorMIDI,
+                                        velocity: 54, durationSteps: 2))
+            }
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD1-028: Chromatic Descent (retired, was MOT-LD1-012) — slow descending line
     // Love Will Tear Us Apart Arp Omni 2 synth: beat-1 attacks, d12-16 holds.
     // Starts near P5 or P4 above root, steps down 1-2 semitones every 2-3 bars, cycles on root.
     // 20% of phrase restarts enter arc mode: ascend from root, fire a chromatic fast run at the
@@ -1524,10 +1637,10 @@ struct LeadGenerator {
         return events
     }
 
-    // MARK: - LD1-013 / LD1-014: Shared phrase-builder config
+    // MARK: - MOT-LD1-029 / 030 (retired): Shared phrase-builder config
 
     // Configuration struct parameterising the shared melodic phrase engine used by
-    // both LD1-013 (Slow Arc) and LD1-014 (Semitone Stab).
+    // MOT-LD1-029 Slow arc and MOT-LD1-030 Rising phrase (were 013 and 014).
     private struct PhraseGenConfig {
         // Note count: low-intensity base + rng(range); high-intensity adds 1 more to base
         var noteCountLow: Int;  var noteCountHigh: Int;  var noteCountRange: Int
@@ -1553,7 +1666,7 @@ struct LeadGenerator {
         var charPCOffsets: [Int]
     }
 
-    // LD1-013 Slow Arc: slow, wide-range phrases
+    // MOT-LD1-029 Slow arc: slow, wide-range phrases
     private static let droneConfig = PhraseGenConfig(
         noteCountLow: 4,  noteCountHigh: 5,  noteCountRange: 3,
         phraseLenBase: 3, phraseLenRange: 3,
@@ -1568,7 +1681,7 @@ struct LeadGenerator {
         charPCOffsets: [0, 3, 7, 10]
     )
 
-    // LD1-014 Semitone Stab: faster, high-register phrases with offbeat entry
+    // MOT-LD1-030 Rising phrase: faster, high-register phrases with offbeat entry
     private static let stabConfig = PhraseGenConfig(
         noteCountLow: 5,  noteCountHigh: 6,  noteCountRange: 3,
         phraseLenBase: 2, phraseLenRange: 2,
@@ -1583,7 +1696,7 @@ struct LeadGenerator {
         charPCOffsets: [0, 7, 3, 10]
     )
 
-    // Shared phrase-building engine for LD1-013 and LD1-014.
+    // Shared phrase-building engine for MOT-LD1-029 and 030.
     private static func buildMelodicPhrase(
         scaleNotes: [Int],
         rootPC: Int,
@@ -1712,7 +1825,7 @@ struct LeadGenerator {
         return events
     }
 
-    // MARK: - LD1-013: Slow Arc — melodic phrase generator, Noir only
+    // MARK: - MOT-LD1-029: Slow arc (retired, was MOT-LD1-013) — melodic phrase generator
     // Joy Division / PiL guitar lead: 4-7 note phrases with clear melodic shape,
     // quarter-to-half-note durations, 2-5 bar silence between phrases.
 
@@ -1757,7 +1870,7 @@ struct LeadGenerator {
                             bar: bar, barStart: barStart)
     }
 
-    // MARK: - LD1-014: Rising phrase — high-register melodic phrase generator, Noir only
+    // MARK: - MOT-LD1-030: Rising phrase (retired, was MOT-LD1-014) — high-register phrase generator
     // PiL Annalisa T1 guitar character: 5-8 note phrases in high register (65-79),
     // shorter durations (3-8 steps), tight gaps, offbeat entry.
     // Silence blends shorter as song progresses. Same phrase engine as LD1-013.
@@ -2229,6 +2342,10 @@ struct LeadGenerator {
             // MOT-LD1-007 (Vanishing Solo) excluded: its major-key melodic arc feels tonally out of place
             // even with minor-scale adjustment.
             // The hook rules MOT-LD1-006 Model riff and MOT-LD1-001 Hallogallo hook hold 4% each.
+            // MOT-LD1-012 Tear Us Apart hook, 013 Transmission figure and 014 Albatross guitar
+            // are Noir's own transcription hooks, and 011 No Birds turn is the record's guitar
+            // figure (2026-11-14). They replaced Chromatic Descent, Slow arc, Rising phrase and
+            // Melodic Spiral, now the retired MOT-LD1-028, 029, 030 and 027, which no pool draws.
             let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
             let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15]
             return rules[rng.weightedPick(weights)]

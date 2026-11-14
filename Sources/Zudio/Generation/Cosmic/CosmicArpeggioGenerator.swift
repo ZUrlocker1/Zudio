@@ -95,7 +95,8 @@ struct KosmicArpeggioGenerator {
             }
             if spaceRule != "KOS-RTHM-016" {
                 let line = spaceRule == "KOS-RTHM-002"
-                    ? generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+                    ? generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
+                                      followChord: true)
                     : generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
                                           followChord: true)
                 return withSolo(line.filter { spaceArrangement?.sequencerRests(atBar: $0.stepIndex / 16) != true }.map {
@@ -522,7 +523,8 @@ struct KosmicArpeggioGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG,
+        followChord: Bool = false
     ) -> [MIDIEvent] {
 
         // 8th note (2 steps) 55%, quarter (4) 30%, dotted-8th (3) 15%
@@ -545,7 +547,8 @@ struct KosmicArpeggioGenerator {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
                 let barStart    = bar * 16
-                let notes       = jmjHookNotes(entry: entry, frame: frame, shape: hookShape)
+                let notes       = jmjHookNotes(entry: entry, frame: frame, shape: hookShape,
+                                               followChord: followChord)
                 let countBefore = events.count
 
                 // Gate probabilities replace the coarse whole-bar silence: the anchor note
@@ -568,12 +571,19 @@ struct KosmicArpeggioGenerator {
                 // No harmony voice during intro/outro or low-intensity sections
                 if addHarmony && !isIntroOutro && section.intensity != .low {
                     let keyPC     = keySemitone(frame.key)
+                    // Space counts the thirds in the chord's scale: in the key, the third above
+                    // the major V's leading tone was the b6, a semitone over the chord's 5th
+                    // (Les Chants Cosmiques, C Aeolian: Eb over G major against the pads' D).
+                    let harmScale = followChord
+                        ? spaceChordScale(chordTones: entry.chordWindow.chordTones, frame: frame)
+                            .map { ($0 - keyPC + 12) % 12 }.sorted()
+                        : frame.mode.intervals
                     let harmNotes = notes.map { note -> Int in
                         // Diatonic third: scale degree +2 above each melody note.
                         // Using a fixed chromatic interval (e.g. +3) causes out-of-scale
                         // clashes whenever the melody note is not the root (e.g. C → Eb
                         // in A Aeolian, which is a semitone outside the scale).
-                        Swift.min(diatonicThirdAbove(note, keyPC: keyPC, mode: frame.mode), 84)
+                        Swift.min(diatonicThirdAbove(note, keyPC: keyPC, scale: harmScale), 84)
                     }
                     emitJMJVoice(notes: harmNotes, barStart: barStart, stepDur: stepDur,
                                  offset: stepDur, legato: true, bar: bar, rng: &rng, events: &events,
@@ -962,12 +972,17 @@ struct KosmicArpeggioGenerator {
             let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
             let scalePCs   = frame.scalePCs
             let mode       = entry.sectionMode
-            let third      = mode.nearestInterval(3)
+            // The chord's own 3rd (nearestInterval(3) ties 2 and 4 in a major-3rd mode and picked
+            // the 2nd). Over a major 3rd the 4th, held about a bar, sat a semitone above it, so it
+            // takes the 6th (Void Perihelion, A Mixolydian: D held over the pads' C#).
+            let chordThird = entry.chordWindow.chordType.intervals.first { $0 == 3 || $0 == 4 }
+            let third      = chordThird ?? mode.nearestInterval(3)
+            let fourth     = chordThird == 4 ? 9 : 5
             let flat7      = mode.nearestInterval(10)
 
             // Build a 2-octave scale pool in MIDI 58–82
             var pool: [Int] = []
-            for pc in [0, 2, third, 5, 7, flat7, 12, 12 + third, 12 + 7] {
+            for pc in [0, 2, third, fourth, 7, flat7, 12, 12 + third, 12 + 7] {
                 let snapped = pc == 12 || pc == 12 + third || pc == 12 + 7
                     ? snapToScale(rootPC + (pc % 12), scalePCs: scalePCs)
                     : snapToScale(rootPC + pc, scalePCs: scalePCs)
@@ -1235,9 +1250,16 @@ struct KosmicArpeggioGenerator {
     }
 
     /// JMJ hook note set: 4 notes in MIDI 60–80, scale degrees depend on shape
-    private static func jmjHookNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, shape: Int) -> [Int] {
+    /// In Kosmic Space (`followChord`) a chord tone is taken as it is, and any other note snaps to
+    /// the key and then takes the chord's alteration (`spaceChordAlterations`). Snapped to the key
+    /// alone, the major V's 3rd (the leading tone) rounded up to the tonic, against the pads'
+    /// leading tone (Rendez-Vous a Vectore, D Aeolian: D over A major under the pads' C#).
+    private static func jmjHookNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, shape: Int,
+                                     followChord: Bool) -> [Int] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let scalePCs = frame.scalePCs
+        let tones    = entry.chordWindow.chordTones
+        let swaps    = followChord ? spaceChordAlterations(chordTones: tones, scalePCs: scalePCs) : [:]
         // Use chord type (not song mode) for third quality — avoids C natural against a major chord
         // in a Dorian/Aeolian song (mode.nearestInterval gives minor third regardless of chord type).
         let isMajorChord: Bool
@@ -1250,8 +1272,11 @@ struct KosmicArpeggioGenerator {
         let octave = 12
 
         func place(_ semitones: Int) -> Int {
-            let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
-            return clampToRegister(60 + snapped, low: 60, high: 80)
+            let pc = (rootPC + semitones) % 12
+            let snapped = semitones == 12 ? rootPC
+                : (followChord && tones.contains(pc)) ? pc
+                : snapToScale(rootPC + semitones, scalePCs: scalePCs)
+            return clampToRegister(60 + (swaps[snapped] ?? snapped), low: 60, high: 80)
         }
         switch shape {
         case 0:  return [place(0), place(third), place(fifth), place(third)]   // pendulum
@@ -1411,8 +1436,8 @@ struct KosmicArpeggioGenerator {
 
     /// Returns the MIDI note a diatonic third (scale degree +2) above `note`.
     /// Correctly handles all scale positions — never produces out-of-scale pitches.
-    private static func diatonicThirdAbove(_ note: Int, keyPC: Int, mode: Mode) -> Int {
-        let scale      = mode.intervals  // e.g. Aeolian: [0,2,3,5,7,8,10]
+    private static func diatonicThirdAbove(_ note: Int, keyPC: Int, scale: [Int]) -> Int {
+        // scale: intervals above the key, ascending (e.g. Aeolian: [0,2,3,5,7,8,10])
         let relPC      = (note % 12 - keyPC + 12) % 12
         // Find which scale degree this pitch class best matches
         let degIdx     = scale.enumerated().min(by: { abs($0.element - relPC) < abs($1.element - relPC) })?.offset ?? 0

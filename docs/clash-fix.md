@@ -1,6 +1,8 @@
 # Clash fix plan
 
-Started 2026-11-13. Read this first in any session working on clashing notes. Each numbered item below is sized for one session; work them in order, tick them off here, and record what changed and what was measured.
+Started 2026-11-13. Read this first in any session working on clashing notes. Current state, remaining options and how to rescan: see "Where it stands" and "Rescanning later" near the end.
+
+**Live state (2026-11-14, end of day):** committed through 9342e16 (unpushed). Item 11 and its regression fixes are uncommitted and not yet heard, in `CosmicStructureGenerator.swift`, `CosmicBassGenerator.swift`, `CosmicPadsGenerator.swift`, `CosmicArpeggioGenerator.swift` and `SongState.swift` (F marks). Zack still has to hear four demo folders: `~/Downloads/Zudio out-of-key third demos/`, plus the three from 9342e16 (Kosmic pads, BoC loop, Call and answer). Commit on his word after that. The clash work is otherwise closed at diminishing returns. Each numbered item below is sized for one session; work them in order, tick them off here, and record what changed and what was measured.
 
 ## Summary
 
@@ -224,8 +226,96 @@ Rarer rules with very high counts when they fire. Probably fixed note choices in
 
 ### 10. Not yet scanned
 
-- Ambient (all substyles). Its pads and textures may use clusters on purpose, so agree the threshold with Zack before scanning.
+- Ambient (all substyles). Its pads and textures may use clusters on purpose. Zack (2026-11-14): don't worry about Ambient; leave it unscanned unless he hears something.
 - Regenerated tracks and Evolve passes: the scan covers fresh songs only.
+
+### 11. Out-of-key chord 3rd, Kosmic Drift and Space (done in code 2026-11-14, uncommitted, not heard)
+
+Zack asked for this after a rescan showed it was the one structural cause left. Three small fixes, all no new draws. Measured on the same 1,000 Kosmic seeds (random seed 11) as item 8, before (9342e16) and after.
+
+- **The chord type** (`keyThird` in `CosmicStructureGenerator.swift`, called in `buildChordWindows`). The base and Drift chord pickers draw "minor" whatever the degree. That gave a minor tonic in Mixolydian, a minor IV in Dorian, a minor bVII in Mixolydian and a minor bVI in Aeolian. The pads voice the key's 3rd (they follow the mode), but Rhythm and Bass follow the type, so they played the out-of-key 3rd against it. Solaxe V (E Mixolydian): Rhythm and Bass F natural under the pads' F# over D. Now a minor or major chord takes the key's own 3rd on its root, after every draw. A root outside the key (the bVII in Ionian) is left alone. Space builds its own chord plan and is unaffected.
+  - Measured: half of Drift's glaring clashes had an out-of-key chord 3rd (477 of 907, in 42 songs); now none. In Drift, Rhythm changed in 56 songs, Lead 1 in 7 and Bass in 1. Base Kosmic carried the same mislabelled windows but had no glaring clashes from them. Its Lead 1, Lead 2 and Bass changed in about 35 songs; glaring clashes in those songs went from 296 to 283 (Omni Prism 8 to 4, Empyrion's Rhythm 8 to 1).
+- **KOS-BASS-014 Smooth Arpeggio** (`smoothArpeggioBar` in `CosmicBassGenerator.swift`, Drift). Its 3rd was the tonic's 3rd (`Mixolydian or Ionian ? 4 : 3`) over every root. That gave B natural over Ab in C Aeolian (Frozen Void) and F natural over D in E Dorian (Spectrion Dream). It agreed with the wrong chord type before, so the chord fix exposed it. Now it plays the key's 3rd above the chord root, the same line as the BoC fix. Bass changed in 11 Drift songs; their glaring clashes went from 90 to 42 (Orthodoxx II 59 to 32, Spectrion Dream 8 to 0). Marked F.
+- **KOS-RTHM-002 JMJ Hook in Space** (`jmjHookNotes` and the harmony voice in `generateJMJHook`, `CosmicArpeggioGenerator.swift`). Over the major V of Magnetic Arc and Turn, the hook's 3rd (the leading tone) was snapped to the key and rounded up to the tonic, against the pads' leading tone. Rendez-Vous a Vectore (D Aeolian): D over A major under the pads' C#, every V bar. `fitSpaceChordScale` couldn't catch it because the tonic is in the key. In Space (`followChord`), a chord tone is now taken as it is, and any other note snaps to the key and then takes the chord's alteration (`spaceChordAlterations`). The harmony voice counts its thirds in the chord's scale (`spaceChordScale`). Base Kosmic passes the mode as before and is unchanged.
+  - A first version snapped every note to the chord's scale. Over G major in C Aeolian, that took the hook's 2nd down to Ab, a semitone over the root (Waiting for Sputnique bar 33: G Ab D). It also left the harmony's key-scale third above B as Eb, now an octave up against the pads' D (Les Chants Cosmiques). The current version plays G B B D with harmony B D D F.
+  - Measured: Rhythm changed in 11 Space songs and Lead 2 in 1; their glaring clashes went from 167 to 111. Space Rhythm glaring clashes 374 to 312. Rendez-Vous a Vectore 26 to 5. KOS-RTHM-002 drops off the problem list. Marked F.
+- **Regressions the chord fix exposed, and their fixes** (Zack: fix them without complicating the code). Each is the same move inside the rule: the rule's 3rd follows the chord, and over a major 3rd a held 4th steps aside. No new draws.
+  - **KOS-PADS-004 Suspended sus4 minor** (`suspendedResolutionBar` in `CosmicPadsGenerator.swift`). The pad holds root, 4th, 5th for 3 bars of 4, under a Rhythm that plays the full chord. Over a major chord its 4th sat a semitone above the Rhythm's 3rd. Slow Nimbus (E Mixolydian) went from 13 to 39 with item 11's chord fix: Rhythm G#3 under the pads' A3. The 4th bar was also meant to resolve to the 3rd, but `mode.nearestInterval(3)` ties 2 and 4 in a major-3rd mode and picked the 2nd, so it never resolved there. Now, over a major 3rd, the suspension is the 2nd (a whole tone under the 3rd), and the resolution plays the chord's own 3rd. A chord with no 3rd (sus4, power, quartal) keeps the old code. Pads changed in 38 songs; glaring clashes in those songs went from 529 to 342 (base 380 to 316, Drift 149 to 26). Slow Nimbus 13 to 0. Marked F.
+  - **KOS-PADS-005 Stacked fourths** (`quartalStackBar`). Picked over a chord that is now major, its 4th sat on the Rhythm's 3rd (Formless Expanse, D Dorian: F over C major against the Rhythm's E; base songs with this went from 1 to 4). Over a chord with a major 3rd, the 4th now becomes the 9th, the same move its out-of-key fix already makes. Quartal and sus chords are unchanged. Pads changed in 18 songs; Formless Expanse back to 0. Already marked F.
+  - **KOS-RTHM-008 Oxygene 8-bar Arc** (`generateOxygene8Bar`). The same `nearestInterval(3)` tie meant the arc had no 3rd in major modes, and its 4th, held about a bar, sat over the major 3rd (Void Perihelion, A Mixolydian: D over the pads' C#). The arc's 3rd now follows the chord, and over a major 3rd the 4th becomes the 6th. Rhythm changed in 18 songs: base 69 to 60 glaring, Drift 11 to 14 (single clashes where the restored 3rd meets a passing lead note). Marked F.
+- **Totals against 9342e16, all fixes:** Kosmic Drift problem songs 20% to 9%. Base 25% to 24%. Space 19% to 19% (73 to 72 songs). In the songs that changed, glaring clashes went from 601 to 100 in Drift, 761 to 627 in base and 167 to 111 in Space. KOS-BASS-016, KOS-BASS-006 and KOS-RTHM-002 drop off the problem list. Motorik and Chill code was not touched.
+- **Regression check.** Every one of the 1,000 songs was compared before and after, and every song whose glaring total rose by 3 or more was read. One is left: Polar Aurora (base, B Mixolydian), 4 to 9. Lead 1 and Lead 2 hold E, the 4th, over B major, on KOS-PADS-004's resolution bars (80, 84, 92, 108). The pad now plays the 3rd there, where it used to play the 2nd by mistake. The pad is right. Moving the lead note would take a Kosmic lead clearance, which Zack ruled out, so it stays.
+- Hear: `~/Downloads/Zudio out-of-key third demos/` (before is MIDI at 9342e16; after has .MID and .zudio on the final code):
+  - Solaxe V 51 to 0, bars 29–48.
+  - Paraphonic Flexure 38 to 0, bars 33–55.
+  - Algorhythme VII 29 to 0, bars 14–39.
+  - Rendez-Vous a Vectore 26 to 5, every V bar (8, 15–16, 23–24 and so on).
+  - Slow Nimbus 13 to 0 (KOS-PADS-004), bars 20–76: the sus2 suspension and the real resolution every 4th bar.
+  - Waiting for Sputnique 12 to 12 (the hook over the V, bar 33: G B D, unchanged from before).
+  - Formless Expanse 0 to 0 (KOS-PADS-005's 9th over C major, bars 21–26).
+  - Void Perihelion 4 to 3 (KOS-RTHM-008's arc over A major).
+  - Polar Aurora 4 to 9, the one leftover, bars 80, 84, 92, 108.
+
+## Where it stands (2026-11-14) and what's left
+
+Glaring problem songs after items 1 to 11 (from 1,000 seeds per style; Chill from 1,501):
+
+- Chill base 2%, Chill Soho 2%, Chill Blues 7%.
+- Motorik base 11%, Noir 7%, Europe 6%, Arcade 6%. Median glaring clashes per song: 0.
+- Kosmic Drift 9%, Space 19%, base 24%.
+
+This is the point of diminishing returns. No rule is glaring in more than a quarter of its songs, and no single cause stands out. In base Kosmic, 97% of the remaining glaring clashes have both notes in the key: scale neighbours spread across Lead 1, Lead 2, Bass and Rhythm, with no pattern behind them. The only general fix would be a Kosmic clearance pass, which Zack ruled out (Kosmic is sequencer-driven; counts are small).
+
+Future work, only if Zack hears a problem (each needs his go-ahead, because each changes a figure):
+
+1. **KOS-RTHM-002 scale walk over minor.** The hook's third shape (root, 2nd, 3rd, 5th) puts the 2nd a semitone under the pads' minor 3rd. In the quarter and dotted-8th versions it lands on a beat: 182 glaring clashes in 7 songs, and the rule's worst song. Le Grand Eideon (kosmic_22ffc9ccac21941d, B Dorian) has 61, with C#3 against the pads' D3 from bar 1. A fix like MOT-LD1-005's would climb root, b3, 4, 5 over minor chords.
+2. **Leads holding the 4th over a major chord** (Polar Aurora, item 11). Spread thin: 1 to 3 per song across Space, base and Drift. Only a Kosmic lead clearance would move them, which Zack ruled out.
+3. **The major V's 4-3 in Space.** Leads and pads hold the tonic over the leading tone, 1 to 3 per song across about 35 songs. A suspension by nature; leave it unless it is heard.
+4. **The bVII root in Ionian** (Cyber Transcendome: pads C#, bass C). Only 2 songs have glaring clashes from it (47 in total).
+5. **Next Kosmic rules on the list:** KOS-LD1-018 (25% glaring, 24 songs), KOS-BASS-004 (23%), KOS-LD1-002 and KOS-LD1-007 (21%). Small counts each.
+6. **The Motorik log omits a B-section Lead 1 rule** that differs from the A rule (`bRule` in `LeadGenerator.swift`). It's a log gap, not a clash; it only matters to scans that pick songs by the logged rule.
+
+Before the App Store build, the F marks (`fixMarkedRules` in `SongState.swift`) come out.
+
+## Rescanning later
+
+To check whether new code has added clashes, or to look at a style again:
+
+1. **Seeds.** Use the same seeds each time so runs compare. From the repo root:
+   `python3 -c "import random; r=random.Random(11); [print(s, '%016x'%r.getrandbits(64)) for s in ['kosmic']*1000+['motorik']*1000]" > <folder>/seeds.txt`
+   For Chill, use `['chill']*1500`. Style names are the lowercased `MusicStyle` raw values.
+2. **Throwaway test.** Create `Tests/ZudioTests/TmpClashDump.swift` (XCTest, because Swift Testing `@Test` functions don't run under `xctest -XCTest`):
+
+   ```swift
+   import XCTest
+   @testable import Zudio
+
+   final class TmpClashDump: XCTestCase {
+       func testDump() throws {
+           guard let dir = ProcessInfo.processInfo.environment["ZUDIO_DUMP_DIR"] else { return }
+           let base = URL(fileURLWithPath: dir)
+           let text = try String(contentsOf: base.appendingPathComponent("seeds.txt"), encoding: .utf8)
+           for line in text.split(separator: "\n") {
+               let parts = line.split(separator: " ")
+               guard parts.count == 2, let seed = UInt64(parts[1], radix: 16),
+                     let style = MusicStyle.allCases.first(where: { $0.rawValue.lowercased() == parts[0] })
+               else { continue }
+               let song = SongGenerator.generate(seed: seed, style: style)
+               let url = base.appendingPathComponent("\(parts[0])_\(parts[1]).MID")
+               try MIDIFileExporter.export(song, to: url)
+               try SongLogExporter.export(song, midiURL: url)
+           }
+       }
+   }
+   ```
+
+3. **Build and generate** with the real toolchain and the sandbox off (Claude: memory `reference_claude_session_toolchain`). In short: `swift build --build-tests --build-system native --scratch-path <scratch>/build` with the `-F` framework flags, then `SWIFT_DETERMINISTIC_HASHING=1 ZUDIO_DUMP_DIR=<folder> xctest -XCTest ZudioTests.TmpClashDump <scratch>/build/debug/ZudioPackageTests.xctest`. 2,000 songs take about 15 seconds.
+4. **Scan:** `python3 tools/clash_scan.py <folder> --worst 3`. Read the problem rate per substyle and the per-rule list. Compare with the numbers under "Where it stands" above. A new rule over 15% glaring, or a substyle that rises a few points, is worth a look.
+5. **Before and after a change:** generate once with the change stashed (`git stash push -- Sources`, then `git stash pop`) into a second folder. Diff the `.MID` files track by track to see which tracks moved, and check that untouched substyles are byte-identical. A count that rises on a track you didn't touch is usually attribution: the clash is counted against the later or out-of-chord note, so a fix elsewhere moves it. Read the actual notes before believing a rise. Totals hide regressions, so also compare every song's glaring total and read each song that rose by 3 or more. A fix to the chord, or to one track, often exposes another rule that was quietly agreeing with the old wrong note (item 11: KOS-BASS-014, KOS-PADS-004, KOS-RTHM-008).
+6. **Sort by cause before fixing.** For each glaring clash, ask whether either note is outside the key, and if so whether the logged chord itself has an out-of-key tone. That split found item 11. Then read the notes in two or three of the worst songs, bar by bar, before proposing anything.
+7. **Delete the throwaway test** afterwards.
+
+The analysis helpers used in these sessions (`pdump_lib.py` for glaring clashes per track with the scanner's grading, `bars.py` for notes per bar, `changed.py` for the track diff, and the by-cause split) live in session scratchpads and get cleared. They are short; rewrite them from the description above, or ask for them to be moved into `tools/` if rescans become routine.
 
 ## Listening sets
 
@@ -244,3 +334,6 @@ Rarer rules with very high counts when they fire. Probably fixed note choices in
 - 2026-11-14: KOS-RTHM-021 and 005 fixed (item 7), uncommitted, not heard. Fresh scan of 1,000 Kosmic and 1,000 Motorik seeds on current code, before the Rhythm fix: Kosmic Space 33%, base 28%, Drift 24%; Motorik base 14%, Noir, Europe and Arcade 6–7%. Still worth a look: MOT-LD1-005 (38% glaring, propose first), KOS-BASS-016 (44%), KOS-PADS-005 (31%). Kosmic Lead 1 rules are now 3–25% with small counts, so no Kosmic lead clearance.
 - 2026-11-14: KOS-PADS-005 analysed and prototyped (item 8), reverted pending Zack's choice. MOT-LD1-005 analysed on 1,000 Motorik seeds, nothing changed: 399 glaring clashes in 80 songs, 30 over 4. The call (1, 2, 3, 5 on the beats) plays its 2 on beat 2 for a dotted 8th; over a minor chord that is a semitone under the b3 the pads and Rhythm hold, often struck at the same moment (253 clashes, 63%; Summt Nudnik bar 73: F#4 against the pads' and Rhythm's G4 over E minor). The answer's 4 on beat 3 over a major chord rubs the 3rd for a beat before it resolves (about 76; Schlep Wunderwaffe bar 12: G4 against the Rhythm's F#4). Over a sus2 chord the figure's b3 rubs the pad's 2nd (about 60). Fixing the call alone would take songs over 4 from 30 to about 10; the call and the answer, to 0. KOS-BASS-016 analysed (item 8). Options for all three put to Zack.
 - 2026-11-14: Zack chose the recommended option for all three ("Kosmic is sequencer driven, change the notes rather than making passing tones; keep the shapes"). Done, uncommitted, not heard, no new draws, all marked F. KOS-PADS-005 and KOS-BASS-016: see item 8. MOT-LD1-005 (`lead1StatementAnswer`): over a minor chord (the chord type has a minor 3rd) the call climbs 1, b3, 4, 5 instead of 1, 2, 3, 5; same rhythm, answer unchanged. Measured on the 1,000 Motorik seeds: only Lead 1 changed (62 songs) and Lead 2 (22, where its gap answers clear around Lead 1); no other track. The call's clashes are gone. MOT-LD1-005 glaring songs 30 of 80 to 14; Motorik base problem songs 14% to 11%. What's left is the answer's 4 on beat 3 over a major chord (its 4 to 3 suspension, kept by choice) and the figure's b3 over sus2. One changed song, Blinken Schnork, plays 005 in its B section only, which the log doesn't list (the log shows the A rule). Hear: `~/Downloads/Zudio Call and answer clash demos/` (before is MIDI only): Summt Nudnik 46 to 0 (bar 73: E4 G4 A4 B4 over E minor), Wunderwaffen Zeig 22 to 0, Schlep Wunderwaffe 26 to 12 (bar 37: A4 C5 D5 E5 over A min7; the rest are answers).
+- 2026-11-14: committed 9342e16 on Zack's word. A rescan put every style at diminishing returns except one cause: a chord type whose 3rd is outside the key, half of Drift's glaring clashes. Zack asked for the fix (Drift and Space; not Ambient). Item 11: the chord type takes the key's 3rd, KOS-BASS-014's 3rd follows the chord root, and the Space JMJ hook snaps to the chord's scale. Drift 20% to 11%. Uncommitted, not heard. Added "Where it stands and what's left" and "Rescanning later".
+- 2026-11-14: Zack asked for the regressions item 11 exposed to be fixed without complicating the code. KOS-PADS-004, KOS-PADS-005 and KOS-RTHM-008: the rule's 3rd follows the chord, and over a major 3rd a held 4th steps aside (to the 2nd, 9th and 6th). The Space hook revised: chord tones as they are, other notes key-snapped then altered, harmony thirds in the chord's scale. Checked every song for a rise; one leftover (Polar Aurora, leads' 4th). Drift 9%, base 24%, Space 19%. Uncommitted, not heard.
+- Rescan step to add on any fix: compare every song's glaring total before and after, and read each song that rose by 3 or more (see "Rescanning later", step 5).

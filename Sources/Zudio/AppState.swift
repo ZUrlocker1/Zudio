@@ -1620,8 +1620,7 @@ final class AppState: ObservableObject {
         if let idx = persistedHistory.firstIndex(where: { $0.seed == current.globalSeed }),
            idx > 0 {
             let prev = persistedHistory[idx - 1]
-            appendToLog([GenerationLogEntry(tag: "Rewind",
-                description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
+            appendToLog([GenerationLogEntry(tag: "Rewind", description: "")])
             loadFromPersistedSong(prev, forcePlay: false)
             return
         }
@@ -2105,8 +2104,7 @@ final class AppState: ObservableObject {
                     return
                 }
                 let prev = generationHistory[idx - 1]
-                appendToLog([GenerationLogEntry(tag: "Rewind",
-                    description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
+                appendToLog([GenerationLogEntry(tag: "Rewind", description: "")])
                 loadFromGenerationHistory(prev)
             }
         } else {
