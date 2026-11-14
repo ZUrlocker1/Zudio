@@ -867,6 +867,10 @@ final class PlaybackEngine: ObservableObject {
                 case 41, 43, 45: fireNote = GMDrum.kick.rawValue;  wasRemapped = true
                 case 48:         fireNote = GMDrum.snare.rawValue;  wasRemapped = true
                 case 50:         fireNote = GMDrum.openHat.rawValue; wasRemapped = true
+                // Magnetic Gallop's quarter-note agogo (KOS-DRUM-010) clonks on this kit; Space plays
+                // it as a pedal hat (Zack, 2026-11-14, Rendez-Vous a Axiome).
+                case 67 where cachedIsKosmicSpace:
+                                 fireNote = GMDrum.pedalHat.rawValue; wasRemapped = true
                 default:         fireNote = ev.note;                 wasRemapped = false
                 }
             } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 && !cachedIsKosmicSpace {
@@ -881,11 +885,13 @@ final class PlaybackEngine: ObservableObject {
                 default:         fireNote = ev.note;                  wasRemapped = false
                 }
             } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 && cachedIsKosmicSpace
-                        && ev.note == GMDrum.snare2.rawValue {
+                        && (ev.note == GMDrum.snare2.rawValue || ev.note == GMDrum.highAgogo.rawValue) {
                 // Kosmic Space on Machine Kit (Zack, 2026-11-07, Empyrion-Axolotl): the electric snare
                 // slot (40) that Magnetic Gallop uses sounds harsh and mechanical, so it plays the
-                // plain snare. The toms, ride and everything else stay native.
-                fireNote = GMDrum.snare.rawValue; wasRemapped = true
+                // plain snare. Its quarter-note agogo clonks, so it plays a pedal hat (Zack,
+                // 2026-11-14, Rendez-Vous a Axiome). The toms, ride and everything else stay native.
+                fireNote = ev.note == GMDrum.snare2.rawValue ? GMDrum.snare.rawValue : GMDrum.pedalHat.rawValue
+                wasRemapped = true
             } else {
                 fireNote = ev.note; wasRemapped = false
             }
