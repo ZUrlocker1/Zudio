@@ -92,10 +92,12 @@ extension ChillLeadGenerator {
           hookTreatments: String?) {
         // The finished line keeps clear of the Pads, Bass and Rhythm, as base Chill's leads do:
         // a held note a semitone from the band, or a semitone above a chord tone (the 4th over a
-        // major 3rd), moves to the nearest clear scale note. Short passing notes stay. No draws.
+        // major 3rd), moves to the nearest clear scale note. Short passing notes stay. A moved
+        // note keeps the hook moving rather than repeat its neighbour (Zack, 2026-11-14). No draws.
         func voiced(_ line: [MIDIEvent]) -> [MIDIEvent] {
             let (low, high) = register(for: leadInstrument)
-            return band?.voiceLine(line, structure: structure, scale: frame.scalePCs, low: low, high: high) ?? line
+            return band?.voiceLine(line, structure: structure, scale: frame.scalePCs, low: low, high: high,
+                                   avoidRepeat: true) ?? line
         }
         var hookTreatments: String? = nil
         // Bars where the lead comes back to its original form, for the log. Recorded only.

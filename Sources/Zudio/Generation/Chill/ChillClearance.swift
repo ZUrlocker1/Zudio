@@ -76,9 +76,11 @@ struct ChillClearance {
     /// the held notes here and, when it lasts two steps or more, is not an avoid note. One that
     /// fails moves to the nearest pitch that passes, at most four semitones away, inside
     /// `low...high`, in the scale: a chord tone first, then the direction of the next note. With
-    /// none, the note stays as written.
+    /// none, the note stays as written. With `avoidRepeat` (Soho's hooks), a moved note doesn't
+    /// land on the note before or after it unless the line repeated there, and a written repeat
+    /// follows the previous note's move.
     func voiceLine(_ line: [MIDIEvent], structure: SongStructure, scale: Set<Int>,
-                   low: Int, high: Int) -> [MIDIEvent] {
+                   low: Int, high: Int, avoidRepeat: Bool = false) -> [MIDIEvent] {
         let order = line.indices.sorted { (line[$0].stepIndex, line[$0].note) < (line[$1].stepIndex, line[$1].note) }
         let sorted = order.map { line[$0] }
         var out = line
@@ -104,8 +106,17 @@ struct ChillClearance {
             let tones = structure.chordWindow(atBar: e.stepIndex / 16)?.chordTones ?? []
             let next = sorted[(k + 1)...].first { $0.stepIndex > e.stepIndex }.map { Int($0.note) }
             let toward = (next ?? p0) >= p0 ? 1 : -1
-            let candidates = (1...4).flatMap { [p0 + $0 * toward, p0 - $0 * toward] }
+            var candidates = (1...4).flatMap { [p0 + $0 * toward, p0 - $0 * toward] }
                 .filter { $0 >= low && $0 <= high && scale.contains($0 % 12) && ok($0) }
+            if avoidRepeat {
+                let prevNow = k > 0 ? Int(out[order[k - 1]].note) : nil
+                if k > 0, Int(sorted[k - 1].note) == p0, let p = prevNow, candidates.contains(p) {
+                    candidates = [p]
+                } else {
+                    let taken = [prevNow, next].compactMap { $0 }.filter { $0 != p0 }
+                    if candidates.contains(where: { !taken.contains($0) }) { candidates.removeAll { taken.contains($0) } }
+                }
+            }
             guard let pick = candidates.first(where: { tones.contains($0 % 12) }) ?? candidates.first
             else { continue }
             out[idx] = MIDIEvent(stepIndex: e.stepIndex, note: UInt8(pick), velocity: e.velocity,

@@ -96,7 +96,8 @@ struct KosmicArpeggioGenerator {
             if spaceRule != "KOS-RTHM-016" {
                 let line = spaceRule == "KOS-RTHM-002"
                     ? generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-                    : generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+                    : generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
+                                          followChord: true)
                 return withSolo(line.filter { spaceArrangement?.sequencerRests(atBar: $0.stepIndex / 16) != true }.map {
                     MIDIEvent(stepIndex: $0.stepIndex, note: UInt8(max(36, Int($0.note) - 12)),
                               velocity: $0.velocity, durationSteps: $0.durationSteps)
@@ -403,6 +404,10 @@ struct KosmicArpeggioGenerator {
     // octave). Root in MIDI 48–59, as the sequencer engine. Silent through the sequencer break.
     // Homage draw per song: in 30% of songs the upper line sits a step lower (6th, 5th and 4th in
     // place of octave, 7th and 5th), as Oxygene 8 bar 64 does.
+    // An upper note a semitone from a chord tone steps off it, so the figure keeps three upper
+    // notes: the 6th goes up to the 7th (the b6 over a minor chord's 5th), the 4th and the 7th go
+    // down a step (the 4th over a major 3rd, the #4 under the bVI's 5th, the 7th under the root).
+    // Steps count in the chord's own scale, so the V's leading tone is counted.
 
     private static func generateOxygeneOffbeatPedal(
         frame: GlobalMusicalFrame,
@@ -412,12 +417,22 @@ struct KosmicArpeggioGenerator {
     ) -> [MIDIEvent] {
         // Scale steps above the pedal for the top, middle and low upper voices
         let upper = rng.nextDouble() < 0.30 ? [5, 4, 3] : [7, 6, 4]
-        let scalePCs = frame.scalePCs
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
             guard arrangement?.sequencerRests(atBar: bar) != true,
                   let entry = tonalMap.entry(atBar: bar) else { continue }
             let pedal = spaceSequencerRoot(entry, frame: frame)
+            let tones = entry.chordWindow.chordTones
+            let scale = spaceChordScale(chordTones: tones, frame: frame)
+            func rubs(_ p: Int) -> Bool {
+                !tones.contains(p % 12) && (tones.contains((p + 1) % 12) || tones.contains((p + 11) % 12))
+            }
+            func note(_ steps: Int) -> Int {
+                let p = scaleStep(pedal, by: steps, scalePCs: scale)
+                guard steps > 0, rubs(p) else { return p }
+                let alt = scaleStep(pedal, by: steps == 5 ? 6 : steps - 1, scalePCs: scale)
+                return rubs(alt) ? p : alt
+            }
             // (step, scale steps above the pedal)
             let figure: [(Int, Int)] = bar % 2 == 0
                 ? [(2, 0), (4, upper[0]), (6, 0), (8, upper[1]), (10, upper[0]), (12, upper[2])]
@@ -425,7 +440,7 @@ struct KosmicArpeggioGenerator {
             for (i, (step, steps)) in figure.enumerated() {
                 let last = i == figure.count - 1
                 events.append(MIDIEvent(stepIndex: bar * 16 + step,
-                                        note: UInt8(scaleStep(pedal, by: steps, scalePCs: scalePCs)),
+                                        note: UInt8(note(steps)),
                                         velocity: steps == 0 ? 72 : 64, durationSteps: last ? 3 : 2))
             }
         }
@@ -723,7 +738,8 @@ struct KosmicArpeggioGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG,
+        followChord: Bool = false
     ) -> [MIDIEvent] {
         // Gate probability per step position: index 0 anchors the bar; later positions thin out.
         let gateA: [Double] = [0.95, 0.70, 0.70, 0.65, 0.65, 0.68, 0.68, 0.62]  // 8 × 8th-note
@@ -741,7 +757,7 @@ struct KosmicArpeggioGenerator {
 
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart  = bar * 16
-                let notesA    = dualRateNotes(entry: entry, frame: frame)
+                let notesA    = dualRateNotes(entry: entry, frame: frame, followChord: followChord)
                 let notesB    = notesA.reversed() as [Int]
                 let countBefore = events.count
 
@@ -1283,14 +1299,24 @@ struct KosmicArpeggioGenerator {
     }
 
     /// KOS-RTHM-005 note pool: root, modal 3rd, 5th, flat-7 in MIDI 60–80.
-    /// Tonic-anchored to stay in key regardless of Modal Drift chord root.
-    private static func dualRateNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
+    /// Tonic-anchored to stay in key regardless of Modal Drift chord root. In Kosmic Space
+    /// (`followChord`), a pool note a semitone from a tone of the chord takes that tone (the tonic
+    /// under the V's leading tone becomes it; the 5th under the bVI's root moves up to it); under
+    /// the I nothing changes. Base Kosmic's pads don't voice the logged Modal Drift chord (Luxieme:
+    /// F, B, E under "b6 minor" in A Aeolian), so there the pool stays as it is.
+    private static func dualRateNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+                                      followChord: Bool) -> [Int] {
         let rootPC = keySemitone(frame.key)   // tonic-anchored — was: (keySemitone + chordRoot offset)
         let mode   = entry.sectionMode
         let third  = mode.nearestInterval(3)
         let flat7  = mode.nearestInterval(10)
+        let tones  = followChord ? entry.chordWindow.chordTones : []
         func place(_ pc: Int) -> Int {
-            clampToRegister(60 + rootPC + pc, low: 60, high: 80)
+            let p = clampToRegister(60 + rootPC + pc, low: 60, high: 80)
+            guard !tones.isEmpty, !tones.contains(p % 12) else { return p }
+            if tones.contains((p + 11) % 12) { return p > 60 ? p - 1 : p + 11 }
+            if tones.contains((p + 1) % 12) { return p < 80 ? p + 1 : p - 11 }
+            return p
         }
         return [place(0), place(third), place(7), place(flat7)]
     }
