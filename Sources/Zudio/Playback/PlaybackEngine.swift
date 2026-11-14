@@ -1317,6 +1317,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.20   // Lead Bass on Kosmic bass — pull back
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 83 {
                 vol = 1.3    // Chiff Lead runs soft on Motorik Lead 1 — boost
+            } else if trackIndex == kTrackBass && motorikStyle && program == 12038
+                        && songState?.motorikNoirVariation == true {
+                vol = 0.55   // Mean Saw Bass on Motorik Noir: about 3 dB under the Motorik trim (Zack, 2026-11-14)
+            } else if trackIndex == kTrackBass && motorikStyle && program == 11038
+                        && songState?.motorikNoirVariation == true {
+                vol = 1.27   // Techno Bass on Motorik Noir: about 3 dB under the Motorik boost (Zack, 2026-11-14)
             } else if trackIndex == kTrackBass && motorikStyle && program == 12038 {
                 vol = 0.78   // Mean Saw Bass runs hot on Motorik Arcade bass — pull back
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {

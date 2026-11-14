@@ -154,10 +154,11 @@ vi, IV, V (resolving onto the return's I).
 
 **Notes stay in the scale.** Every Space rule snaps its notes to the song's scale. A chord that
 carries a note outside the scale (the major V in Arc and Turn) gets its own scale
-(`spaceChordScale`: the leading tone replaces the natural seventh), and `fitSpaceChordScale` runs
-once per pitched track after generation and after a single-track regen, moving only the notes the
-chord has swapped out. The pads track is fitted one step ahead (`spacePadsAnticipation`) so
-Anticipated Strings' early notes take the chord they belong to. `HarmonicMinor` is not used.
+(`spaceChordScale`: the leading tone replaces the natural seventh). Each Space rule brings its notes
+onto that scale as it writes each bar or line (`fitSpaceNotes`), moving only the notes the chord has
+swapped out; there is no pass over the finished track (2026-11-14). The pads are fitted before
+Anticipated Strings moves its attacks a 16th early, so each early note takes the chord it belongs
+to. `HarmonicMinor` is not used.
 
 **Tempo.** One range, 96–128, triangular, peak 118.
 

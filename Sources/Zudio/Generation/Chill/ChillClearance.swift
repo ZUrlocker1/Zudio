@@ -13,8 +13,8 @@
 //
 // Who yields: the soloist listens to what is already written (Pads and Bass for Lead 1; those
 // and Lead 1 for Lead 2), and Rhythm, written after the leads, voices around the melody as a
-// pianist does. Each line is checked as it is written, phrase by phrase or bar by bar; nothing
-// passes over a finished track. No random draws.
+// pianist does. Each line is checked as it is written, phrase by phrase or bar by bar (Soho's
+// Lead 1 statement by statement); nothing passes over a finished track. No random draws.
 
 import Foundation
 
@@ -35,6 +35,14 @@ struct ChillClearance {
 
     /// True when `pitch`, sounding over `start..<end`, rubs a held note for two steps or more.
     func clashes(_ pitch: Int, start: Int, end: Int) -> Bool { held.clashes(pitch, start: start, end: end) }
+
+    /// True when a melody note held over `start..<end` passes `voiceLine`'s test: clear of the held
+    /// notes (and an octave up) a step either side, and not an avoid note.
+    func holdsClear(_ pitch: Int, start: Int, end: Int) -> Bool {
+        let s = Swift.max(0, start - 1), e = end + 1
+        return !clashes(pitch, start: s, end: e) && !clashes(pitch + 12, start: s, end: e)
+            && !Self.isAvoidNote(pitch, start: s, end: e, structure: structure)
+    }
 
     /// A semitone above a tone of any chord sounding over `start..<end`, and not itself one.
     private static func isAvoidNote(_ pitch: Int, start: Int, end: Int, structure: SongStructure) -> Bool {

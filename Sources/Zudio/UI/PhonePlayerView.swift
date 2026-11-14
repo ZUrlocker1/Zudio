@@ -744,8 +744,7 @@ struct PhonePlayerView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + twoBarsSeconds) {
             if appState.muteState[trackIndex] {
                 appState.toggleMute(trackIndex)
-                appState.regenInstrument(forTrack: trackIndex)
-                appState.regenerateTrack(trackIndex)
+                appState.regenTrackAndInstrument(trackIndex)
             }
         }
     }
@@ -797,30 +796,24 @@ struct PhonePlayerView: View {
     private func handleSwipeRight() {
         appState.triggerVisualizerFlash(trackIndex: kTrackRhythm)
         appState.triggerVisualizerFlash(trackIndex: kTrackPads)
-        appState.regenInstrument(forTrack: kTrackRhythm)
-        appState.regenInstrument(forTrack: kTrackPads)
-        appState.regenerateTrack(kTrackRhythm)
-        appState.regenerateTrack(kTrackPads)
+        appState.regenTrackAndInstrument(kTrackRhythm)
+        appState.regenTrackAndInstrument(kTrackPads)
         hapticSelection.toggle()
     }
 
     private func handleSwipeLeft() {
         appState.triggerVisualizerFlash(trackIndex: kTrackLead1)
         appState.triggerVisualizerFlash(trackIndex: kTrackLead2)
-        appState.regenInstrument(forTrack: kTrackLead1)
-        appState.regenInstrument(forTrack: kTrackLead2)
-        appState.regenerateTrack(kTrackLead1)
-        appState.regenerateTrack(kTrackLead2)
+        appState.regenTrackAndInstrument(kTrackLead1)
+        appState.regenTrackAndInstrument(kTrackLead2)
         hapticImpactSoft.toggle()
     }
 
     private func handleTwoFinger() {
         appState.triggerVisualizerFlash(trackIndex: kTrackBass)
         appState.triggerVisualizerFlash(trackIndex: kTrackDrums)
-        appState.regenInstrument(forTrack: kTrackBass)
-        appState.regenInstrument(forTrack: kTrackDrums)
-        appState.regenerateTrack(kTrackBass)
-        appState.regenerateTrack(kTrackDrums)
+        appState.regenTrackAndInstrument(kTrackBass)
+        appState.regenTrackAndInstrument(kTrackDrums)
         hapticImpactRigid.toggle()
     }
 

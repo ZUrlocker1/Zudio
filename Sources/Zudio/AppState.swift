@@ -1865,9 +1865,21 @@ final class AppState: ObservableObject {
         if !generationHistory.isEmpty { generationHistory[generationHistory.count - 1] = updated }
     }
 
+    /// Track regens asked for while another track regen runs, in order. The two-track gestures
+    /// (Rhythm and Pads, the leads, Bass and Drums) ask for both at once; the second was refused,
+    /// so it kept its notes and took only the new instrument (found 2026-11-14). Each waits its
+    /// turn and starts from the song the one before left.
+    private var queuedRegenTracks: [Int] = []
+    private var trackRegenInFlight = false
+
     func regenerateTrack(_ trackIndex: Int) {
-        guard let current = songState, !isGenerating else { return }
+        if isGenerating, trackRegenInFlight, songState != nil {
+            if !queuedRegenTracks.contains(trackIndex) { queuedRegenTracks.append(trackIndex) }
+            return
+        }
+        guard let current = songState, !isGenerating else { flushPendingInstrumentLog(trackIndex); return }
         isGenerating = true
+        trackRegenInFlight = true
         // In evolve mode the extended state has a minimal structure (sections: []) — generators
         // that call structure.section(atBar:) return nil for every body bar, producing empty arrays.
         //
@@ -1972,10 +1984,24 @@ final class AppState: ObservableObject {
                     }
                     self.instrumentChangeToken += 1
                 }
-                // Append only the NEW regen entries to the flat status log (at the very bottom)
-                self.appendToLog(regenEntries)
-                // If a file-open arrived while we were regenerating, load it now.
+                // Append only the NEW regen entries to the flat status log (at the very bottom),
+                // with a new instrument's line second, under ⚡ REGEN and above the rules.
+                var shown = regenEntries
+                if let inst = self.pendingRegenInstrumentLog.removeValue(forKey: trackIndex) {
+                    shown.insert(inst, at: shown.isEmpty ? 0 : 1)
+                }
+                self.appendToLog(shown)
+                self.trackRegenInFlight = false
+                // If a file-open arrived while we were regenerating, load it now; a queued regen
+                // belongs to the song it was asked for, so a load drops the queue.
+                let loading = self.pendingLoadURL != nil
                 self.consumePendingLoad()
+                if loading || self.isGenerating {
+                    for t in self.queuedRegenTracks { self.flushPendingInstrumentLog(t) }
+                    self.queuedRegenTracks.removeAll()
+                } else if !self.queuedRegenTracks.isEmpty {
+                    self.regenerateTrack(self.queuedRegenTracks.removeFirst())
+                }
             }
         }
     }
@@ -4387,8 +4413,32 @@ final class AppState: ObservableObject {
         return programs[min(idx, programs.count - 1)]
     }
 
-    /// Shuffles the instrument on a track to a different entry in its pool.
-    func regenInstrument(forTrack trackIndex: Int) {
+    /// Instrument lines waiting for their track's regen to finish, so the log reads ⚡ REGEN, then
+    /// the instrument, then the rules (Zack, 2026-11-14). Keyed by track.
+    private var pendingRegenInstrumentLog: [Int: GenerationLogEntry] = [:]
+
+    /// A new instrument and a regenerated track together, logged in that order under ⚡ REGEN.
+    func regenTrackAndInstrument(_ trackIndex: Int) {
+        regenInstrument(forTrack: trackIndex, logAfterRegen: true)
+        regenerateTrack(trackIndex)
+    }
+
+    /// Holds a track's instrument line until its regen is logged (the track row's ⚡ button,
+    /// which picks the instrument itself).
+    func logInstrumentAfterRegen(trackIndex: Int, name: String) {
+        let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
+        pendingRegenInstrumentLog[trackIndex] = GenerationLogEntry(tag: "Instrument", description: "\(tName) \(name)",
+                                                                   isTitle: false)
+    }
+
+    /// The held instrument line for `trackIndex`, logged now; used when no regen follows.
+    private func flushPendingInstrumentLog(_ trackIndex: Int) {
+        if let e = pendingRegenInstrumentLog.removeValue(forKey: trackIndex) { appendToLog([e]) }
+    }
+
+    /// Shuffles the instrument on a track to a different entry in its pool. With `logAfterRegen`
+    /// its log line waits for the track's regen (`regenTrackAndInstrument`).
+    func regenInstrument(forTrack trackIndex: Int, logAfterRegen: Bool = false) {
         // Use the loaded song's style, not selectedStyle — the style picker may differ
         // from the song currently playing (e.g. a Motorik song loaded while the picker
         // still shows Chill would otherwise draw instruments from the Chill pool).
@@ -4417,7 +4467,11 @@ final class AppState: ObservableObject {
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
         let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isChillSoho: isSoho2)
         let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
-        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false)])
+        if logAfterRegen {
+            logInstrumentAfterRegen(trackIndex: trackIndex, name: iName)
+        } else {
+            appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false)])
+        }
     }
 
     /// Sets a specific program on a track and records the override index.

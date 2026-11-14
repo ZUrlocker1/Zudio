@@ -62,10 +62,16 @@ struct KosmicLeadGenerator {
             usedRuleIDs.insert("KOS-LD1-013")
             if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
             var themeNote = "", riffNote = ""
-            var theme = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng, note: &themeNote)
-            var riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                 rng: &rng, note: &riffNote)
+            // Each rule's line comes onto its chords' scales as it is written (`fitSpaceNotes`).
+            func fitted(_ line: [MIDIEvent]) -> [MIDIEvent] {
+                var l = line
+                fitSpaceNotes(&l, from: 0, structure: structure, frame: frame)
+                return l
+            }
+            var theme = fitted(generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                           rng: &rng, note: &themeNote))
+            var riff = fitted(generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                        rng: &rng, note: &riffNote))
             // In 50% of songs KOS-LD1-006 JMJ Phrase Loop plays the B sections in place of the riff,
             // for variety. Drawn after the theme and riff, so they are unchanged for a given seed.
             var phrase: [MIDIEvent] = []
@@ -75,8 +81,8 @@ struct KosmicLeadGenerator {
                 func inB(_ ev: MIDIEvent) -> Bool {
                     bSections.contains { ($0.startBar..<$0.endBar).contains(ev.stepIndex / 16) }
                 }
-                phrase = generateJMJPhraseLoop(frame: frame, structure: structure, tonalMap: tonalMap,
-                                               rng: &rng, xFilesBars: &discard).filter(inB)
+                phrase = fitted(generateJMJPhraseLoop(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                      rng: &rng, xFilesBars: &discard).filter(inB))
                 riff = riff.filter { !inB($0) }
                 usedRuleIDs.remove("KOS-LD1-014")
                 usedRuleIDs.insert("KOS-LD1-006")
@@ -84,8 +90,8 @@ struct KosmicLeadGenerator {
             // In 50% of songs KOS-LD1-016 Rising Strings plays the A sections in place of the theme.
             // Drawn last, so the other Lead 1 draws are unchanged for a given seed.
             if rng.nextDouble() < 0.50 {
-                theme = generateOxygeneRisingStrings(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                     rng: &rng, note: &themeNote)
+                theme = fitted(generateOxygeneRisingStrings(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                            rng: &rng, note: &themeNote))
                 lead1BaseRule = "KOS-LD1-016"
                 usedRuleIDs.remove("KOS-LD1-013")
                 usedRuleIDs.insert("KOS-LD1-016")
@@ -93,8 +99,8 @@ struct KosmicLeadGenerator {
             // In a third of songs KOS-LD1-017 Offbeat Climb plays the A sections instead, so the three
             // A-section rules share them evenly. Drawn last, so the earlier draws are unchanged.
             if rng.nextDouble() < 1.0 / 3.0 {
-                theme = generateOxygeneOffbeatClimb(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng, note: &themeNote)
+                theme = fitted(generateOxygeneOffbeatClimb(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                           rng: &rng, note: &themeNote))
                 lead1BaseRule = "KOS-LD1-017"
                 usedRuleIDs.remove("KOS-LD1-013")
                 usedRuleIDs.remove("KOS-LD1-016")
@@ -103,8 +109,8 @@ struct KosmicLeadGenerator {
             // In a quarter of songs KOS-LD1-015 Magnetic Fields Turn Melody plays the A sections
             // instead, so the four A-section rules share them evenly. Drawn last, as above.
             if rng.nextDouble() < 0.25 {
-                theme = generateMagneticTurnMelody(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                   rng: &rng, note: &themeNote)
+                theme = fitted(generateMagneticTurnMelody(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                          rng: &rng, note: &themeNote))
                 lead1BaseRule = "KOS-LD1-015"
                 usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-016", "KOS-LD1-017"])
                 usedRuleIDs.insert("KOS-LD1-015")
@@ -112,8 +118,8 @@ struct KosmicLeadGenerator {
             // In a fifth of songs KOS-LD1-018 Magnetic Call and Hold plays the A sections instead, so
             // the five A-section rules share them evenly. Drawn last, as above.
             if rng.nextDouble() < 0.20 {
-                theme = generateMagneticCallAndHold(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng, note: &themeNote)
+                theme = fitted(generateMagneticCallAndHold(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                           rng: &rng, note: &themeNote))
                 lead1BaseRule = "KOS-LD1-018"
                 usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-015", "KOS-LD1-016", "KOS-LD1-017"])
                 usedRuleIDs.insert("KOS-LD1-018")
@@ -121,8 +127,8 @@ struct KosmicLeadGenerator {
             // In a third of songs with a B section KOS-LD1-019 Equinoxe Thirds Riff plays the B sections
             // in place of the riff or the Phrase Loop, so the three B-section rules share them evenly.
             if structure.sections.contains(where: { $0.label == .B }), rng.nextDouble() < 1.0 / 3.0 {
-                riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                 rng: &rng, equinoxeThirds: true, note: &riffNote)
+                riff = fitted(generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                        rng: &rng, equinoxeThirds: true, note: &riffNote))
                 phrase = []
                 usedRuleIDs.subtract(["KOS-LD1-014", "KOS-LD1-006"])
                 usedRuleIDs.insert("KOS-LD1-019")
@@ -339,9 +345,13 @@ struct KosmicLeadGenerator {
             }
             if r >= 1.0 / 3.0 {
                 usedRuleIDs.insert("KOS-LD2-001")
-                return rng.nextDouble() < 0.50
+                // Written onto its chords' scales (`fitSpaceNotes`): the late octave lands after
+                // Lead 1's note, sometimes under the next chord.
+                var twin = rng.nextDouble() < 0.50
                     ? spaceStereoTwin(rhythm: rhythmEvents, structure: structure)
                     : magneticLateOctave(lead1: lead1Events, totalBars: frame.totalBars)
+                fitSpaceNotes(&twin, from: 0, structure: structure, frame: frame)
+                return twin
             }
             rule = "KOS-LD2-005"
         } else {
@@ -356,12 +366,17 @@ struct KosmicLeadGenerator {
                                           xFilesBars: xFilesBars)
         }
 
-        // KOS-LD2-005 Space echo reply, the only Lead 2 rule written bar by bar.
+        // KOS-LD2-005 Space echo reply, the only Lead 2 rule written bar by bar. Each part goes onto
+        // its chords' scales as it is written (`fitSpaceNotes`).
         var events: [MIDIEvent] = []
+        func fitNew(from start: Int) {
+            if isKosmicSpace { fitSpaceNotes(&events, from: start, structure: structure, frame: frame) }
+        }
 
         // Bridge A-2: Lead 2 plays a complementary ascending figure on response bars (silent on X-Files bars)
         events += generateBridgeAltLead2(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
                                          xFilesBars: xFilesBars)
+        fitNew(from: 0)
 
         // Rhythm and Lead 1 notes sounding in each bar, for the echo reply's clash check.
         var bandByBar: [Int: [(start: Int, end: Int, note: Int)]] = [:]
@@ -385,9 +400,11 @@ struct KosmicLeadGenerator {
                 let lead2High = section.intensity == .low ? 67 : 80
                 let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
                                                       low: 55, high: lead2High)
+                let barFirst = events.count
                 events += spaceEchoReplyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes,
                                             chordTones: entry.chordWindow.chordTones,
                                             band: bandByBar[bar] ?? [], lastReply: &lastReply, rng: &rng)
+                fitNew(from: barFirst)
             }
         }
 
@@ -429,6 +446,7 @@ struct KosmicLeadGenerator {
                             let vel  = UInt8(48 + rng.nextInt(upperBound: 15))
                             events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note),
                                                     velocity: vel, durationSteps: 28))
+                            fitNew(from: events.count - 1)
                         }
                     }
                 }

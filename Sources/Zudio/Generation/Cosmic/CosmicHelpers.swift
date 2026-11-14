@@ -86,27 +86,37 @@ func spaceChordScale(chordTones: Set<Int>, frame: GlobalMusicalFrame) -> Set<Int
     return frame.scalePCs.subtracting(swaps.keys).union(swaps.values)
 }
 
-// Every Space rule snaps its notes to the song's scale as it writes them. This moves only the
-// notes the chord under them has swapped out (the minor 3rd over a major V becomes the major 3rd)
-// and leaves every other note alone, so it never moves a note twice. Run once per pitched track,
-// after generation and after a regen.
-// KOS-PADS-009 plays each pad attack one 16th early. The Space pads track is therefore fitted
-// by the chord one step ahead: no other Space pad rule attacks on step 15, so this changes nothing
-// for them.
+// KOS-PADS-009 plays each pad attack this many steps early, after its notes are written.
 let spacePadsAnticipation = 1
 
-func fitSpaceChordScale(_ events: [MIDIEvent], structure: SongStructure,
-                        frame: GlobalMusicalFrame, lookAheadSteps: Int = 0) -> [MIDIEvent] {
-    events.map { ev in
-        guard let cw = structure.chordWindow(atBar: (ev.stepIndex + lookAheadSteps) / 16),
-              let to = spaceChordAlterations(chordTones: cw.chordTones,
-                                             scalePCs: frame.scalePCs)[Int(ev.note) % 12]
-        else { return ev }
-        var d = to - Int(ev.note) % 12
-        if d > 6 { d -= 12 } else if d < -6 { d += 12 }
-        return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(Int(ev.note) + d),
-                         velocity: ev.velocity, durationSteps: ev.durationSteps)
+// Every Space rule writes its notes in the song's scale and then, as it writes each bar or line,
+// brings them onto the scale of the chord under them (`fitSpaceNotes`). This moves only the notes
+// the chord has swapped out (the minor 3rd over a major V becomes the major 3rd) and leaves every
+// other note alone. What is written later, and regen, read the notes that sound; there is no pass
+// over a finished track. The pads are fitted before KOS-PADS-009 moves them early, so each note
+// is fitted to its own chord.
+func fitSpaceNotes(_ events: inout [MIDIEvent], from start: Int, structure: SongStructure,
+                   frame: GlobalMusicalFrame) {
+    for i in start..<events.count {
+        let ev = events[i]
+        let n = spaceFitted(Int(ev.note), at: ev.stepIndex, structure: structure, frame: frame)
+        if n != Int(ev.note) {
+            events[i] = MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(n), velocity: ev.velocity,
+                                  durationSteps: ev.durationSteps)
+        }
     }
+}
+
+// One note as a Space rule writes it: a pitch class the chord under `step` has swapped out
+// (`spaceChordAlterations`) moves to its replacement, by the shorter way; any other note is
+// returned as it is. No draws.
+func spaceFitted(_ note: Int, at step: Int, structure: SongStructure, frame: GlobalMusicalFrame) -> Int {
+    guard let cw = structure.chordWindow(atBar: step / 16),
+          let to = spaceChordAlterations(chordTones: cw.chordTones, scalePCs: frame.scalePCs)[note % 12]
+    else { return note }
+    var d = to - note % 12
+    if d > 6 { d -= 12 } else if d < -6 { d += 12 }
+    return note + d
 }
 
 // The Space sequencer register: the chord root in MIDI 48–59, as the Oxygene 4 sequencer plays it.

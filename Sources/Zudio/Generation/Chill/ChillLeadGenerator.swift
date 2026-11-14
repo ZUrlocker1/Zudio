@@ -24,6 +24,10 @@ struct ChillLeadGenerator {
         forceRuleID: String? = nil,
         lickVariants: Bool = true,
         band: ChillClearance? = nil,
+        // Soho's reused rules (001, 004): a moved note keeps the line moving (avoidRepeat), and a
+        // seed phrase is kept as written, so each replay is cleared where it lands. Base Chill
+        // replays the cleared seed.
+        sohoReuse: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         replayBars reportReplayBars: ((Set<Int>) -> Void)? = nil,
@@ -138,7 +142,7 @@ struct ChillLeadGenerator {
         // Each phrase listens to the band as it is written (ChillClearance): no rub with the Pads
         // and Bass notes already written, no avoid note held over the chord.
         func heard(_ line: [MIDIEvent]) -> [MIDIEvent] {
-            band?.voiceLine(line, low: regLow, high: regHigh) ?? line
+            band?.voiceLine(line, low: regLow, high: regHigh, avoidRepeat: sohoReuse) ?? line
         }
 
         // Blues: 60% of songs have a soloist who uses the blue note (the b5 of the key), the rest
@@ -394,10 +398,11 @@ struct ChillLeadGenerator {
 
                 if seedPhrases.count < 2 {
                     // Seed zone: generate normally and store as relative-indexed motif.
-                    let phraseNotes = heard(freshPhrase(bar: bar, bars: actualPhraseLen, label: label))
+                    let written = freshPhrase(bar: bar, bars: actualPhraseLen, label: label)
+                    let phraseNotes = heard(written)
                     events += phraseNotes
                     let offset = bar * 16
-                    seedPhrases.append(phraseNotes.map {
+                    seedPhrases.append((sohoReuse ? written : phraseNotes).map {
                         MIDIEvent(stepIndex: $0.stepIndex - offset, note: $0.note,
                                   velocity: $0.velocity, durationSteps: $0.durationSteps)
                     })

@@ -74,24 +74,32 @@ struct KosmicArpeggioGenerator {
             // the rule, its 8 bars play the full Oxygene pattern (Zack, 2026-11-03, La Nuit Hypnotique,
             // where Dual-Rate's 2–4 notes a bar left the solo bare). No draws.
             let solo = spaceArrangement?.soloRange ?? []
+            // Each line comes onto its chords' scales as it is written (`fitSpaceNotes`). The
+            // sequencer patterns build on chord tones and 002/005 on the chord's scale, so this
+            // moved nothing in 1,000 seeds; it keeps any rare one in the chord's scale.
+            func fitted(_ line: [MIDIEvent]) -> [MIDIEvent] {
+                var l = line
+                fitSpaceNotes(&l, from: 0, structure: structure, frame: frame)
+                return l
+            }
             func withSolo(_ line: [MIDIEvent]) -> [MIDIEvent] {
-                guard !solo.isEmpty else { return line }
+                guard !solo.isEmpty else { return fitted(line) }
                 let inSolo = { (bar: Int) in solo.contains { $0.contains(bar) } }
-                return (silenceBars(line, solo)
+                return fitted((silenceBars(line, solo)
                         + jmjStepSequencer(frame: frame, tonalMap: tonalMap) { inSolo($0) ? oxygeneSourcePattern : nil })
-                    .sorted { $0.stepIndex < $1.stepIndex }
+                    .sorted { $0.stepIndex < $1.stepIndex })
             }
             if spaceRule == "KOS-RTHM-021" {
                 return withSolo(generateOxygeneOffbeatPedal(frame: frame, tonalMap: tonalMap, rng: &rng,
                                                             arrangement: spaceArrangement))
             }
             if spaceRule == "KOS-RTHM-017" {
-                return generateEquinoxeFifthTriplets(frame: frame, tonalMap: tonalMap, rng: &rng,
-                                                     arrangement: spaceArrangement)
+                return fitted(generateEquinoxeFifthTriplets(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                            arrangement: spaceArrangement))
             }
             if spaceRule == "KOS-RTHM-018" {
-                return generateMagneticLeadingToneCell(frame: frame, tonalMap: tonalMap, rng: &rng,
-                                                       arrangement: spaceArrangement)
+                return fitted(generateMagneticLeadingToneCell(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                              arrangement: spaceArrangement))
             }
             if spaceRule != "KOS-RTHM-016" {
                 let line = spaceRule == "KOS-RTHM-002"
@@ -104,8 +112,8 @@ struct KosmicArpeggioGenerator {
                               velocity: $0.velocity, durationSteps: $0.durationSteps)
                 })
             }
-            return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng,
-                                                  arrangement: spaceArrangement)
+            return fitted(generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                         arrangement: spaceArrangement))
         }
 
         let chosenRule: String

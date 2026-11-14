@@ -29,9 +29,10 @@ struct KosmicTextureGenerator {
 
         if isKosmicSpace {
             usedRuleIDs.insert("KOS-TEXT-005")
-            let sweeps = generateOxygeneSurfSweep(frame: frame, structure: structure, tonalMap: tonalMap,
+            var sweeps = generateOxygeneSurfSweep(frame: frame, structure: structure, tonalMap: tonalMap,
                                                   rng: &rng,
                                                   returnBars: spaceArrangement?.swellBars ?? [])
+            fitSpaceNotes(&sweeps, from: 0, structure: structure, frame: frame)   // onto its chords' scales
             // The sequencer solo takes no swell of its own; one landing on its first bar rings on.
             let silences = spaceArrangement?.textureSilences ?? []
             return sweeps.filter { ev in !silences.contains { $0.contains(ev.stepIndex / 16) } }

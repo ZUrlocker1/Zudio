@@ -245,6 +245,9 @@ struct KosmicBassGenerator {
         let bridgeMelodyBassRule = bridgeMelodyBassRules[rng.nextInt(upperBound: bridgeMelodyBassRules.count)]
 
         for bar in 0..<frame.totalBars {
+            // Space: each bar's notes go onto the chord's scale as the bar is written.
+            let barFirst = events.count
+            defer { if isKosmicSpace { fitSpaceNotes(&events, from: barFirst, structure: structure, frame: frame) } }
             guard let section = structure.section(atBar: bar) else { continue }
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
@@ -631,6 +634,7 @@ struct KosmicBassGenerator {
                 .map { Int($0.note) }
                 ?? tonalMap.entry(atBar: returnBar).map { Int(bassRoot(entry: $0, frame: frame)) }
             events = silenceBars(events, [bridge.range])
+            let bridgeFirst = events.count
             let holdBars = bridge.kind == .breakdown
                 ? Array(stride(from: bridge.range.lowerBound, to: bridge.range.upperBound, by: 2))
                 : [bridge.range.lowerBound]
@@ -646,6 +650,7 @@ struct KosmicBassGenerator {
                                             velocity: UInt8(80 + i * 8), durationSteps: 2))
                 }
             }
+            fitSpaceNotes(&events, from: bridgeFirst, structure: structure, frame: frame)
             events.sort { $0.stepIndex < $1.stepIndex }
         }
 

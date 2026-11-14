@@ -61,6 +61,10 @@ struct KosmicPadsGenerator {
         var events: [MIDIEvent] = []
 
         for bar in 0..<frame.totalBars {
+            // Space: each bar's notes go onto the chord's scale as the bar is written, before
+            // KOS-PADS-009 moves its attacks a 16th early, so each is fitted to its own chord.
+            let barFirst = events.count
+            defer { if isKosmicSpace { fitSpaceNotes(&events, from: barFirst, structure: structure, frame: frame) } }
             guard let section = structure.section(atBar: bar) else { continue }
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
@@ -319,8 +323,8 @@ struct KosmicPadsGenerator {
         let silenced = silenceBars(events, spaceArrangement?.padsSilences ?? [])
         // KOS-PADS-009 Oxygene 7-13 Anticipated Strings: every attack one 16th early, so each chord
         // change lands on step 15 of the bar before. Done after the silences so a silenced bar does
-        // not leak a note, and the release stays on its grid. fitSpaceChordScale reads the pads one
-        // step ahead (spacePadsAnticipation) so the early note is fitted to the chord it belongs to.
+        // not leak a note, and the release stays on its grid. Each note was fitted to its chord in
+        // the bar loop, before the move.
         guard primaryRule == "KOS-PADS-009" else { return silenced }
         return silenced.map { ev in
             guard ev.stepIndex > 0 else { return ev }

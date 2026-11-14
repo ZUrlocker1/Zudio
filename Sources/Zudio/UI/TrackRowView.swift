@@ -171,6 +171,8 @@ struct TrackRowView: View {
                             appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
                             appState.instrumentOverrides[trackIndex] = instrumentIndex
                             applyDefaultEffects()
+                            appState.logInstrumentAfterRegen(trackIndex: trackIndex,
+                                                             name: instruments[instrumentIndex].name)
                             appState.regenerateTrack(trackIndex)
                         } label: {
                             Image(systemName: "bolt.fill")

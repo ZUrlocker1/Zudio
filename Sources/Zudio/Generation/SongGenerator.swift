@@ -657,14 +657,6 @@ struct SongGenerator {
             spaceWalkingBass: !bassRules.isDisjoint(with: KosmicDrumGenerator.spaceWalkingBasses)
         )
 
-        // Kosmic Space: notes the chord under them has altered move onto the chord's scale.
-        if isKosmicSpace {
-            for t in 0..<kTrackDrums {
-                trackEvents[t] = fitSpaceChordScale(trackEvents[t], structure: structure, frame: frame,
-                                                    lookAheadSteps: t == kTrackPads ? spacePadsAnticipation : 0)
-            }
-        }
-
         // Post-processing: apply arrangement and harmonic filters
         // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Kosmic)
         // Kosmic Space: the sequencer is never block-silenced or thinned — the same pattern plays
@@ -2116,11 +2108,6 @@ struct SongGenerator {
                 let l2   = trackIndex == kTrackLead1 ? "N/A" : mine
                 grooveFixupRegen = n == 0 ? "No changes!" : "L1: \(l1), L2: \(l2) fixes"
             }
-        }
-
-        if isSpace && trackIndex != kTrackDrums {
-            events = fitSpaceChordScale(events, structure: songState.structure, frame: songState.frame,
-                                        lookAheadSteps: trackIndex == kTrackPads ? spacePadsAnticipation : 0)
         }
 
         // A regenerated Kosmic lead gets the harmonic filter a generated song's leads get, the clash

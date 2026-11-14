@@ -90,14 +90,14 @@ extension ChillLeadGenerator {
         reportReturns: ((Set<Int>) -> Void)? = nil
     ) -> (events: [MIDIEvent], handoffBars: Set<Int>,
           hookTreatments: String?) {
-        // The finished line keeps clear of the Pads, Bass and Rhythm, as base Chill's leads do:
-        // a held note a semitone from the band, or a semitone above a chord tone (the 4th over a
-        // major 3rd), moves to the nearest clear scale note. Short passing notes stay. A moved
-        // note keeps the hook moving rather than repeat its neighbour (Zack, 2026-11-14). No draws.
-        func voiced(_ line: [MIDIEvent]) -> [MIDIEvent] {
-            let (low, high) = register(for: leadInstrument)
-            return band?.voiceLine(line, low: low, high: high,
-                                   avoidRepeat: true) ?? line
+        // Each phrase or statement keeps clear of the Pads, Bass and Rhythm as it is written, as
+        // base Chill's leads do: a held note a semitone from the band, or a semitone above a chord
+        // tone (the 4th over a major 3rd), moves to the nearest clear scale note. Short passing
+        // notes stay. A moved note keeps the hook moving rather than repeat its neighbour (Zack,
+        // 2026-11-14). No draws. What follows a phrase reads it as written.
+        let (regLow, regHigh) = register(for: leadInstrument)
+        func heard(_ line: [MIDIEvent]) -> [MIDIEvent] {
+            band?.voiceLine(line, low: regLow, high: regHigh, avoidRepeat: true) ?? line
         }
         var hookTreatments: String? = nil
         // Bars where the lead comes back to its original form, for the log. Recorded only.
@@ -113,9 +113,9 @@ extension ChillLeadGenerator {
         }
         if sohoReusedLead1Rules.contains(ruleID) {
             let r = reusedLead1(ruleID, frame: frame, structure: structure, leadInstrument: leadInstrument,
-                                breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs,
-                                formReturns: &formReturns)
-            return (voiced(r.events), r.handoffBars, nil)   // not an Avalon Hook
+                                breakdownStyle: breakdownStyle, band: band, rng: &rng,
+                                usedRuleIDs: &usedRuleIDs, formReturns: &formReturns)
+            return (r.events, r.handoffBars, nil)   // not an Avalon Hook
         }
         usedRuleIDs.insert(ruleID)
 
@@ -167,28 +167,29 @@ extension ChillLeadGenerator {
         switch ruleID {
         case "CHL-LD1-011":
             sustainedTone(frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
-                          open: open, remixReturns: remixReturns,
+                          open: open, remixReturns: remixReturns, heard: heard,
                           events: &events, rng: &rng)
         case "CHL-LD1-012":
             tightHook(treatmentNote: &hookTreatments, formReturns: &formReturns,
                       frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
-                      open: open, remixReturns: remixReturns,
+                      open: open, remixReturns: remixReturns, heard: heard, band: band,
                       events: &events, rng: &rng)
         default:
             counterLine(formReturns: &formReturns,
                         frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
-                        open: open, remixReturns: remixReturns,
+                        open: open, remixReturns: remixReturns, heard: heard,
                         events: &events, rng: &rng)
         }
 
-        events += remixPickups(remixReturns, structure: structure, frame: frame, pool: pool, rng: &rng)
+        events += remixPickups(remixReturns, structure: structure, frame: frame, pool: pool,
+                               band: band, leadInstrument: leadInstrument, rng: &rng)
 
         // No unbroken stretch over 14–16 bars: this substyle is built on space. Motorik uses 20.
         if ruleID != "CHL-LD1-011" {
             events = LeadGenerator.capUnbrokenStretch(events, maxBars: 14 + rng.nextInt(upperBound: 3),
                                                       totalBars: frame.totalBars, rng: &rng)
         }
-        return (voiced(events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }), [], hookTreatments)
+        return (events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }, [], hookTreatments)
     }
 
     // MARK: - Reused base Chill rules
@@ -201,15 +202,18 @@ extension ChillLeadGenerator {
     private static func reusedLead1(
         _ ruleID: String, frame: GlobalMusicalFrame, structure: SongStructure,
         leadInstrument: ChillLeadInstrument, breakdownStyle: ChillBreakdownStyle,
+        band: ChillClearance?,
         rng: inout SeededRNG, usedRuleIDs: inout Set<String>, formReturns: inout Set<Int>
     ) -> (events: [MIDIEvent], handoffBars: Set<Int>) {
         var replays = Set<Int>(), returns = Set<Int>()
         defer { formReturns = returns }
+        // Each phrase keeps clear of the band as base Chill writes it (see `sohoReuse`).
         let (base, handoff, _) = generateLead1(
             frame: frame, structure: structure, leadInstrument: leadInstrument,
             beatStyle: .electronic,   // only consulted by the St Germain staccato roll, which forcing skips
             breakdownStyle: breakdownStyle, forceRuleID: ruleID,
             lickVariants: false,   // Chill Soho unchanged: Chet sigh plays as written
+            band: band, sohoReuse: true,
             rng: &rng, usedRuleIDs: &usedRuleIDs, replayBars: { replays = $0 },
             returns: { returns = $0 })
 
@@ -231,7 +235,8 @@ extension ChillLeadGenerator {
 
         let pool = sohoPool(frame: frame, leadInstrument: leadInstrument)
         if pool.count >= 4 {
-            events += remixPickups(remixReturns, structure: structure, frame: frame, pool: pool, rng: &rng)
+            events += remixPickups(remixReturns, structure: structure, frame: frame, pool: pool,
+                                   band: band, leadInstrument: leadInstrument, rng: &rng)
         }
         events = LeadGenerator.capUnbrokenStretch(events, maxBars: 14 + rng.nextInt(upperBound: 3),
                                                   totalBars: frame.totalBars, rng: &rng)
@@ -281,6 +286,7 @@ extension ChillLeadGenerator {
     private static func counterLine(formReturns: inout Set<Int>,
                                     frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                     firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
+                                    heard: ([MIDIEvent]) -> [MIDIEvent],
                                     events: inout [MIDIEvent],
                                     rng: inout SeededRNG) {
         var hook: (phrase: SohoPhrase, offset: Int, pitch: Int)? = nil
@@ -342,7 +348,7 @@ extension ChillLeadGenerator {
                 notes[n - 1] = stepped(notes[n - 1], up: notes[n - 2].note < notes[n - 1].note, pool: pool)
             }
             guard let last = notes.last else { bar += 1; continue }
-            events += notes
+            events += heard(notes)
             lastPitch = Int(last.note)
             let endBar = (last.stepIndex + last.durationSteps + 15) / 16
             // Rests of about a bar and a half: the partial bar after the phrase plus 0–2 more.
@@ -478,6 +484,7 @@ extension ChillLeadGenerator {
     private static func tightHook(treatmentNote: inout String?, formReturns: inout Set<Int>,
                                   frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                   firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
+                                  heard: ([MIDIEvent]) -> [MIDIEvent], band: ChillClearance?,
                                   events: inout [MIDIEvent],
                                   rng: inout SeededRNG) {
         let closed = rng.nextDouble() < 0.30
@@ -576,6 +583,8 @@ extension ChillLeadGenerator {
         let preferred = treatments.contains(.displaced)
             ? [4, 6, 8][rng.nextInt(upperBound: 3)]
             : (length <= 12 ? [0, 2, 4][rng.nextInt(upperBound: 3)] : 0)
+        // The statements as written and as they sound, note for note in the same order.
+        var written = events, sounding = events
         var bar = firstPlayable + rng.nextInt(upperBound: 2)
 
         while bar < frame.totalBars {
@@ -685,9 +694,11 @@ extension ChillLeadGenerator {
                 // sound through an intro or a breakdown, where this lead must rest.
                 guard (0..<span).allSatisfy({ bar + $0 < frame.totalBars && open(bar + $0) })
                 else { break }
-                events += realise(figure, at: bar * 16 + offset, from: start,
-                                  limit: (bar + span) * 16,
-                                  pool: pool, vel: velocity(at: bar, structure: structure), rng: &rng)
+                let statement = realise(figure, at: bar * 16 + offset, from: start,
+                                        limit: (bar + span) * 16,
+                                        pool: pool, vel: velocity(at: bar, structure: structure), rng: &rng)
+                written += statement
+                sounding += heard(statement)
                 stated += 1
                 bar += span > 1 ? span : (everyOther ? 2 : 1)
             }
@@ -705,7 +716,7 @@ extension ChillLeadGenerator {
             }
             bar += 1 + rng.nextInt(upperBound: 2)                    // a bar or two off
         }
-        events = holdSomeFigureEndings(events, structure: structure, rng: &rng)
+        events = holdSomeFigureEndings(sounding, written: written, structure: structure, band: band, rng: &rng)
     }
 
     /// Occasionally hold the last note of a figure, so a rule built from short bursts breathes.
@@ -725,9 +736,17 @@ extension ChillLeadGenerator {
     ///   two or three beats is a clash
     /// - clamped to the next figure's onset and to the end of the chord window, so it can neither
     ///   collide with what follows nor ring over a chord change
-    private static func holdSomeFigureEndings(_ events: [MIDIEvent], structure: SongStructure,
+    /// - only as long as the band leaves it clear (`ChillClearance.holdsClear`)
+    ///
+    /// `events` are the figures as they sound and `written` the same notes, in the same order, as
+    /// written; which figure ends are held is decided on the written line, so clearing a note
+    /// never moves a hold to another figure. A note the clearance moved off the chord isn't held.
+    private static func holdSomeFigureEndings(_ events: [MIDIEvent], written: [MIDIEvent],
+                                              structure: SongStructure, band: ChillClearance?,
                                               rng: inout SeededRNG) -> [MIDIEvent] {
-        let sorted = events.sorted { $0.stepIndex < $1.stepIndex }
+        let order = written.indices.sorted { written[$0].stepIndex < written[$1].stepIndex }
+        let sorted = order.map { written[$0] }
+        let sounding = order.map { events[$0] }
         guard sorted.count > 2 else { return events }
         // Figures are separated by a rest; inside one, notes are at most a quarter apart.
         var figures: [[Int]] = [[0]]
@@ -736,7 +755,7 @@ extension ChillLeadGenerator {
             if sorted[i].stepIndex - (prev.stepIndex + prev.durationSteps) > 4 { figures.append([i]) }
             else { figures[figures.count - 1].append(i) }
         }
-        var out = sorted
+        var out = sounding
         var heldPrevious = false
         for f in figures {
             guard let i = f.last else { continue }
@@ -784,8 +803,19 @@ extension ChillLeadGenerator {
                     let weights: [Double] = fits.count == 1 ? [1.0]
                                           : fits.count == 2 ? [0.42, 0.58]
                                                             : [0.28, 0.40, 0.32]
-                    out[i] = MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity,
-                                       durationSteps: fits[rng.weightedPick(weights)])
+                    let drawn = fits[rng.weightedPick(weights)]
+                    // The sounding note is held only if it is still a chord tone, and only as
+                    // long as the band leaves it clear: the longest such length up to the one
+                    // drawn. The draw, and the next figure's turn, go as written.
+                    let s = sounding[i]
+                    if s.note == e.note || w.chordTones.contains(Int(s.note) % 12),
+                       let length = fits.last(where: {
+                           $0 <= drawn && band?.holdsClear(Int(s.note), start: s.stepIndex,
+                                                           end: s.stepIndex + $0) ?? true
+                       }) {
+                        out[i] = MIDIEvent(stepIndex: s.stepIndex, note: s.note, velocity: s.velocity,
+                                           durationSteps: length)
+                    }
                     held = true
                 }
             }
@@ -1036,6 +1066,7 @@ extension ChillLeadGenerator {
     /// notes in the whole song, median 47.6 steps, inside a 12-semitone compass.
     private static func sustainedTone(frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                       firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
+                                      heard: ([MIDIEvent]) -> [MIDIEvent],
                                       events: inout [MIDIEvent],
                                       rng: inout SeededRNG) {
         let centre = pool[pool.count / 2]
@@ -1117,22 +1148,24 @@ extension ChillLeadGenerator {
                 return band.min { abs($0 - target) < abs($1 - target) } ?? note
             }
             let punchVel = UInt8(Swift.min(120, vel + 8))
+            var phrase: [MIDIEvent] = []
+            defer { events += heard(phrase) }
             if base.longFirst {
-                events.append(MIDIEvent(stepIndex: start, note: UInt8(note),
+                phrase.append(MIDIEvent(stepIndex: start, note: UInt8(note),
                                         velocity: UInt8(vel), durationSteps: longHold))
                 for sh in shorts {
-                    events.append(MIDIEvent(stepIndex: start + longHold + sh.step,
+                    phrase.append(MIDIEvent(stepIndex: start + longHold + sh.step,
                                             note: UInt8(snapped(sh.interval)),
                                             velocity: punchVel, durationSteps: sh.dur))
                 }
                 phraseEnd = start + longHold + cellSpan
             } else {
                 for sh in shorts {
-                    events.append(MIDIEvent(stepIndex: start + sh.step,
+                    phrase.append(MIDIEvent(stepIndex: start + sh.step,
                                             note: UInt8(snapped(sh.interval)),
                                             velocity: punchVel, durationSteps: sh.dur))
                 }
-                events.append(MIDIEvent(stepIndex: start + cellSpan, note: UInt8(note),
+                phrase.append(MIDIEvent(stepIndex: start + cellSpan, note: UInt8(note),
                                         velocity: UInt8(vel), durationSteps: longHold))
                 phraseEnd = start + cellSpan + longHold
             }
@@ -1146,10 +1179,15 @@ extension ChillLeadGenerator {
     /// Three eighths on steps 10, 12 and 14 of the remix's last bar, climbing by scale step to
     /// a chord tone on the downbeat of the return. Played on both exits — the unison stabs and
     /// the fill — so the lead is what brings the song back in.
+    /// Each pickup keeps clear of the band as it is written, on its own.
     private static func remixPickups(_ returns: [Int], structure: SongStructure, frame: GlobalMusicalFrame,
-                                     pool: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
-        var events: [MIDIEvent] = []
+                                     pool: [Int], band: ChillClearance?, leadInstrument: ChillLeadInstrument,
+                                     rng: inout SeededRNG) -> [MIDIEvent] {
+        var all: [MIDIEvent] = []
+        let (low, high) = register(for: leadInstrument)
         for bar in returns {
+            var events: [MIDIEvent] = []
+            defer { all += band?.voiceLine(events, low: low, high: high, avoidRepeat: true) ?? events }
             guard let chord = structure.chordWindow(atBar: bar) else { continue }
             let landings = pool.indices.filter { $0 >= 3 && chord.chordTones.contains(pool[$0] % 12) }
             guard !landings.isEmpty else { continue }
@@ -1163,7 +1201,7 @@ extension ChillLeadGenerator {
             events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(pool[target]),
                                     velocity: UInt8(vel + 4), durationSteps: 6))
         }
-        return events
+        return all
     }
 
     // MARK: - Shared
