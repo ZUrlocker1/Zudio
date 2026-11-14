@@ -959,8 +959,9 @@ struct LeadGenerator {
     }
 
     // MARK: - LD1-010: Pendulum arc — Disorder two-note quarter alternation, Noir only
-    // Restructured: max 3–4 bar blocks, mandatory 3–5 bar rest between blocks.
-    // Rhythmic fade: bar 0-1 full, bar 2 drops beat 4, bar 3 beats 1-2 only.
+    // Restructured: 2-bar blocks, then the release phrase and a 2–4 bar rest (1–2 in the reprise).
+    // The root-lower pair plays at most 3 times a block (Zack, 2026-11-14, Dunkel Trieb):
+    // bar 0 full (two pairs), bar 1 one pair with the lower note held into the rest.
     // Rest bars: sparse dark drone fill (option 2 — pendulum as punctuation into a held field).
     // Active bars: occasional third-pitch interjection between root and lower (option 4).
     // Chord change mid-block forces an early rest.
@@ -989,8 +990,9 @@ struct LeadGenerator {
         }
         pendulumLastRootPC = rootPC
 
-        // Reprise: truncate any ongoing post-phrase silence so the next block starts immediately
-        if isReprise && bar >= pendulumPhraseEnd && pendulumPhraseEnd > 0 && bar < pendulumRestEnd {
+        // Reprise: truncate any ongoing post-phrase silence so the next block starts immediately.
+        // A block begun inside the reprise keeps its rest: the bars freed by the shorter block.
+        if isReprise && pendulumBlockStart < frame.totalBars * 3 / 4 && bar >= pendulumPhraseEnd && pendulumPhraseEnd > 0 && bar < pendulumRestEnd {
             pendulumRestEnd = bar
         }
 
@@ -1022,14 +1024,17 @@ struct LeadGenerator {
                 pendulumUsesP4         = rng.nextDouble() < 0.30   // consume draw for RNG determinism
                 return []
             }
-            let blockLen           = 3 + rng.nextInt(upperBound: 2)   // 3–4 bars max
+            // The block was 3–4 bars; it is now 2 (three root-lower pairs at most), and the bars it
+            // gave up rest after the release phrase, so the phrase comes round no more often.
+            let freedBars          = 1 + rng.nextInt(upperBound: 2)
+            let blockLen           = 2
             pendulumBlockStart     = bar
             pendulumWindowEnd      = bar + blockLen
             pendulumPhraseShape    = rng.nextInt(upperBound: 3)        // pick phrase shape once
             pendulumPhraseBarStart = pendulumWindowEnd
             pendulumPhraseEnd      = pendulumWindowEnd + 2             // 2-bar phrase
-            // Reprise: no silence after phrase — chain directly into next block
-            let silenceLen         = isReprise ? 0 : 1 + rng.nextInt(upperBound: 2)
+            // Reprise: no silence after phrase other than the freed bars
+            let silenceLen         = (isReprise ? 0 : 1 + rng.nextInt(upperBound: 2)) + freedBars
             pendulumRestEnd        = pendulumPhraseEnd + silenceLen
             pendulumUsesP4         = rng.nextDouble() < 0.30
         }
@@ -1046,7 +1051,7 @@ struct LeadGenerator {
 
         var events: [MIDIEvent] = []
         switch blockPos {
-        case 0, 1:
+        case 0:
             events.append(MIDIEvent(stepIndex: barStart,      note: root,      velocity: UInt8(baseVel),      durationSteps: 4))
             events.append(MIDIEvent(stepIndex: barStart + 4,  note: lowerNote, velocity: UInt8(baseVel - 8),  durationSteps: 4))
             events.append(MIDIEvent(stepIndex: barStart + 8,  note: root,      velocity: UInt8(baseVel - 2),  durationSteps: 4))
@@ -1069,20 +1074,18 @@ struct LeadGenerator {
                                             velocity: UInt8(max(50, baseEvent.2 - 10)), durationSteps: 4))
                 }
             }
-        case 2:
-            // Beat 4 dropped — root held as half note on beat 3
-            events.append(MIDIEvent(stepIndex: barStart,     note: root,      velocity: UInt8(baseVel),     durationSteps: 4))
-            events.append(MIDIEvent(stepIndex: barStart + 4, note: lowerNote, velocity: UInt8(baseVel - 8), durationSteps: 4))
-            events.append(MIDIEvent(stepIndex: barStart + 8, note: root,      velocity: UInt8(baseVel - 4), durationSteps: 8))
         default:
-            // Beats 1–2 only, then silence — winds down into rest
+            // Third and last pair on beats 1–2, the lower note held as a half note into the rest
             events.append(MIDIEvent(stepIndex: barStart,     note: root,      velocity: UInt8(baseVel),     durationSteps: 4))
-            events.append(MIDIEvent(stepIndex: barStart + 4, note: lowerNote, velocity: UInt8(baseVel - 8), durationSteps: 4))
+            events.append(MIDIEvent(stepIndex: barStart + 4, note: lowerNote, velocity: UInt8(baseVel - 8), durationSteps: 8))
         }
 
         if blockPos <= 1 && rng.nextDouble() < 0.15 {
             let echoStep = rng.nextDouble() < 0.5 ? barStart + 2 : barStart + 6
-            events.append(MIDIEvent(stepIndex: echoStep, note: root, velocity: 58, durationSteps: 2))
+            // Bar 0 only: in the last bar an echo would restart the pendulum (draws kept)
+            if blockPos == 0 {
+                events.append(MIDIEvent(stepIndex: echoStep, note: root, velocity: 58, durationSteps: 2))
+            }
         }
 
         // Third-pitch interjection: ghosted scale tone between root and lower, on an off-beat.
@@ -2354,17 +2357,19 @@ struct LeadGenerator {
             // are Noir's own transcription hooks, and 011 No Birds turn is the record's guitar
             // figure (2026-11-14). They replaced Chromatic Descent, Slow arc, Rising phrase and
             // Melodic Spiral, now the retired MOT-LD1-028, 029, 030 and 027, which no pool draws.
-            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
-            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15]
+            // MOT-LD1-005 Call and answer left the Noir pool 2026-11-14 (Zack); its 4% went to 011 to 014.
+            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
+            let weights: [Double] = [0.04,         0.04,         0.04,         0.11,         0.12,         0.18,         0.16,         0.15,         0.16]
             return rules[rng.weightedPick(weights)]
         }
         if arcade {
             // Arcade: staccato mechanical leads dominant. Arpeggio rules 018/019 together ~37% of picks.
             // 020 (Synth Hook) is melodic but not an arp — gives Bass/Lead 2 full weights via coordination layer.
             // 017 (Pentatonic Blitz) fires only when BPM ≥ 143 — handled inside the bar generator.
-            // The hook rules MOT-LD1-001 Hallogallo hook and MOT-LD1-002 Radioactive riff hold 3% and 2%.
-            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-001","MOT-LD1-002"]
-            let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02]
+            // The hook rule MOT-LD1-002 Radioactive riff holds 2%. MOT-LD1-001 Hallogallo hook left the
+            // Arcade pool 2026-11-14 (Zack); its 3% went to 015, 016 and 020.
+            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-002"]
+            let weights: [Double] = [0.17,          0.18,          0.18,          0.14,          0.14,          0.14,          0.03,          0.02]
             return rules[rng.weightedPick(weights)]
         }
         // 005 Call and answer sits at 0.11. It is the most recognisable shape in the pool, and

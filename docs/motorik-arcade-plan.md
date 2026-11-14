@@ -150,8 +150,7 @@ A sustained root on the downbeats with a short syncopated approach note in betwe
 
 ### Lead 1
 
-**MOT-LD1-001 "Neu! Motif First"** *(shared)* — 3%
-The opening statement of the classic Neu! motif, carried over at low weight for an occasional base-Motorik anchor moment.
+MOT-LD1-001 Hallogallo hook left the Arcade pool 2026-11-14; its 3% went to 015, 016 and 020.
 
 **MOT-LD1-002 "Neu! Motif Repeat"** *(shared)* — 2%
 The repeat pass of the same motif.
@@ -159,10 +158,10 @@ The repeat pass of the same motif.
 **MOT-LD1-005 "Call and Answer"** *(shared)* — 3%
 The organic, varying call-and-answer rule from base Motorik.
 
-**MOT-LD1-015 "Arcade Riff"** — 17%
+**MOT-LD1-015 "Arcade Riff"** — 18%
 The core Arcade lead concept: a 2-bar ascending staccato motif built mostly from 3rd-based movement, with an occasional wider leap at the peak. It repeats unchanged for a while, then can shift up a step for an "energy boost" moment. The repetition is deliberate — it's what makes the lead feel mechanical rather than developing.
 
-**MOT-LD1-016 "Machine Answer"** — 13%
+**MOT-LD1-016 "Machine Answer"** — 14%
 A 4-bar call-and-answer figure with exact mechanical symmetry — the "answer" is the literal reverse of the "call," rather than a varied response like the shared Call and Answer rule.
 
 **MOT-LD1-017 "Pentatonic Blitz"** — 14%
@@ -174,7 +173,7 @@ The defining Tempest 2000 gesture: a lead that bounces a chord tone up and down 
 **MOT-LD1-019 "Triad Climb"** — 18% (the highest-weighted Lead 1 rule)
 An ascending broken-chord arpeggio through the triad that climbs a step higher every couple of bars, rather than repeating in place — where Octave Bounce oscillates between two fixed pitches, Triad Climb keeps moving forward through the chord.
 
-**MOT-LD1-020 "Synth Hook"** — 13%
+**MOT-LD1-020 "Synth Hook"** — 14%
 A short diatonic call-and-answer phrase — not an arpeggio — followed by a couple of bars of silence that hand the spotlight to Bass and Lead 2. Because it isn't one of the "busy" dense-arp rules, picking it doesn't trigger the bass/Lead 2 pullback the way the other four new Lead 1 rules do.
 
 Lead 1 also enters earlier in Arcade than elsewhere in Motorik, and is exempt from the spotlight-rotation thinning that other tracks get during solo sections.

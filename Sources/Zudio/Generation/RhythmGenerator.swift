@@ -422,7 +422,16 @@ struct RhythmGenerator {
         // Snap third and flat-7 to nearest in-scale pitch class to prevent chromatic leakage
         // when the chord root is non-tonic (e.g. Bbsus2 in G Dorian: raw minor-3rd = C# OOS).
         let scalePCsSet = frame.scalePCs
-        let rawThird = (rootPC + (isMajorThird ? 4 : 3)) % 12
+        // A sus chord has no 3rd: its "third" slot plays the chord's own 2nd or 4th, which the
+        // pads hold. A minor 3rd over sus2 sat a semitone over the pad's 2nd, and a major 3rd
+        // over sus4 a semitone under its 4th (MOT-RTHM-001, 2026-11-14).
+        let thirdInterval: Int
+        switch entry.chordWindow.chordType {
+        case .sus2: thirdInterval = 2
+        case .sus4: thirdInterval = 5
+        default:    thirdInterval = isMajorThird ? 4 : 3
+        }
+        let rawThird = (rootPC + thirdInterval) % 12
         let thirdPC  = nearestScalePitchClass(rawThird, in: scalePCsSet)
         let rawFlat7 = (rootPC + 10) % 12
         let flat7PC  = nearestScalePitchClass(rawFlat7, in: scalePCsSet)
