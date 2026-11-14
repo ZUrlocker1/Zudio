@@ -76,6 +76,10 @@ struct HookRule: Sendable {
     /// it sounded "too happy", where Space Takt's sus2 chords kept the same hook dark (Zack,
     /// 2026-11-14).
     var susOverMajor = false
+    /// B sections restate the hook a third up or in place, never a single step up. Transmission's
+    /// rock a step up is 5 b6, and over a b6 chord clearance pulled every held fifth onto the b6,
+    /// so the figure went flat into one repeated note (Tunnel Gleis, Zack, 2026-11-14).
+    var noStepUpInB = false
 
     /// True when each weight list is as long as the list it weights. A mismatch would pick the
     /// wrong entry, or none, without any error, so the rule tables are checked as they are built.
@@ -243,7 +247,8 @@ enum HookLeadEngine {
         statementCounts: [4, 5, 6], statementCountWeights: [0.30, 0.40, 0.30],
         // Lead 1's middle put the figure around A3, inside the Rhythm's octave; a fourth or so up
         // it sits above the band.
-        register: RegisterBounds(low: 57, high: 79)
+        register: RegisterBounds(low: 57, high: 79),
+        noStepUpInB: true
     )
 
     /// Albatross, Keith Levene's guitar (track 2), read in E: the call rocks 5 1 b3 1 b3 (bar 15)
@@ -599,7 +604,8 @@ enum HookLeadEngine {
 
         // B sections restate the hook a scale step or a third up, or lean on the variants.
         let bRoll  = r.nextDouble()
-        let bShift = bRoll < 0.40 ? 1 : bRoll < 0.70 ? 2 : 0
+        let bShift = rule.noStepUpInB ? (bRoll < 0.50 ? 2 : 0)
+                                      : (bRoll < 0.40 ? 1 : bRoll < 0.70 ? 2 : 0)
 
         func vary(_ st: inout Statement, moreVariants: Bool) {
             // One varied statement in five returns to form instead.
@@ -980,8 +986,18 @@ enum HookLeadEngine {
                           durationSteps: Swift.max(1, notes[$0].len))
             }
             let none = MotorikClearance.heldBand([])
-            for i in line.indices {
-                if let p = MotorikClearance.clearPitch(i, in: line, tonalMap: tonalMap, held: none) { sounding[i] = p }
+            // A moved note mustn't land on the pitch of the note either side of it, or a rocking
+            // figure flattens into one repeated note (Tunnel Gleis: every held G under an Ab chord
+            // went to Ab, next to the written Abs). It takes the next clear note instead.
+            let moved = line.indices.map {
+                MotorikClearance.clearPitch($0, in: line, tonalMap: tonalMap, held: none)
+            }
+            for i in line.indices where moved[i] != nil {
+                var neighbours = Set<Int>()
+                if i > 0 { neighbours.insert(sounding[i - 1]) }
+                if i + 1 < line.count { neighbours.insert(moved[i + 1] ?? sounding[i + 1]) }
+                sounding[i] = MotorikClearance.clearPitch(i, in: line, tonalMap: tonalMap, held: none,
+                                                          avoiding: neighbours) ?? moved[i]!
             }
         }
 

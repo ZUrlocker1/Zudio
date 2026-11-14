@@ -2,7 +2,9 @@
 
 ## V 3.0 (Build 138) — Chill jazz leads and chord progressions
 
-Work in progress after 2.9 shipped: Chill's new jazz leads, Lead 2 answers and stop-time solos, and new chord progressions that move in base Chill and Chill Blues.
+Work in progress after 2.9 shipped: Chill's new jazz leads, Lead 2 answers and stop-time solos, and new chord progressions that move in base Chill and Chill Blues. Nearly final; only listening adjustments remain.
+
+- **Better Motorik Noir solos** — (2026-11-14, build 138) Noir's Lead 1 hooks are rebuilt from Joy Division and PiL guitar parts (MOT-LD1-011 to 014). The hook clearance no longer moves a held note onto the pitch next to it, which had flattened MOT-LD1-013 Transmission figure into one repeated note in some B sections, and Transmission's B section now restates a third up or in place. Synth Bass 3 on the Motorik Rhythm track plays about 4 dB quieter.
 
 - **Fewer clashing bass notes in Chill Blues** — (2026-11-13, build 138) Three Blues bass patterns (CHL-BASS-004, 011, 012) played notes that clashed with the Pads and Rhythm chords; they now follow the chord. The bass also no longer holds a chromatic approach note on beat 4 of IV and V bars (CHL-BASS-001, 003, 010, 011): beat 4 plays the 5th, and the approach passes once per 16-bar form as a short off-beat note. The Blues pickup riff (CHL-BASS-009) plays the chord's own 3rd and 7th, and its B-section tail no longer rubs a half step under the root every bar; the ascending riff (CHL-BASS-011) climbs 5th, 7th, root when it plays 8ths.
 

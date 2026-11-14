@@ -902,6 +902,9 @@ final class AppState: ObservableObject {
             // trimmed the same 1.8 dB as Moog.
             case (kTrackBass,    .motorik, "Rock Bass"):     return 90
             case (kTrackRhythm,  .motorik, "Charang"):       return 70
+            // Synth Bass 3 sat on top of the Motorik Rhythm pool (Zack, 2026-11-14). 80 is about
+            // 4 dB down; Arcade draws it from the same pool, so it takes the trim too.
+            case (kTrackRhythm,  .motorik, "Synth Bass 3"):  return 80
             case (kTrackTexture, .motorik, "Interference"):  return 127
             case (kTrackBass,    .kosmic,  "Pulse Bass"):    return 115
             // Moog, Mono Synth and Synth Bass 3 are the loudest patches in the Kosmic bass

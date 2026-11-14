@@ -3261,8 +3261,9 @@ enum MotorikClearance {
     /// The pitch `sorted[i]` (a line sorted by step) moves to, or nil when it keeps its own: it
     /// isn't held (an 8th or more on a beat, or a beat or more), it is a short passing note, it
     /// is clear of the chord and of `held`, or no clear scale note lies within four semitones.
+    /// Pitches in `avoiding` are passed over while another clear note is in reach.
     static func clearPitch(_ i: Int, in sorted: [MIDIEvent], tonalMap: TonalGovernanceMap,
-                           held: HeldNotes) -> Int? {
+                           held: HeldNotes, avoiding: Set<Int> = []) -> Int? {
         let e = sorted[i]
         let start = e.stepIndex, end = start + e.durationSteps
         guard e.durationSteps >= 2, start % 4 == 0 || e.durationSteps >= 4 else { return nil }
@@ -3282,6 +3283,7 @@ enum MotorikClearance {
         func rank(_ c: Int) -> (Int, Int, Int) {
             (abs(c - p), first.chordTones.contains(c % 12) ? 0 : 1, c)
         }
-        return candidates.min(by: { rank($0) < rank($1) })
+        let preferred = candidates.filter { !avoiding.contains($0) }
+        return (preferred.isEmpty ? candidates : preferred).min(by: { rank($0) < rank($1) })
     }
 }
