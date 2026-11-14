@@ -35,6 +35,9 @@ struct GenerationLogEntry: Sendable {
         "MOT-LD1-012",   // Chromatic Descent: clear held notes, chromatic step as an off-beat 8th
         "CHL-LD1-010", "CHL-LD1-011", "CHL-LD1-012",   // Soho Lead 1 under ChillClearance
         "KOS-RTHM-021", "KOS-RTHM-005",   // notes a semitone from a chord tone step off it
+        "KOS-PADS-005",   // fourths that leave the key stack down from the root instead
+        "KOS-BASS-016",   // the BoC cell's 2nd takes the key's minor 3rd
+        "MOT-LD1-005",    // the call climbs 1, b3, 4, 5 over a minor chord
     ]
 
     /// The testing markers a description can start with.

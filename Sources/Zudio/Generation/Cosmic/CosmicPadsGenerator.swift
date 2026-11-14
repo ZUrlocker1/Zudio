@@ -611,17 +611,15 @@ struct KosmicPadsGenerator {
         let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
 
-        // b7 and fourth snapped to scale for non-tonic roots
-        let b7raw    = (rootPC + 10) % 12
-        let b7pc     = scalePCs.contains(b7raw) ? b7raw : {
-            for d in 1...6 {
-                if scalePCs.contains((b7raw + d) % 12) { return (b7raw + d) % 12 }
-                if scalePCs.contains((b7raw - d + 12) % 12) { return (b7raw - d + 12) % 12 }
-            }
-            return b7raw
-        }()
-        let fourthPC = snapToScale((rootPC + 5) % 12, scalePCs: scalePCs)
+        // The fourths stay in the key. Where a fourth above leaves it, the stack builds down from
+        // the root instead: the b7 becomes the 5th (a fourth below the root), and where the 4th is
+        // out too, the 4th becomes the 9th (a fourth below the 5th). Snapping them up gave the
+        // major 7th and the #4, a semitone under the root and the 5th the band plays.
         let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
+        let b7raw    = (rootPC + 10) % 12
+        let b7pc     = scalePCs.contains(b7raw) ? b7raw : fifthPC
+        let fourthRaw = (rootPC + 5) % 12
+        let fourthPC = scalePCs.contains(fourthRaw) ? fourthRaw : snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
 
         var root   = noteInPadsRegister(pc: rootPC,   targetOct: 2)
         var fourth = noteInPadsRegister(pc: fourthPC, targetOct: 2)

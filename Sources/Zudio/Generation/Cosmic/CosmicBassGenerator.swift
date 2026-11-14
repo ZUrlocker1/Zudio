@@ -177,7 +177,8 @@ struct KosmicBassGenerator {
         var drift015VarType = 0
         var drift015LastWin = -8
         if ruleID == "KOS-BASS-016" {
-            // Root → mode-2nd → root → 5th; Dorian 2nd = 2 semitones, 5th = 7 semitones
+            // Root → mode-2nd → root → 5th; Dorian 2nd = 2 semitones, 5th = 7 semitones.
+            // bocLoopBar plays the 2nd as the minor 3rd where the key's 3rd above the root is minor.
             let second = 2  // major 2nd (Dorian has raised 2nd vs Aeolian)
             let fifth  = 7
             let vb     = UInt8(clamping: driftVelocityBase)
@@ -1872,12 +1873,19 @@ struct KosmicBassGenerator {
     ) -> [MIDIEvent] {
         guard !cell.isEmpty else { return [] }
         let root = bassRoot(entry: entry, frame: frame)
+        // The key's 3rd above the root. Where it is minor, the 2nd takes it: the 2nd sat a semitone
+        // under the minor 3rd the pads and Rhythm hold, for a beat, every bar. A sus2 chord keeps
+        // the 2nd, which the Rhythm plays.
+        let third = frame.scalePCs.contains((Int(root) + 3) % 12) ? 3 : 4
+        let takeThird = third == 3 && entry.chordWindow.chordType != .sus2
 
         return cell.enumerated().map { (i, pair) in
             var (semitones, vel) = pair
-            // Apply shift: note at shiftIdx moves by ±2 (2nd→3rd or 5th→4th)
+            if semitones == 2 && takeThird { semitones = 3 }
+            // Apply shift: note at shiftIdx moves up or down (2nd→3rd or 5th→4th). Where the 2nd
+            // already took the minor 3rd it stays.
             if i == shiftIdx {
-                semitones = semitones == 2 ? 3 : (semitones == 7 ? 5 : semitones)
+                semitones = semitones == 2 ? third : (semitones == 7 ? 5 : semitones)
             }
             let note = UInt8(clampToRegister(Int(root) + semitones, low: 38, high: 55))
             return MIDIEvent(stepIndex: barStart + i * 4, note: note,

@@ -4,7 +4,7 @@
 // MOT-LD1-001 Hallogallo hook, 002 Radioactive riff, 003 Tour de France riff and 006 Model riff,
 //   transcription hooks written by HookLeadEngine
 // MOT-LD1-004 Stepwise Sequence — descending 5→4→2→1 (bar A), shifted b7→5→4→2 (bar B)
-// MOT-LD1-005 Call and answer — bar A ascends 1→2→b3→5, bar B silent then answers 4→b3
+// MOT-LD1-005 Call and answer — bar A ascends 1→2→3→5 (1→b3→4→5 over a minor chord), bar B silent then answers 4→3
 // MOT-LD1-007 Vanishing Solo — 10-bar pentatonic guitar-style solo, with shorter returns
 // MOT-LD1-008 Visiting Solo — 9-bar Dorian moog-style solo with octave arpeggios, with shorter returns
 //   (Lead 2 plays with both: only the gap-answer rule MOT-LD2-002 Low bed keeps the solo bars to itself)
@@ -717,7 +717,10 @@ struct LeadGenerator {
         let third = frame.mode.isMajorFlavored ? 4 : 3
 
         if bar % 2 == 0 {
-            let offsets = [0, 2, third, 7]
+            // Over a minor chord the call climbs 1, b3, 4, 5. Its 2 on beat 2 sat a semitone under
+            // the chord's minor 3rd, often struck at the same moment by the pads and Rhythm.
+            let minorChord = entry.chordWindow.chordType.intervals.contains(3)
+            let offsets = minorChord ? [0, 3, 5, 7] : [0, 2, third, 7]
             let durs    = [4, 3, 3, 5]
             let velBump = [0, -6, -3, +2]
             for (i, step) in [0, 4, 8, 12].enumerated() {
