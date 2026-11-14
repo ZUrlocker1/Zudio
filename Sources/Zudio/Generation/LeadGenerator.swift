@@ -1129,6 +1129,19 @@ struct LeadGenerator {
 
         func s(_ i: Int) -> UInt8 { UInt8(scale[min(max(0, i), scale.count - 1)]) }
         func v(_ base: Int) -> UInt8 { UInt8(max(50, min(95, base + rng.nextInt(upperBound: 8) - 4))) }
+        // A note on beat 1 or 3 takes the nearest chord tone (down first on a tie), so the phrase
+        // never opens on a non-chord note: the Rising Call's s1 is a semitone over the root when the
+        // chord sits on the key's 5th in Aeolian (Black Mittelwerk, G4 over F# minor, 2026-11-14).
+        func onBeat(_ note: UInt8, step: Int) -> UInt8 {
+            guard step % 8 == 0, !chordTones.contains(Int(note) % 12) else { return note }
+            for d in 1...6 {
+                for m in [Int(note) - d, Int(note) + d]
+                where m >= bounds.low && m <= bounds.high && chordTones.contains(m % 12) {
+                    return UInt8(m)
+                }
+            }
+            return note
+        }
 
         // Build from scratch on first episode; mutate at the start of each subsequent episode.
         if phraseData.isEmpty {
@@ -1148,7 +1161,7 @@ struct LeadGenerator {
             // one-step-lower bridge note so the fall to s3 feels less abrupt.
             if phraseBar == 1 && step == 0 && dur >= 6 && rng.nextDouble() < 0.25 {
                 let shortDur = 3 + rng.nextInt(upperBound: 3)   // 3–5 steps
-                events.append(MIDIEvent(stepIndex: barStart + step, note: s(scaleIdx),
+                events.append(MIDIEvent(stepIndex: barStart + step, note: onBeat(s(scaleIdx), step: step),
                                         velocity: v(velBase), durationSteps: shortDur))
                 let bridgeStep = step + shortDur
                 if bridgeStep < 8 {   // only if there's room before s3
@@ -1160,7 +1173,7 @@ struct LeadGenerator {
                 continue
             }
 
-            events.append(MIDIEvent(stepIndex: barStart + step, note: s(scaleIdx),
+            events.append(MIDIEvent(stepIndex: barStart + step, note: onBeat(s(scaleIdx), step: step),
                                     velocity: v(velBase), durationSteps: dur))
         }
 
