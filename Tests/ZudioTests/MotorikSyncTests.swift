@@ -162,7 +162,7 @@ import Foundation
         let kraftwerk: [Int: [String]] = [
             kTrackDrums:   ["Sequenced Timekeeper", "Sparse Accents"],
             kTrackRhythm:  ["Two-Note Lock", "Paired Sequencer"],
-            kTrackLead1:   ["Short Statement", "Long Run"],
+            kTrackLead1:   ["Short Statement", "Long Run", "Model riff", "Tour de France riff", "Radioactive riff"],
             kTrackTexture: ["Wide Scatter", "Sparse Punctuation"],
         ]
         var checked = 0

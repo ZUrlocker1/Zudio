@@ -571,8 +571,11 @@ Every track with more than one option needs a split. These are the weights:
 - **Rhythm** (Sequence Lock, Machine Voice) — `MOT-RTHM-014` Two-Note Lock 55%,
   `MOT-RTHM-015` Paired Sequencer 45%. This draw also determines which Lead 2 partner is
   available.
-- **Lead 1** (Machine Voice only) — `MOT-LD1-021` Short Statement 60%,
-  `MOT-LD1-022` Long Run 40%.
+- **Lead 1** (Rhythm Section and Machine Voice) — `MOT-LD1-021` Short Statement 10%,
+  `MOT-LD1-022` Long Run 10%, `MOT-LD1-006` Model riff 27%, `MOT-LD1-003` Tour de France riff 27%,
+  `MOT-LD1-002` Radioactive riff 26% (changed 2026-11-15; was 021 at 60% and 022 at 40%). The
+  three hooks are the base Motorik transcription rules and run through the hook engine, owning
+  the whole song. Across all Europe songs a synced Lead 1 is about 7% / 7% / 18% / 18% / 17%.
 - **Texture** (all sync groups) — `MOT-TEXT-009` Wide Scatter 65%,
   `MOT-TEXT-010` Sparse Punctuation 35%.
 - **Lead 2** — partner 65% / silent 35%, as above.

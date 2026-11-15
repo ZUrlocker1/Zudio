@@ -16,7 +16,8 @@
 //   (they were 011, 012, 013 and 014)
 // Lead 1, Arcade: MOT-LD1-015 Arcade Riff, 016 Machine Answer, 017 Pentatonic Blitz,
 //   018 Octave Bounce, 019 Triad Climb, 020 Synth Hook
-// Lead 1, Kraftwerk sync: MOT-LD1-021 Short Statement, 022 Long Run
+// Lead 1, Kraftwerk sync: MOT-LD1-021 Short Statement, 022 Long Run, plus the hooks 006 Model riff,
+//   003 Tour de France riff and 002 Radioactive riff
 // Lead 2, gap answers written later by GapAnswerEngine: MOT-LD2-001 Echo answer, 002 Low bed,
 //   003 Hook fragment, 004 Answer cell, 006 Statement harmony
 // Lead 2, Arcade arps: MOT-LD2-007 Arcade Arp, 008 Gate Arp, 009 Bounce Arp, 010 Blip
@@ -64,17 +65,29 @@ struct LeadGenerator {
 
         // Kraftwerk sync (Machine Voice only). No solo range: these rules are announcements
         // separated by silence, not a solo, and the Lead 1 solo machinery would fight them.
+        // Five rules share the draw: the two cell rules (021, 022) at 10% each and three Kraftwerk
+        // transcription hooks, MOT-LD1-006 Model riff (1978) and MOT-LD1-003 Tour de France riff
+        // (1983) at 27% each and MOT-LD1-002 Radioactive riff (1975) at 26% (Zack, 2026-11-15).
+        // The cell rules alone carried every synced lead and read as a random scale walk; the
+        // hooks are the melodic Kraftwerk vocabulary. A hook is handed to the hook engine below as
+        // the forced A rule, so it owns the whole song.
+        var syncHookRule: String? = nil
         if forceLeadRuleID == nil, sync.includes(kTrackLead1) {
-            let ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-LD1-022" : "MOT-LD1-021"
-            usedRuleIDs.insert(ruleID)
-            return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), .none)
+            let syncRules = ["MOT-LD1-021", "MOT-LD1-022", "MOT-LD1-006", "MOT-LD1-003", "MOT-LD1-002"]
+            let ruleID = syncRules[rng.weightedPick([0.10, 0.10, 0.27, 0.27, 0.26])]
+            if HookLeadEngine.isMotorikHookRule(ruleID) {
+                syncHookRule = ruleID
+            } else {
+                usedRuleIDs.insert(ruleID)
+                return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), .none)
+            }
         }
 
         // A: Per-section rule — always consume two draws for RNG determinism across songs.
         // forceLeadRuleID is honoured only for known Motorik-lead IDs; cross-style IDs are ignored.
         let pickedA        = pickLd1Rule(rng: &rng, noir: noirVariation, arcade: arcadeVariation)
         let bRuleCandidate = pickLd1Rule(rng: &rng, noir: noirVariation, arcade: arcadeVariation)
-        let aRule: String  = forceLeadRuleID.flatMap { $0.hasPrefix("MOT-LD1-") ? $0 : nil } ?? pickedA
+        let aRule: String  = (forceLeadRuleID ?? syncHookRule).flatMap { $0.hasPrefix("MOT-LD1-") ? $0 : nil } ?? pickedA
         // B sections reuse the A rule 70% of the time.
         var bRule = (rng.nextDouble() < 0.70) ? aRule : bRuleCandidate
         // Hook rules own the whole song, so one can only arrive as the A rule. A hook drawn
