@@ -142,7 +142,7 @@ out the whole song in one call and returns early, owning both A and B sections.
 
 ### Where the retired rules were replaced outside the base pool
 
-- Motorik Noir Lead 1: MOT-LD1-001 Hallogallo hook and MOT-LD1-006 Model riff, 4% each.
+- Motorik Noir Lead 1: MOT-LD1-001 Hallogallo hook and MOT-LD1-006 Model riff, 4% each. Model riff left the Noir and base pools on 2026-11-15 (Motorik Europe signature); Radioactive riff left base the same day. Base gained MOT-LD1-031 Pocket Calculator riff. See motorik-plan.md and motorik-europe-plan.md for the current weights.
 - Motorik Arcade Lead 1: MOT-LD1-001 at 3% and MOT-LD1-002 at 2%.
 - Motorik Arcade Lead 2 regular pool: MOT-LD2-001, 003 and 004.
 - Motorik Europe base Lead 2, when Lead 2 is not in the sync.

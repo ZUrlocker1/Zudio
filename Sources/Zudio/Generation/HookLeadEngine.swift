@@ -15,6 +15,7 @@
 // MOT-LD1-002 Radioactive riff    — Kraftwerk, Radioactivity (1975), the key-synth riff
 // MOT-LD1-006 Model riff          — Kraftwerk, The Model (1978), synth riff and vocal line
 // MOT-LD1-003 Tour de France riff — Kraftwerk, Tour de France (1983), the guitar theme
+// MOT-LD1-031 Pocket Calculator riff — Kraftwerk, Pocket Calculator (1981), the second melody
 // Motorik Noir (2026-11-14), from Zack's Guitar Pro tabs:
 // MOT-LD1-012 Tear Us Apart hook  — Joy Division, Love Will Tear Us Apart (1980), the Arp synth line
 // MOT-LD1-013 Transmission figure — Joy Division, Transmission (1979), guitar 1 and the chorus chant
@@ -173,6 +174,27 @@ enum HookLeadEngine {
         ]
     )
 
+    /// Pocket Calculator's second melody (track "Second Melody"), a two-bar phrase in F minor kept
+    /// to its plain shape (2026-11-15, Zack): b3 4 then the octave twice, then back down the scale,
+    /// b3 4 7 7 6 5. Degrees are semitones from the tonic: 3 4-step 5, octave 12, b7 10, 6th 9,
+    /// fifth 7. Bar one ends on the b7 as the pickup into the next statement; bar two settles on
+    /// the fifth, held to the bar end where the record leaves it short. The riff is complete on
+    /// its own, so there is no answer. A source variant lands on the b3 instead, as the record's
+    /// third pass does. A few long notes, so the homage changes one.
+    static let pocketCalculator = HookRule(
+        id: "MOT-LD1-031",
+        call: [[n(0, 3, 2, 84), n(2, 5, 2, 80), n(4, 12, 4, 88), n(8, 12, 2, 82), n(14, 10, 2, 78)],
+               [n(0, 3, 2, 84), n(2, 5, 2, 80), n(4, 10, 4, 86), n(8, 10, 2, 82), n(10, 9, 2, 76),
+                n(12, 7, 4, 84)]],
+        answer: [],
+        sourceVariants: [
+            HookSourceVariant(call: [[n(0, 3, 2, 84), n(2, 5, 2, 80), n(4, 12, 4, 88), n(8, 12, 2, 82), n(14, 10, 2, 78)],
+                                     [n(0, 3, 2, 84), n(2, 5, 2, 80), n(4, 10, 4, 86), n(8, 10, 2, 82),
+                                      n(10, 9, 2, 76), n(12, 3, 4, 84)]]),
+        ],
+        gentle: true
+    )
+
     // MARK: - Motorik Noir rule data
     //
     // Noir is minor (Aeolian, Dorian, Phrygian, harmonic minor), so these sources are read in
@@ -274,7 +296,7 @@ enum HookLeadEngine {
         register: noirHighRegister
     )
 
-    static let motorikRules = rulesByID([hallogallo, radioactive, model, tourDeFrance,
+    static let motorikRules = rulesByID([hallogallo, radioactive, model, tourDeFrance, pocketCalculator,
                                          tearUsApart, transmission, albatross])
 
     /// The rules keyed by ID, each checked for weight lists that don't match their values.

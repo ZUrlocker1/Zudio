@@ -817,7 +817,7 @@ final class AppState: ObservableObject {
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
-        case (kTrackDrums,   .kosmic):  return ["808 Kit","Machine Kit","Standard Kit","Brush Kit","Jazz Kit"]
+        case (kTrackDrums,   .kosmic):  return ["808 Kit","Machine Kit","Standard Kit","Brush Kit","Jazz Kit","Dance Drums"]
         case (kTrackDrums,   .motorik): return ["Rock Kit","Brush Kit","Dance Drums","Machine Kit"]
         case (kTrackDrums,   _):        return ["Rock Kit","808 Kit","Brush Kit"]
         default:                        return []
@@ -872,7 +872,7 @@ final class AppState: ObservableObject {
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
         case (kTrackDrums, .ambient):  return [0, 40]
-        case (kTrackDrums, .kosmic):   return [25, 24, 0, 40, 32]  // + Brush Kit, Jazz Kit
+        case (kTrackDrums, .kosmic):   return [25, 24, 0, 40, 32, 26]  // + Brush Kit, Jazz Kit, Dance Drums (Space only)
         case (kTrackDrums, .motorik):  return [8, 40, 26, 24]
         case (kTrackDrums, _):         return [8, 25, 40]
         default: return []
@@ -1516,8 +1516,36 @@ final class AppState: ObservableObject {
         if !statusLog.isEmpty {
             batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
         }
-        batch.append(contentsOf: entries)
+        batch.append(contentsOf: Self.inTrackOrder(entries))
         appendToLog(batch)
+    }
+
+    /// Reorders the rule lines (tags like KOS-LD1-014) into track order: Lead 1, Lead 2, Pads,
+    /// Rhythm, Texture, Bass, Drums. Only the slots that hold such lines are rearranged, so Style,
+    /// Form, Chords, Instruments and the Bar lines stay where they are. The sort is stable.
+    private static func inTrackOrder(_ entries: [GenerationLogEntry]) -> [GenerationLogEntry] {
+        func rank(_ tag: String) -> Int? {
+            let parts = tag.split(separator: "-")
+            guard parts.count == 3, parts[0].count == 3, Int(parts[2]) != nil else { return nil }
+            switch parts[1] {
+            case "LD1", "LEAD", "PNO": return 0
+            case "LD2": return 1
+            case "PAD", "PADS": return 2
+            case "RHY", "RTHM": return 3
+            case "TEX", "TEXT": return 4
+            case "BASS": return 5
+            case "DRUM": return 6
+            default: return nil
+            }
+        }
+        let slots = entries.indices.filter { rank(entries[$0].tag) != nil }
+        let sorted = slots.sorted {
+            let a = rank(entries[$0].tag)!, b = rank(entries[$1].tag)!
+            return a != b ? a < b : $0 < $1
+        }
+        var out = entries
+        for (slot, src) in zip(slots, sorted) { out[slot] = entries[src] }
+        return out
     }
 
     // MARK: - Live annotation feed
@@ -1641,8 +1669,7 @@ final class AppState: ObservableObject {
         if let idx = persistedHistory.firstIndex(where: { $0.seed == current.globalSeed }),
            idx + 1 < persistedHistory.count {
             let next = persistedHistory[idx + 1]
-            appendToLog([GenerationLogEntry(tag: "Forward",
-                description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+            appendToLog([GenerationLogEntry(tag: "Forward", description: "")])
             loadFromPersistedSong(next, forcePlay: false)
             return
         }
@@ -2700,8 +2727,9 @@ final class AppState: ObservableObject {
                 // White Noise Wave, Solar Wind, Solar Wind 2, Starship, Interference, 20% each:
                 // KOS-TEXT-005 needs a noise or wind source for its swell
                 case kTrackTexture: return [5, 2, 6, 7, 8]
-                // 808 Kit 75%, Machine Kit 25% (its synth toms bloop in the fills)
-                case kTrackDrums:   return [0, 0, 0, 1]
+                // 808 Kit 50%, Machine Kit 25%, Dance Drums 25%: the Machine Kit and Dance Drums
+                // synth toms bloop in the fills, the 808 remaps its toms (Zack, 2026-11-15)
+                case kTrackDrums:   return [0, 0, 1, 5]
                 default: break
                 }
             }
@@ -2908,8 +2936,7 @@ final class AppState: ObservableObject {
               let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
               idx + 1 < generationHistory.count else { return false }
         let next = generationHistory[idx + 1]
-        appendToLog([GenerationLogEntry(tag: "Forward",
-            description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+        appendToLog([GenerationLogEntry(tag: "Forward", description: "")])
         loadFromGenerationHistory(next, forcePlay: true)
         return true
     }

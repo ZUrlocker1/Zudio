@@ -16,6 +16,7 @@
 //   (they were 011, 012, 013 and 014)
 // Lead 1, Arcade: MOT-LD1-015 Arcade Riff, 016 Machine Answer, 017 Pentatonic Blitz,
 //   018 Octave Bounce, 019 Triad Climb, 020 Synth Hook
+// Lead 1, base Motorik hook added 2026-11-15: MOT-LD1-031 Pocket Calculator riff
 // Lead 1, Kraftwerk sync: MOT-LD1-021 Short Statement, 022 Long Run, plus the hooks 006 Model riff,
 //   003 Tour de France riff and 002 Radioactive riff
 // Lead 2, gap answers written later by GapAnswerEngine: MOT-LD2-001 Echo answer, 002 Low bed,
@@ -2378,14 +2379,15 @@ struct LeadGenerator {
             // Noir: sparse, atmospheric leads dominate — long-note anchor, solo phrases, cold chord texture.
             // MOT-LD1-007 (Vanishing Solo) excluded: its major-key melodic arc feels tonally out of place
             // even with minor-scale adjustment.
-            // The hook rules MOT-LD1-006 Model riff and MOT-LD1-001 Hallogallo hook hold 4% each.
+            // The hook rule MOT-LD1-001 Hallogallo hook holds 4%. MOT-LD1-006 Model riff left the Noir pool
+            // 2026-11-15 (Zack) to be a Motorik Europe signature; its 4% went to 009 and 010.
             // MOT-LD1-012 Tear Us Apart hook, 013 Transmission figure and 014 Albatross guitar
             // are Noir's own transcription hooks, and 011 No Birds turn is the record's guitar
             // figure (2026-11-14). They replaced Chromatic Descent, Slow arc, Rising phrase and
             // Melodic Spiral, now the retired MOT-LD1-028, 029, 030 and 027, which no pool draws.
             // MOT-LD1-005 Call and answer left the Noir pool 2026-11-14 (Zack); its 4% went to 011 to 014.
-            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
-            let weights: [Double] = [0.04,         0.04,         0.04,         0.11,         0.12,         0.18,         0.16,         0.15,         0.16]
+            let rules:   [String] = ["MOT-LD1-008","MOT-LD1-001","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
+            let weights: [Double] = [0.04,         0.04,         0.13,         0.14,         0.18,         0.16,         0.15,         0.16]
             return rules[rng.weightedPick(weights)]
         }
         if arcade {
@@ -2402,10 +2404,15 @@ struct LeadGenerator {
         // because bRule reuses aRule 70% of the time a rule that wins usually carries the whole
         // song, so a larger share registers as more frequent than it is.
         //
-        // The transcription hook rules MOT-LD1-001 Hallogallo hook, 002 Radioactive riff,
-        // 003 Tour de France riff and 006 Model riff hold 56% of the pool.
-        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008"]
-        let weights: [Double] = [0.15,          0.14,          0.15,          0.11,          0.11,          0.12,          0.12,          0.10]
+        // The transcription hook rules MOT-LD1-001 Hallogallo hook, 003 Tour de France riff and
+        // 031 Pocket Calculator riff hold 48% of the pool. MOT-LD1-002 Radioactive riff and
+        // MOT-LD1-006 Model riff are Motorik Europe signatures (2026-11-15, Zack): Radioactive holds
+        // 26% and Model 27% of the synced Lead 1 draw, and neither is in the base pool. Their
+        // shares went to 001, 003, 007 and 008. MOT-LD1-031 Pocket Calculator riff, a short
+        // two-bar Kraftwerk melody, is new in base with 12%, taken from 001 and 007 (24% and 20%
+        // before); 004 and 005 are untouched.
+        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-007", "MOT-LD1-008", "MOT-LD1-031"]
+        let weights: [Double] = [0.18,          0.18,          0.11,          0.11,          0.14,          0.16,          0.12]
         return rules[rng.weightedPick(weights)]
     }
 

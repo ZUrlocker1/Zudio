@@ -892,6 +892,13 @@ final class PlaybackEngine: ObservableObject {
                 // 2026-11-14, Rendez-Vous a Axiome). The toms, ride and everything else stay native.
                 fireNote = ev.note == GMDrum.snare2.rawValue ? GMDrum.snare.rawValue : GMDrum.pedalHat.rawValue
                 wasRemapped = true
+            } else if trackIndex == kTrackDrums && cachedDrumProgram == 26 && cachedIsKosmicSpace
+                        && ev.note == GMDrum.highAgogo.rawValue {
+                // Kosmic Space on Dance Drums (Zack, 2026-11-15, Aetheron-Laserharp): Magnetic Gallop's
+                // quarter-note agogo clonks here as on the other kits, so it plays a pedal hat. The
+                // toms stay native: the bleeps are wanted in the fills.
+                fireNote = GMDrum.pedalHat.rawValue
+                wasRemapped = true
             } else {
                 fireNote = ev.note; wasRemapped = false
             }
@@ -1483,8 +1490,11 @@ final class PlaybackEngine: ObservableObject {
                 // Stereo Piano needs boost above unity. Motorik Synth Lead and Saw Stack sat under the
                 // band (Zack, 2026-11-10), and so did Polysynth: Saw Stack is already at the CC7 ceiling,
                 // so the lift goes through the boost node, about +2.3 dB.
+                // Synth Lead lifted from 1.3 to 1.85 and then to 2.6 (about +3 dB each time) on Motorik
+                // Lead 1, base and every substyle (Zack, 2026-11-15).
                 let mult: Float = (program == 61001) ? 8.0
-                                : (motorikStyle && (program == 87 || program == 11100 || program == 90)) ? 1.3 : 1.0
+                                : (motorikStyle && program == 87) ? 2.6
+                                : (motorikStyle && (program == 11100 || program == 90)) ? 1.3 : 1.0
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
             } else if trackIndex == kTrackRhythm {

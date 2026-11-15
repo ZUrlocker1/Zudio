@@ -512,7 +512,7 @@ struct KosmicDrumGenerator {
 
     // MARK: - Space fills (Zack, 2026-11-03, from Eternal-Cosmos)
     // Every Space fill was a falling tom roll, and the toms in both Space kits are synth toms
-    // (808 Kit plays pitched sines, Machine Kit an electric tom), so every fill blooped. The bloop
+    // (Machine Kit and Dance Drums play electric toms; the 808 Kit remaps its toms to kick, snare and hat, so it does not bloop), so every fill on those kits blooped. The bloop
     // is now one fill of three, never twice running:
     //   snare roll 35% · tom roll 40% · kick and snare 25%, toms raised from 30% (Zack, 2026-11-07)
     // The third was a figure on cowbell, then on claves; both read as acoustic knocks against an

@@ -524,16 +524,23 @@ A hook rule owns the whole song, so one drawn for B alone gives way to the A rul
 
 Base Motorik, also drawn by the Motorik Europe songs whose Lead 1 is in the Sequence Lock group:
 
-- 15% MOT-LD1-001 Hallogallo hook
-- 15% MOT-LD1-003 Tour de France riff
-- 14% MOT-LD1-002 Radioactive riff
-- 12% MOT-LD1-006 Model riff
-- 12% MOT-LD1-007 Vanishing solo
+- 18% MOT-LD1-001 Hallogallo hook
+- 18% MOT-LD1-003 Tour de France riff
+- 16% MOT-LD1-008 Visiting solo
+- 14% MOT-LD1-007 Vanishing solo
+- 12% MOT-LD1-031 Pocket Calculator riff
 - 11% MOT-LD1-004 Stepwise sequence
 - 11% MOT-LD1-005 Call and answer
-- 10% MOT-LD1-008 Visiting solo
 
-The four hooks hold 56%. MOT-LD1-005 Call and answer is the most recognisable shape in the
+MOT-LD1-031 is new (2026-11-15): a plain two-bar phrase from the Pocket Calculator "Second Melody",
+built like the other hooks. Its 12% came from Hallogallo and Vanishing solo.
+
+MOT-LD1-002 Radioactive riff and MOT-LD1-006 Model riff left this pool 2026-11-15 so that they
+are Motorik Europe signatures (26% and 27% of the synced Lead 1 draw). Radioactive's 14% went to
+001, 007 and 008; Model's 12% to 001, 003, 007 and 008, with 004 and 005 unchanged. Radioactive
+stays in the Arcade pool at 2%; Model also left the Noir pool.
+
+The three hooks hold 48%. MOT-LD1-005 Call and answer is the most recognisable shape in the
 pool and is held at 11%: with the 70% A/B reuse it reads as more frequent than its share.
 It is kept in every pool and is never replaced.
 
@@ -575,6 +582,8 @@ in `Sources/Zudio/Generation/HookLeadEngine.swift`.
   note, by a drop or a swap only, since an added passing note filled the held root.
 - **MOT-LD1-006 Model riff**, Kraftwerk, *The Model*: a two-bar riff with a long held root. The
   vocal line alternates with it as a restatement, and a source variant ends the riff on the root.
+- **MOT-LD1-031 Pocket Calculator riff**, Kraftwerk, *Pocket Calculator*: a two-bar phrase in F
+  minor, b3 4 then the octave twice, back down b7 b7 6 5. Plain on purpose, not the long melody.
 - **MOT-LD1-003 Tour de France riff**, Kraftwerk, *Tour de France*: a rising one-bar call and a
   two-bar answer, with a variant cadence 4 3 1. The longest phrase.
 

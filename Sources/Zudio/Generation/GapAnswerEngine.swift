@@ -77,6 +77,8 @@ enum GapAnswerEngine {
         "MOT-LD1-006": [[n(0, 2, 6, 72), n(6, -2, 2, 66), n(8, -5, 8, 70)]],
         // Tour de France riff: the cadence flat 7 flat 3 1, its last note moved onto the beat.
         "MOT-LD1-003": [[n(0, -2, 4, 72), n(4, 3, 4, 68), n(8, 0, 8, 72)]],
+        // Pocket Calculator riff: the start, b3 4 then the b7 held.
+        "MOT-LD1-031": [[n(0, 3, 2, 66), n(2, 5, 2, 70), n(4, 10, 4, 64), n(8, 10, 8, 68)]],
     ]
 
     /// MOT-LD2-004's cell under every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.

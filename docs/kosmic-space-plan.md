@@ -230,7 +230,7 @@ fold by octaves. Weights are shares of Space songs on that track.
 KOS-DRUM-009 Preset Box 26%, KOS-DRUM-001 Mini Pops 20%, KOS-DRUM-010 Magnetic Gallop 15%,
 KOS-DRUM-012 Hand Percussion 15%, KOS-DRUM-005 Electric Buddha Pulse 12%, no percussion 12%. The
 Gallop and Hand Percussion are distinctive, so they are held to 15%; the Pulse takes load off the
-Preset Box. Kits: 808 Kit 75%, Machine Kit 25%,
+Preset Box. Kits: 808 Kit 50%, Machine Kit 25%, Dance Drums 25%,
 playing its own synth toms in fills; its electric snare (40) plays as the plain snare.
 
 **KOS-DRUM-009 Oxygene Preset Box** — the Minipops pattern of Oxygene 4. Closed hat on steps 0, 1,
@@ -441,7 +441,7 @@ Base Kosmic and Drift picks are capped at their pre-Space pool sizes.
   20% each
 - **Texture** — White Noise Wave (12/122, shown as White Noise), Solar Wind, Solar Wind 2 (12/89),
   Starship (8/125), Interference (11/127), 20% each
-- **Drums** — 808 Kit 75%, Machine Kit 25%
+- **Drums** — 808 Kit 50%, Machine Kit 25%, Dance Drums (26, appended) 25% (2026-11-15). The Machine Kit and Dance Drums toms bloop in the tom fill; the 808 remaps its toms to kick, snare and hat. Bleeping songs rise from about 25% to about 50%. Open: count fills per song; if under 2 to 4 tom fills on a bleeping kit, raise the tom weight from 40% to about 50%
 
 Per-instrument level trims were set by ear and live in code (`spaceCC7Trim` in AppState.swift and
 the per-program gain tables); they are not restated here. The on-screen Instruments line names

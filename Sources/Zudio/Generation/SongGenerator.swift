@@ -3190,6 +3190,7 @@ struct SongGenerator {
         case "MOT-LD1-002": return "Radioactive riff"
         case "MOT-LD1-006": return "Model riff"
         case "MOT-LD1-003": return "Tour de France riff"
+        case "MOT-LD1-031": return "Pocket Calculator riff"
         default:            return ruleID
         }
     }
