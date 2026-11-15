@@ -431,6 +431,19 @@ final class PlaybackEngine: ObservableObject {
             self.onAudioInterrupted?("Stopped by another app")
         }
 
+        // mediaServicesWereResetNotification: iOS restarted its audio daemon, which leaves our
+        // engine and session objects stale. Diagnostic only: stop cleanly and log it, so a later
+        // -50 can be tied to a reset. Nothing is rebuilt here; Play tries a normal start.
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.stopSchedulerOnly()
+            self.onAudioInterrupted?("Audio services were reset by iOS")
+        }
+
         // routeChangeNotification fires when headphones connect or disconnect.
         // Headphones pulled (.oldDeviceUnavailable): stop playback and restart the engine for the
         // new output route — iOS silences audio in this case, so running silently is pointless.
@@ -592,7 +605,8 @@ final class PlaybackEngine: ObservableObject {
         // Re-activate the session (deactivated by the previous stop()) and restart the engine
         // if it was suspended when the session deactivated. setActive must precede engine.start().
         try? AVAudioSession.sharedInstance().setActive(true)
-        if !engine.isRunning { startEngine() }
+        // If every start attempt failed (already logged), stay stopped rather than advance silently.
+        if !engine.isRunning && !startEngine() { return }
         #endif
         // Resume from current playhead position (currentStep already set correctly)
         isPlaying = true
@@ -761,7 +775,7 @@ final class PlaybackEngine: ObservableObject {
         // .newDeviceAvailable (Bluetooth, wired CarPlay): wasPlaying=true → auto-resume.
         //   play() finds engine.isRunning=true (just started) and isPlaying=false (cleared by
         //   stopSchedulerOnly()), so it skips startEngine() and goes straight to the scheduler.
-        if wasPlaying { startEngine(); play() }
+        if wasPlaying, startEngine() { play() }
         #endif
     }
 
@@ -3065,16 +3079,35 @@ final class PlaybackEngine: ObservableObject {
         catch { return error as NSError }
     }
 
-    /// One short line for the log: the session's sample rate, current output and activation result.
-    private func sessionSummary(activateError: NSError?) -> String {
+    /// Seconds to wait before each retry after a failed first start. The wait grows because a
+    /// Bluetooth route that was idle can take a second or two to wake. After the last one we give up.
+    private static let startRetryGaps: [TimeInterval] = [0.3, 0.5, 1.0, 2.0]
+
+    /// True when the current output is a Bluetooth route (A2DP, HFP or LE).
+    private func outputIsBluetooth() -> Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains {
+            $0.portType == .bluetoothA2DP || $0.portType == .bluetoothHFP || $0.portType == .bluetoothLE
+        }
+    }
+
+    /// One short line for the log: the session's sample rate, current output and activation result,
+    /// the engine's own output and mixer rates (a mismatch with the session means a stale engine),
+    /// whether another app is playing, and how many start attempts were made.
+    private func sessionSummary(activateError: NSError?, tries: Int) -> String {
         let session = AVAudioSession.sharedInstance()
         let out = session.currentRoute.outputs.first?.portType.rawValue ?? "none"
         let act = activateError.map { "activate \($0.code)" } ?? "activate ok"
-        return "Session \(Int(session.sampleRate)) Hz, out \(out), \(act)"
+        let engineOut = Int(engine.outputNode.outputFormat(forBus: 0).sampleRate)
+        let mixerOut = Int(engine.mainMixerNode.outputFormat(forBus: 0).sampleRate)
+        let other = session.isOtherAudioPlaying ? "yes" : "no"
+        return "Session \(Int(session.sampleRate)) Hz, out \(out), \(act), engine out \(engineOut) Hz, mixer \(mixerOut) Hz, other audio \(other), \(tries) tries"
     }
     #endif
 
-    private func startEngine() {
+    /// Starts the engine. Returns false when every attempt failed (the failure is already logged),
+    /// so play() can stay stopped instead of advancing the song in silence.
+    @discardableResult
+    private func startEngine() -> Bool {
         #if os(iOS)
         // Session must be active before the engine starts — starting on an inactive session
         // causes the engine to open onto a dead route, producing silence even though isRunning=true.
@@ -3082,49 +3115,59 @@ final class PlaybackEngine: ObservableObject {
         try? AVAudioSession.sharedInstance().setPreferredIOBufferDuration(0.023)
         var activateError = activateSession()
         #endif
-        do { try engine.start() }
+        do { try engine.start(); return true }
         catch {
             var lastError = error as NSError
             #if os(iOS)
             let firstCode = lastError.code
-            // A route that is still switching (e.g. a multipoint headset just handed to another
-            // device) can fail the first start with -50. Retry once on a freshly reactivated session.
-            engine.stop()
-            Thread.sleep(forTimeInterval: 0.3)   // let the route settle; only runs after a failure
-            activateError = activateSession()
-            do {
-                try engine.start()
-                onEngineRecovered?("Audio engine restarted after error \(firstCode)")
-                return
-            } catch { lastError = error as NSError }
-            // Still failing: the engine's output connection was made under an earlier route and
-            // can no longer match the hardware, and neither a plain retry nor Reset changes that.
-            // Reset the engine, drop and re-make the main mixer to output connection so it takes
-            // the current hardware format, and cycle the session before the last attempt.
-            engine.stop()
-            engine.reset()
-            engine.disconnectNodeOutput(engine.mainMixerNode)
-            try? AVAudioSession.sharedInstance().setActive(false)
-            Thread.sleep(forTimeInterval: 0.3)
-            activateError = activateSession()
-            // Use the hardware format explicitly: format nil would reuse the mixer's stale one.
-            // A dead route reports 0 Hz, and connecting with that raises, so fall back to nil then.
-            // Always reconnect: leaving the mixer unplugged would make a later start play silence.
-            let hwFormat = engine.outputNode.outputFormat(forBus: 0)
-            let usable = hwFormat.sampleRate > 0 && hwFormat.channelCount > 0
-            engine.connect(engine.mainMixerNode, to: engine.outputNode, format: usable ? hwFormat : nil)
-            do {
-                try engine.start()
-                onEngineRecovered?("Audio engine rebuilt after error \(firstCode)")
-                return
-            } catch { lastError = error as NSError }
-            let detail = sessionSummary(activateError: activateError)
+            var tries = 1
+            // Retry with a growing wait (0.3, 0.5, 1, 2 s). The first retry is a plain restart on a
+            // freshly reactivated session (a route still switching, e.g. a multipoint headset just
+            // handed to another device, can fail the first start with -50). Later retries rebuild:
+            // the engine's output connection was made under an earlier route and can no longer
+            // match the hardware, so reset the engine, drop and re-make the main mixer to output
+            // connection so it takes the current hardware format, and cycle the session.
+            for (index, gap) in Self.startRetryGaps.enumerated() {
+                let rebuild = index > 0
+                engine.stop()
+                if rebuild {
+                    engine.reset()
+                    engine.disconnectNodeOutput(engine.mainMixerNode)
+                    try? AVAudioSession.sharedInstance().setActive(false)
+                }
+                Thread.sleep(forTimeInterval: gap)   // let the route settle; only runs after a failure
+                activateError = activateSession()
+                if rebuild {
+                    // Use the hardware format explicitly: format nil would reuse the mixer's stale one.
+                    // A dead route reports 0 Hz, and connecting with that raises, so fall back to nil then.
+                    // Always reconnect: leaving the mixer unplugged would make a later start play silence.
+                    let hwFormat = engine.outputNode.outputFormat(forBus: 0)
+                    let usable = hwFormat.sampleRate > 0 && hwFormat.channelCount > 0
+                    engine.connect(engine.mainMixerNode, to: engine.outputNode, format: usable ? hwFormat : nil)
+                }
+                tries += 1
+                do {
+                    try engine.start()
+                    let what = rebuild ? "rebuilt" : "restarted"
+                    onEngineRecovered?("Audio engine \(what) after error \(firstCode), try \(tries)")
+                    return true
+                } catch { lastError = error as NSError }
+            }
+            let detail = sessionSummary(activateError: activateError, tries: tries)
             print(detail)
             onEngineDiagnostic?(detail)
-            #endif
+            // The route is stated as a fact; -50 is a generic parameter error, so it is not called a cause.
+            let route = outputIsBluetooth() ? ", Bluetooth out" : ""
+            let msg = "Audio engine fail (\(lastError.code)\(route))"
+            print(msg)
+            onEngineError?(msg)
+            return false
+            #else
             let msg = "Audio engine fail (\(lastError.code))"
             print(msg)
             onEngineError?(msg)
+            return false
+            #endif
         }
     }
 

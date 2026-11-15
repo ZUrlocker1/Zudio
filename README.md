@@ -19,7 +19,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v3.0/Zudio-3.0.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-The download is `3.0` (build 138), nearly final, with only listening adjustments left. It has improved Chill jazz leads and new chord progressions as well as the recent Kosmic Space style and performance optimizations. Build 138 fixes some clashing bass notes in Chill Blues and improves the Motorik Noir solos.
+**Zudio 3.0 is a major release, with many improvements across all four styles.** Build 138 is the release candidate for V3 and was submitted to the App Store on 2026-11-15. The Mac download is the same build. Highlights: Chill has new jazz leads, second-soloist answers and chords that move; Kosmic gains the Jean-Michel Jarre-style Space substyle; Motorik Noir and Europe get new leads transcribed from real tracks; Chill Soho brings back the St Germain beat; playback is smoother with a lighter visualizer; and iPhone audio recovers better from a stuck output. The sections below list the details.
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 **v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. Each part draws from several rules derived from his songs. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
