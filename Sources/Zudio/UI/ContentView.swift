@@ -84,6 +84,52 @@ struct ContentView: View {
     @State private var logMinusFlash: Bool = false
     @State private var logPlusFlash:  Bool = false
 
+    // Mac log resize: dragging the Generation Log bar up grows the log over the track rows.
+    // logExtraHeight is how many points of the 7 track rows the log covers (0 = default layout).
+    @AppStorage("macLogExtraHeight") private var logExtraHeight: Double = 0
+    @State private var logDragStartExtra: Double? = nil      // non-nil while a drag is under way
+    @State private var logHoverLeft  = false                 // pointer over the label-side handle
+    @State private var logHoverRight = false                 // pointer over the grip
+    @State private var logCursorPushed = false
+    private let trackRowsNatural: Double = 7 * 63            // 7 TrackRowViews at rowHeight 63
+
+    #if os(macOS)
+    /// Drag on the Generation Log bar: up grows the log over the track rows, down shrinks it.
+    /// Global coordinates, because the bar itself moves with the drag.
+    private var logResizeDrag: some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .onChanged { value in
+                if logDragStartExtra == nil {
+                    // A short window already squeezes the rows: start from what is visible,
+                    // so the first pixel of drag moves the bar.
+                    logDragStartExtra = max(logExtraHeight, trackRowsNatural - Double(trackRowsHeight))
+                    updateLogResizeCursor()
+                }
+                let raw = (logDragStartExtra ?? 0) - Double(value.translation.height)
+                let clamped = max(0, min(trackRowsNatural, raw))
+                logExtraHeight = clamped < 4 ? 0 : clamped
+                NSCursor.resizeUpDown.set()   // the log's I-beam cursor rect would otherwise win mid-drag
+            }
+            .onEnded { _ in
+                logDragStartExtra = nil
+                updateLogResizeCursor()
+            }
+    }
+
+    private func resetLogHeight() {
+        withAnimation(.easeOut(duration: 0.2)) { logExtraHeight = 0 }
+    }
+
+    /// Up-down resize cursor while hovering the handle or dragging (the pointer can leave
+    /// the handle mid-drag). Push and pop are kept paired so the cursor stack never leaks.
+    private func updateLogResizeCursor() {
+        let want = logHoverLeft || logHoverRight || logDragStartExtra != nil
+        guard want != logCursorPushed else { return }
+        if want { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+        logCursorPushed = want
+    }
+    #endif
+
     // Cross-platform accessors for macOS-only AppState properties.
     // mainContent is compiled on all platforms even though it's only called on macOS,
     // so bare references to #if os(macOS) AppState properties would fail on iOS.
@@ -256,9 +302,13 @@ struct ContentView: View {
                 // frame(minHeight:0) + clipped() lets the VStack compress when the window is
                 // made short: its row children have fixed .frame(height:63) so SwiftUI would
                 // otherwise treat it as incompressible.
+                // maxHeight: a dragged-up log caps the rows, top-aligned so the bottom rows
+                // (Drums, then Bass...) are the ones covered; the log takes the freed space.
                 // contentShape(Rectangle()) bounds the gesture-capture area to the visible
                 // clipped region so MIDILaneView's DragGesture can't reach outside it.
-                .frame(minHeight: 0)
+                .frame(minHeight: 0,
+                       maxHeight: logExtraHeight > 0 ? CGFloat(max(0, trackRowsNatural - logExtraHeight)) : nil,
+                       alignment: logExtraHeight > 0 ? .top : .center)
                 .clipped()
                 .contentShape(Rectangle())
                 .background(
@@ -335,6 +385,9 @@ struct ContentView: View {
                         Text("Generation Log")
                             .font(.system(size: 10, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.secondary)
+                            #if os(macOS)
+                            .onHover { logHoverLeft = $0; updateLogResizeCursor() }
+                            #endif
                         HStack(spacing: 4) {
                             Button {
                                 appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
@@ -374,8 +427,20 @@ struct ContentView: View {
                             .disabled(appState.statusLogFontOffset >= 8)
                         }
                         .padding(.leading, 4)
+                        // Empty space after the buttons: part of the resize handle.
+                        Color.clear
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            #if os(macOS)
+                            .onHover { logHoverLeft = $0; updateLogResizeCursor() }
+                            #endif
                     }
                     .frame(width: midiLaneLeading - 8, alignment: .leading)
+                    .contentShape(Rectangle())
+                    #if os(macOS)
+                    .gesture(logResizeDrag)
+                    .onTapGesture(count: 2) { resetLogHeight() }
+                    #endif
                 }
                 HStack(spacing: 6) {
                     Text("Bar 1")
@@ -393,7 +458,25 @@ struct ContentView: View {
                         .frame(width: 36, alignment: .trailing)
                 }
                 if isTracksMode {
-                    Color.clear.frame(width: midiLaneTrailing + 5)
+                    // Grip: shows the bar can be dragged to resize the log (Mac only).
+                    ZStack {
+                        #if os(macOS)
+                        VStack(spacing: 2) {
+                            Capsule().frame(width: 18, height: 1.5)
+                            Capsule().frame(width: 18, height: 1.5)
+                        }
+                        .foregroundStyle(Color.white.opacity(logHoverRight || logDragStartExtra != nil ? 0.65 : 0.30))
+                        #endif
+                    }
+                    .frame(width: midiLaneTrailing + 5)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    #if os(macOS)
+                    .onHover { logHoverRight = $0; updateLogResizeCursor() }
+                    .gesture(logResizeDrag)
+                    .onTapGesture(count: 2) { resetLogHeight() }
+                    .help("Drag to resize the log, double-click to reset")
+                    #endif
                 }
             }
             .padding(.horizontal, 8)

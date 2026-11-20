@@ -123,7 +123,7 @@ struct ChillBassGenerator {
                         }
                     } else {
                         // Base riff: root (3 steps) → 5th (2 steps) → root (2 steps) → approach (2 steps)
-                        let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
+                        let approach = approachNote(into: chordRoot, scale: scale)
                         events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),  velocity: 90, durationSteps: 3))
                         if breakdownBar >= 1 {
                             // Bar 1+: add 5th
@@ -154,7 +154,7 @@ struct ChillBassGenerator {
                         // Approach into groove on beat 4, aimed at the next bar's root: the same
                         // note unless the breakdown closes on a V7sus4.
                         let target = nextChordRootNote(bar: bar, frame: frame, structure: structure)
-                        let approach = clampBass(snapToScale(target - 1, scale: scale))
+                        let approach = approachNote(into: target, scale: scale)
                         events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach), velocity: 92, durationSteps: 3))
                     } else if breakdownBar == sectionLen - 2 {
                         // Bar 3: whisper root reentry — barely there, tension peaking
@@ -257,11 +257,14 @@ struct ChillBassGenerator {
             }
             // Occasional approach tone (25%) — adds forward motion between bars
             if rng.nextDouble() < 0.25 {
-                let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
-                if approach != clampBass(chordRoot) {
-                    result.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach),
-                                            velocity: UInt8(60 + rng.nextInt(upperBound: 8)), durationSteps: 3))
-                }
+                // Where the old half-step snap landed on the root the note was skipped without a
+                // velocity draw; it now plays the scale step below at a fixed velocity, so the
+                // draws stay as they were and the rest of the song keeps its notes.
+                let approach = approachNote(into: chordRoot, scale: scale)
+                let snapped = clampBass(snapToScale(chordRoot - 1, scale: scale))
+                let velocity = snapped != clampBass(chordRoot) ? 60 + rng.nextInt(upperBound: 8) : 63
+                result.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach),
+                                        velocity: UInt8(velocity), durationSteps: 3))
             }
         }
         return result
@@ -277,7 +280,7 @@ struct ChillBassGenerator {
                                            rng: inout SeededRNG) -> [MIDIEvent] {
         var result: [MIDIEvent] = []
         let root     = clampBass(chordRoot)
-        let approach = clampBass(snapToScale(nextChordRoot - 1, scale: scale))
+        let approach = approachNote(into: nextChordRoot, scale: scale)
 
         switch bar % 4 {
         case 1:
@@ -325,7 +328,7 @@ struct ChillBassGenerator {
         let root  = clampBass(chordRoot)
         let third = clampBass(snapToScale(chordRoot + 3, scale: scale))
         let fifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
-        let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
+        let approach = approachNote(into: chordRoot, scale: scale)
         let notes = [root, third, fifth, approach]
         for (i, note) in notes.enumerated() {
             let vel: UInt8 = i == 0 ? UInt8(85 + rng.nextInt(upperBound: 11)) : UInt8(75 + rng.nextInt(upperBound: 11))
@@ -546,7 +549,7 @@ struct ChillBassGenerator {
                 let fifth    = clampBass(snapToScale(chordRoot + 7, scale: scale))
                 let fourth   = clampBass(snapToScale(chordRoot + 5, scale: scale))
                 let nextRoot = nextChordRootNote(bar: bar, frame: frame, structure: structure)
-                let approach = clampBass(snapToScale(nextRoot - 1, scale: scale))
+                let approach = approachNote(into: nextRoot, scale: scale)
 
                 let breathChance = 0.08 - evolutionPhase * 0.04   // 8% → 4% → 8%
                 let fillChance   = 0.06 + evolutionPhase * 0.14   // 6% → 20% → 6%
@@ -1252,6 +1255,14 @@ struct ChillBassGenerator {
         return frame.mode.intervals.map { (root + $0) % 12 }
     }
 
+    /// The approach into `target`: the half step below when it is in the key, otherwise the
+    /// scale step below, in the bass register. Never the target itself. It used to be
+    /// `snapToScale(target - 1)`, which in a key without the half step could round up onto the
+    /// target, so the approach repeated the root it led into (2026-11-20, Zack: flattened bass).
+    private static func approachNote(into target: Int, scale: [Int]) -> Int {
+        clampBass(scaleStep(from: target, up: false, scale: scale))
+    }
+
     /// The nearest scale note strictly above (or below) `note`.
     private static func scaleStep(from note: Int, up: Bool, scale: [Int]) -> Int {
         let pcs = Set(scale.map { (($0 % 12) + 12) % 12 })
@@ -1328,7 +1339,7 @@ struct ChillBassGenerator {
                     events.append(MIDIEvent(stepIndex: base,     note: UInt8(root),  velocity: 88, durationSteps: 3))
                     events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(fifth), velocity: 76, durationSteps: 2))
                     events.append(MIDIEvent(stepIndex: base + 9, note: UInt8(root),  velocity: 82, durationSteps: 2))
-                    events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(snapToScale(target - 1, scale: scale) == clampBass(target) ? b7 : clampBass(snapToScale(target - 1, scale: scale))), velocity: 70, durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(approachNote(into: target, scale: scale)), velocity: 70, durationSteps: 2))
                 case .harmonicDrone:
                     // Alternating pulse / motion arc. This used to be a root quarter-note on
                     // every beat of every breakdown bar — four identical bars, 16 identical

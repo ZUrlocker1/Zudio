@@ -97,7 +97,7 @@ extension ChillLeadGenerator {
         // 2026-11-14). No draws. What follows a phrase reads it as written.
         let (regLow, regHigh) = register(for: leadInstrument)
         func heard(_ line: [MIDIEvent]) -> [MIDIEvent] {
-            band?.voiceLine(line, low: regLow, high: regHigh, avoidRepeat: true) ?? line
+            band?.voiceLine(line, low: regLow, high: regHigh) ?? line
         }
         var hookTreatments: String? = nil
         // Bars where the lead comes back to its original form, for the log. Recorded only.
@@ -1187,7 +1187,7 @@ extension ChillLeadGenerator {
         let (low, high) = register(for: leadInstrument)
         for bar in returns {
             var events: [MIDIEvent] = []
-            defer { all += band?.voiceLine(events, low: low, high: high, avoidRepeat: true) ?? events }
+            defer { all += band?.voiceLine(events, low: low, high: high) ?? events }
             guard let chord = structure.chordWindow(atBar: bar) else { continue }
             let landings = pool.indices.filter { $0 >= 3 && chord.chordTones.contains(pool[$0] % 12) }
             guard !landings.isEmpty else { continue }

@@ -55,20 +55,21 @@ struct ChillClearance {
     }
 
     /// A melodic line as it is written. Each note that is not a short passing note keeps clear of
-    /// the held notes here and, when it lasts two steps or more, is not an avoid note. One that
-    /// fails moves to the nearest pitch that passes, at most four semitones away, inside
-    /// `low...high`, in the scale: a chord tone first, then the direction of the next note. With
-    /// none, the note stays as written. With `avoidRepeat` (Soho's hooks), a moved note doesn't
-    /// land on the note before or after it unless the line repeated there, and a written repeat
-    /// follows the previous note's move.
-    func voiceLine(_ line: [MIDIEvent], low: Int, high: Int, avoidRepeat: Bool = false) -> [MIDIEvent] {
+    /// the held notes here and, when it sits on a beat or lasts longer than an 8th, is not an
+    /// avoid note (an off-beat 8th may lean). One that fails moves to the nearest pitch that
+    /// passes, at most four semitones away, inside `low...high`, in the scale: a chord tone
+    /// first, then the direction of the next note. With none, the note stays as written. A moved
+    /// note doesn't land on the note before or after it unless the line repeated there, and a
+    /// written repeat follows the previous note's move: about half the moves used to land on a
+    /// neighbour, which flattened lines into repeated notes (Zack, 2026-11-20; it was Soho-only).
+    func voiceLine(_ line: [MIDIEvent], low: Int, high: Int) -> [MIDIEvent] {
         let order = line.indices.sorted { (line[$0].stepIndex, line[$0].note) < (line[$1].stepIndex, line[$1].note) }
         let sorted = order.map { line[$0] }
         var out = line
         for (k, idx) in order.enumerated() where !Clearance.isPassing(k, in: sorted) {
             let e = sorted[k]
             let written = e.stepIndex + Swift.max(1, e.durationSteps)
-            let held = written - e.stepIndex >= 2
+            let held = written - e.stepIndex > 2 || e.stepIndex % 4 == 0
             // The span as it will sound. The groove fixup that runs after the leads are written
             // can move an onset a step and join a note legato to the next one (up to three steps
             // longer), so the check covers a step either side and, where the next onset is two
@@ -90,14 +91,12 @@ struct ChillClearance {
             let toward = (next ?? p0) >= p0 ? 1 : -1
             var candidates = (1...4).flatMap { [p0 + $0 * toward, p0 - $0 * toward] }
                 .filter { $0 >= low && $0 <= high && scale.contains($0 % 12) && ok($0) }
-            if avoidRepeat {
-                let prevNow = k > 0 ? Int(out[order[k - 1]].note) : nil
-                if k > 0, Int(sorted[k - 1].note) == p0, let p = prevNow, candidates.contains(p) {
-                    candidates = [p]
-                } else {
-                    let taken = [prevNow, next].compactMap { $0 }.filter { $0 != p0 }
-                    if candidates.contains(where: { !taken.contains($0) }) { candidates.removeAll { taken.contains($0) } }
-                }
+            let prevNow = k > 0 ? Int(out[order[k - 1]].note) : nil
+            if k > 0, Int(sorted[k - 1].note) == p0, let p = prevNow, candidates.contains(p) {
+                candidates = [p]
+            } else {
+                let taken = [prevNow, next].compactMap { $0 }.filter { $0 != p0 }
+                if candidates.contains(where: { !taken.contains($0) }) { candidates.removeAll { taken.contains($0) } }
             }
             guard let pick = candidates.first(where: { tones.contains($0 % 12) }) ?? candidates.first
             else { continue }

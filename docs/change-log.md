@@ -1,5 +1,13 @@
 # Zudio Change Log
 
+## V 3.1 (Build 139)
+
+**Minor release with minor adjustments, 2026-11-20.** Chill leads and bass repeat fewer notes, and the Mac Generation Log is resizable. The Mac DMG (Zudio-3.1.dmg, signed with Developer ID) was built from build 139.
+
+- **Resizable Generation Log on Mac** — (2026-11-20, build 139) In Track View, drag the Generation Log bar up to grow the log over the track rows, from the bottom row up; a grip at its right end and the up-down cursor show where to grab, and a double-click resets it. The height is remembered between launches. Mac only.
+
+- **Fewer repeated notes in Chill leads and bass** — (2026-11-20, build 139) The 3.0 clash fixes went too far in places: a lead note moved off a clash often landed on the note beside it, and some leads and bass lines flattened into repeated notes. Changes: (1) a lead note moved by the clearance no longer lands on its neighbour, in every Chill lead (it was Soho only); (2) an off-beat 8th may lean on an avoid note, which now applies only to notes on a beat or longer than an 8th; (3) when a jazz lick is fitted to the key, an out-of-key note (a major 3rd in a minor key) no longer moves onto the note beside it; (4) a bass approach note into the next chord is the half step below when it is in the key, otherwise the scale step below, never the root itself (CHL-BASS-001, 002, 003, 005 breakdowns, 007, 008 breakdown). Measured on 603 Chill seeds: Lead 1 repeated notes fall from 12% to 4% (CHL-LD1-001 Chet sigh), 10% to 4% (007 Horace hook), 11% to 4% (008 Blues bossa), 27% to 17% (014 Cantaloupe); Soho Lead 2 from about 10% to 2%; CHL-BASS-002 from 29% to 13% and Blues CHL-BASS-003 from 17% to 5%. Glaring clashes unchanged. Riffs that repeat by design (Soho hooks, Blue Monk, Tenor Madness) are unchanged. Short chromatic runs into a good landing note stay allowed. Pads, Drums and Texture are unchanged; leads, Rhythm (which voices around the leads) and bass change in most Chill songs. Marked "* " in the log. Not yet heard.
+
 ## V 3.0 (Build 138) — Chill jazz leads and chord progressions
 
 **Release candidate for V3, submitted to the App Store on 2026-11-15.** Zudio 3.0 is a major release with many improvements: Chill's new jazz leads, Lead 2 answers and stop-time solos, new chord progressions that move in base Chill and Chill Blues, the St Germain beat in Chill Soho, Kosmic Space, new Motorik Noir and Europe leads, playback and visualizer performance work, and sturdier iPhone audio recovery. The Mac DMG (Zudio-3.0.dmg, notarized) was built from the same build 138.

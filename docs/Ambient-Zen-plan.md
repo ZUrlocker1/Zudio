@@ -22,7 +22,13 @@ Copyright (c) 2026 Zack Urlocker
 
 ## 1. What Ambient Zen is
 
-A third Ambient flavour beside base Ambient and Ambient Piano: a "sounds like" homage to AMB-1 (Charles Vestal's generative firmware for the M-Vave FM-1), and through it to Eno's Music for Airports. It is not an emulation.
+A third Ambient flavour beside base Ambient and Ambient Piano: a "sounds like" homage to AMB-1 (Charles Vestal's generative firmware for the M-Vave FM-1), and through it to Eno's Music for Airports. It is not an exact emulation.
+But it must have the key characteristics which we can learn from the manual and from the source code. We want 
+soothing, evolving background music that is pleasant and ever changing.  We want the rich underlying drones 
+of bass and pads. We want the elegant shifting of chord tones across instruments. We want the randomness of 
+bells and similar sounds so that it is captivating and beautiful as the original AMB-1. 
+However, since Zudio does not have dials, we will somwhat randomly assign certain values so that there is 
+sufficient variation song to song.
 
 The sound: pad voices that breathe in and out on their own cycles so the chord forms and dissolves, a low bed that never stops, a slow chord journey that leaves home and comes back, and soft bells on loops of unequal length that slide past each other, all in a long hall with a long, darkening echo. It evolves over minutes: the bells thin out and fill in, and the chords drift.
 
@@ -45,10 +51,10 @@ Most of the sound comes from four mechanisms: the moving chords, the breathing p
 - **Base Ambient and Ambient Piano do not change.** Only the shares move. A fingerprint check proves it (section 12).
 - **No rearchitecture.** Zen is an early-return branch in generateAmbient, the way Ambient Piano is. Zen code lives in new files; shared files get small guarded branches.
 - **No new playback features in phases 1 to 3.** Everything is ordinary MIDI notes and existing effect paths (reverb, echo, tremolo, filter sweep, auto-pan, the per-note boost fade). New tables for existing settings are fine.
-- **No clashes.** Every Zen note is in the song's mode, and section 6's rules are enforced where each note is written, never by a post-pass.
+- **No clashes.** Every Zen note is in the song's mode or a short passing note, and section 6's rules are enforced where each note is written, preferably not a post-pass unless required.
 - **Determinism.** No Dictionary or Set order feeds an RNG draw. Zen draws come from the fresh trackSeed block 120 to 127 (section 4).
 - **iPhone parity.** Any effect default set in TrackRowView is mirrored in AppState.restoreDefaultEffects.
-- **Long sustain.** Every pad, pedal and bass instrument must hold for a long time without dying away.
+- **Long sustain.** Every pad, pedal and bass instrument must hold for a long time without dying away. We can use techniques from Kosmic or Ambient for long sustains. 
 
 **Shares.** Zen reuses the unused pianoRuleRoll, so no new draw enters the shared prefix. Piano if pianoRoll < 0.35, Zen if not Piano and pianoRuleRoll < zenShare, otherwise base Ambient. Testing: Piano 10, base Ambient 10, Zen 80 (pianoRoll < 0.10, zenShare = 0.889), marked in the code as temporary (Zack, 2026-11-09). Release: Piano 35, Zen about 30 (zenShare about 0.46), base about 35. A base Ambient seed that falls in the Zen share becomes Zen on reload; that is accepted.
 
@@ -62,7 +68,8 @@ Zudio normally rolls each track's rule on its own. Zen works only if every track
 - The pedal's pitch set per window (section 6).
 - The swell, one value per bar (phase 2).
 
-**The dials, in place of recipes.** Each song draws these from its seed:
+**The dials, in place of recipes.** Each song draws these from its seed. Unlike AMB-1 Zudio has no dials for thes
+so they are to be randomly genarated. 
 1. **Mode:** Ionian 0.22, Dorian 0.22, Aeolian 0.20, Mixolydian 0.18, Lydian 0.18. Lydian is Zen's own; base Ambient doesn't draw it.
 2. **Tempo:** 62 to 88 bpm, triangular, peak 72. The floor is 62 because the Ambient frame clamps there.
 3. **Chord pace:** a mean window of 25 to 60 s.
@@ -198,7 +205,8 @@ The goal is to hear whether the core works before building anything else: a song
 
 **Plumbing, structure and the ZenPlan.** Sections 4, 5 and 11.
 - The song uses the Ambient frame length (180 to 315 s) at the Zen tempo.
-- It has an 8-bar intro, one body section A and a 12-bar outro.
+- It has an 8-bar intro, one body section A and a 12-bar outro.  Question: DO we really need intro, outro? 
+if its not necessary we can remove those.  
 - The song is trimmed to its last pad note plus 2 bars, the way Ambient Piano trims. If the reverb and echo wash is cut short, the tail becomes 4 bars.
 
 **Pads: AMB-PADS-011 Airports Breath.** Four voices, each breathing on its own cycle (AMB-1's numbers).
@@ -211,7 +219,8 @@ The goal is to hear whether the core works before building anything else: a song
 
 **Pads must swell, not strike.** AMB-1's bed is slow swells: each voice rises over 4 to 7 s, so the four voices merge into one level wash with no audible attacks. A stock preset re-attacks on every breath. Phase 1 therefore builds both of these and compares them at the listening stop:
 1. **Stock presets** with the list below. Warm Pad (0.8 s attack) and Halo Pad come first because they attack slowest.
-2. **Swell presets.** Copies of Warm Pad, Halo Pad, Concert Choir and Space Voice in a new soundfont bank. Each copy sets SF2 generator 34 (attackVolEnv) to 3000 timecents (about 5.6 s) and generator 38 (releaseVolEnv) to 2600 (about 4.5 s).
+2. **Swell presets.** Copies of Warm Pad, Halo Pad, Concert Choir and Space Voice in a new soundfont bank. Each copy sets SF2 generator 34 (attackVolEnv) to 3000 timecents (about 5.6 s) and generator 38 (releaseVolEnv) to 2600 (about 4.5 s).  Question: Do we really need to make a copy? Or can we work with the existing SF2 file overriding 
+playback settings as necessary?
    - The note-off moves to 55 percent of the cycle, so the release supplies the fall and the voice goes quiet near 90 percent.
    - The tool is a sibling of tools/sf2_copy_presets.py, which appends presets and keeps every existing byte, so no existing program moves.
    - This is a soundfont edit and needs no playback code.

@@ -142,7 +142,7 @@ struct ChillLeadGenerator {
         // Each phrase listens to the band as it is written (ChillClearance): no rub with the Pads
         // and Bass notes already written, no avoid note held over the chord.
         func heard(_ line: [MIDIEvent]) -> [MIDIEvent] {
-            band?.voiceLine(line, low: regLow, high: regHigh, avoidRepeat: sohoReuse) ?? line
+            band?.voiceLine(line, low: regLow, high: regHigh) ?? line
         }
 
         // Blues: 60% of songs have a soloist who uses the blue note (the b5 of the key), the rest
@@ -3027,12 +3027,17 @@ extension ChillLeadGenerator {
             if !allowed.contains(pitch % 12) {
                 // A short note a semitone from the next one is a passing tone (the blue note, or a
                 // chromatic approach) and stays. Anything else moves to the nearest allowed note,
-                // a chord tone first, then the lower one.
+                // a chord tone first, then the lower one, but not onto the note before or after
+                // it where another will do: a major 3rd's lean in a minor key used to become the
+                // b3 beside it, three of the same note (Zack, 2026-11-20).
                 let next = i + 1 < cell.count ? root + cell[i + 1].iv : nil
                 let passing = n.dur <= 2 && next.map { Swift.abs($0 - pitch) == 1 } == true
                 if !passing {
-                    let options = [pitch - 1, pitch + 1, pitch - 2, pitch + 2]
+                    let near = [pitch - 1, pitch + 1, pitch - 2, pitch + 2]
                         .filter { allowed.contains($0 % 12) }
+                    let neighbours = [events.last.map { Int($0.note) }, next].compactMap { $0 }
+                    let fresh = near.filter { !neighbours.contains($0) }
+                    let options = fresh.isEmpty ? near : fresh
                     pitch = options.first { tones.contains($0 % 12) } ?? options.first ?? pitch
                 }
             }

@@ -21,6 +21,10 @@ struct GenerationLogEntry: Sendable {
         "CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-013", "CHL-LD1-014", "CHL-LD1-015",
         "CHL-LD2-002", "CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006",
         "CHL-PAD-004",
+        // Fewer repeated notes in Chill leads and bass (2026-11-20, 3.1): clearance moves don't
+        // land on a neighbour, bass approach notes don't snap onto the root.
+        "CHL-LD1-002", "CHL-LD1-003", "CHL-LD1-004", "CHL-LD1-009",
+        "CHL-BASS-001", "CHL-BASS-002", "CHL-BASS-003", "CHL-BASS-005", "CHL-BASS-007",
         // Motorik Noir Lead 1 from transcriptions (2026-11-14): No Birds turn, Tear Us Apart hook,
         // Transmission figure, Albatross guitar.
         "MOT-LD1-011", "MOT-LD1-012", "MOT-LD1-013", "MOT-LD1-014",
