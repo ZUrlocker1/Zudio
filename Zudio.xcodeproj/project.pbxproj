@@ -30,6 +30,7 @@
 		AA000000000000000000014 /* TextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000014 /* TextureGenerator.swift */; };
 		AA000000000000000000015 /* RhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000015 /* RhythmGenerator.swift */; };
 		AA000000000000000000016 /* StepScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000016 /* StepScheduler.swift */; };
+		AA000000000000000000784 /* ZenBassGlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000784 /* ZenBassGlide.swift */; };
 		AA000000000000000000017 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000017 /* PlaybackEngine.swift */; };
 		AA000000000000000000018 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000018 /* ContentView.swift */; };
 		AA000000000000000000019 /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000019 /* TrackRowView.swift */; };
@@ -135,6 +136,7 @@
 		IS000000000000000000014 /* TextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000014 /* TextureGenerator.swift */; };
 		IS000000000000000000015 /* RhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000015 /* RhythmGenerator.swift */; };
 		IS000000000000000000016 /* StepScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000016 /* StepScheduler.swift */; };
+		IS000000000000000000784 /* ZenBassGlide.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000784 /* ZenBassGlide.swift */; };
 		IS000000000000000000017 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000017 /* PlaybackEngine.swift */; };
 		IS000000000000000000018 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000018 /* ContentView.swift */; };
 		IS000000000000000000019 /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000019 /* TrackRowView.swift */; };
@@ -278,6 +280,7 @@
 		BB000000000000000000014 /* TextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000015 /* RhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000016 /* StepScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepScheduler.swift; sourceTree = "<group>"; };
+		BB000000000000000000784 /* ZenBassGlide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenBassGlide.swift; sourceTree = "<group>"; };
 		BB000000000000000000017 /* PlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
 		BB000000000000000000018 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BB000000000000000000019 /* TrackRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRowView.swift; sourceTree = "<group>"; };
@@ -499,6 +502,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000000000000000000016 /* StepScheduler.swift */,
+				BB000000000000000000784 /* ZenBassGlide.swift */,
 				BB000000000000000000017 /* PlaybackEngine.swift */,
 				BB000000000000000000068 /* AudioTexturePlayer.swift */,
 				BB00000000000000000007B /* NowPlayingController.swift */,
@@ -943,6 +947,7 @@
 				AA000000000000000000014 /* TextureGenerator.swift in Sources */,
 				AA000000000000000000015 /* RhythmGenerator.swift in Sources */,
 				AA000000000000000000016 /* StepScheduler.swift in Sources */,
+				AA000000000000000000784 /* ZenBassGlide.swift in Sources */,
 				AA000000000000000000017 /* PlaybackEngine.swift in Sources */,
 				AA000000000000000000018 /* ContentView.swift in Sources */,
 				AA000000000000000000019 /* TrackRowView.swift in Sources */,
@@ -1052,6 +1057,7 @@
 				IS000000000000000000014 /* TextureGenerator.swift in Sources */,
 				IS000000000000000000015 /* RhythmGenerator.swift in Sources */,
 				IS000000000000000000016 /* StepScheduler.swift in Sources */,
+				IS000000000000000000784 /* ZenBassGlide.swift in Sources */,
 				IS000000000000000000017 /* PlaybackEngine.swift in Sources */,
 				IS000000000000000000018 /* ContentView.swift in Sources */,
 				IS000000000000000000019 /* TrackRowView.swift in Sources */,

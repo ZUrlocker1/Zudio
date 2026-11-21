@@ -50,7 +50,6 @@ What sets it apart from base Ambient, in order of how much you hear it:
 5. Phase 3 (section 13): Garden Pulse, the octave dials, the deep and dry echo and the Big Ship cycle are built, not yet heard; the Drums level is by ear.
 6. Before release, the testing values to set back:
    - Ambient shares: Piano 10 / base 10 / Zen 80 back to Piano 35 / Zen about 30 / base about 35 (section 3, SongGenerator).
-   - Bass low and bells low: 35 percent each back to 10 to 15 (AmbientZenDials.draw).
    - Big Ship cycle: 30 percent (15 breathing, 15 block) back to about 20, or drop the variant Zack doesn't keep (AmbientZenDials.draw).
    - Then rerun tools/zen_fpcheck.sh, and clean up the SF2.
 
@@ -91,10 +90,15 @@ Zudio normally rolls each track's rule on its own. Zen works only if every track
 10. **Outro length:** 6 to 12 bars, uniform.
 11. **End offsets:** the order the pads, Texture and bass stop in (section 7).
 12. **Lead 2 lock:** in 25 percent of songs Lead 2 plays on Lead 1's instrument, as AMB-1 plays every bell loop on one voice.
-13. **Bass low:** AMB-1's bass octave at -1, in 35 percent of songs while testing (likely 10 to 15 at release). Never higher.
-14. **Bells low:** AMB-1's bell octave at -1, all three bell loops an octave down, 35 percent while testing (likely 10 to 15). Never higher.
+13. **Bass low:** AMB-1's bass octave at -1, in 12 percent of songs (Zack, 2026-11-21). Never higher.
+14. **Bells low:** AMB-1's bell octave at -1, all three bell loops an octave down, 12 percent of songs (Zack, 2026-11-21). Never higher.
 15. **Echo character:** usual 75 percent; deep 15 (feedback 79 to 80 percent, bells 15 points wetter, after AMB-1's Shoreline); dry 10 (feedback 66 to 70, bells 15 points drier). One dial, so a song is never extreme both ways. The echo time doesn't change.
 16. **Big Ship cycle:** breathing pads 15 percent, block chords 15 percent while testing (likely 20 in all at release); otherwise the journey (section 5).
+17. **Texture rule:** Low Tide 40 percent, Pearl Pedal 60.
+18. **Shell Voices:** drawn in 47 percent of songs and ignored under Big Ship block chords, so about 40 percent of all Zen songs (section 7).
+19. **Slow Glide:** 35 percent of songs play AMB-BASS-009 (section 7).
+20. **6/9 home:** 25 percent of songs; it takes effect only in Ionian and Lydian drift songs without Shell Voices (section 5, pad colours).
+21. **Pad colour stream:** a seed for the per-window pad colours (section 5), the last draw.
 
 The swell's depth (0.5 to 0.9) is drawn on the swell's own stream, not with the dials.
 
@@ -171,6 +175,15 @@ Zen computes its own safe set. The shared NotePoolBuilder's scaleTensions includ
   - Dorian: IV 0.5, bVII 0.3, ii 0.2;
   - Aeolian: iv 0.4, bVII 0.3, bVI 0.3.
 - The outro is the tonic.
+
+**Pad colours** (Zack, 2026-11-21). In drift songs without Shell Voices the breathing pads now and then voice a window differently. The window's chord stays the same seventh chord for the bells, Texture, bass, log and chord display; only the pads' four notes change.
+- **9th for the root:** 20 percent of non-tonic windows, only where the 9th is a safe tension. The bass holds the root.
+- **Triad:** 10 percent of non-tonic windows. Root, 3rd, 5th and the root an octave away, no 7th.
+- **6/9 home:** in songs with the 6/9 dial (Ionian and Lydian), every tonic window and the held breath as a rootless 6/9: 6th, 3rd, 5th, 9th (in C: A, E, G, D).
+- A colour is used only if each added note sits a semitone (or a major 7th) from no chord tone, pad tone, Texture note or bass note in the window; otherwise the window stays plain. In practice this keeps the 9th off minor and half-diminished chords, whose minor 3rd sits a semitone above the 9th.
+- One draw per window from the pad colour stream, in window order, so a rebuild from the song's windows gives the same colours (AmbientZenPlan.colourPads).
+- On 200 songs: 45 had a colour; of 1,944 windows, 27 took the 9th, 32 a triad and 14 the 6/9; no glaring clash with the bed or between pad voices; the log matched in every song.
+
 **AMB-PADS-015 Big Ship Cycle** (after Eno's The Big Ship, Another Green World), in place of the journey in 30 percent of songs while testing, half with breathing pads and half with block chords.
 - A, B and C are drawn from the table on the walk weights, without repeats and never the tonic. The cycle is A B T B A B T C (T the tonic), 4 bars a chord, 32 bars a pass, repeated for the whole body.
 - The body is a whole number of chord pairs, so it always ends on B or C, which go to T in the cycle itself; the leftover 0 to 7 bars join the outro's tonic.
@@ -178,7 +191,7 @@ Zen computes its own safe set. The shared NotePoolBuilder's scaleTensions includ
 - **Block chords:** AMB-PADS-015 Big Ship Block Chords. All four voices strike together on each chord and hold it, on the same voicings; a note the next chord keeps holds on.
 - Layers come in by addition at half-cycles: Lead 1 at bar 16, Lead 2 at 32, Rhythm at 48 (or the latest half-cycle that leaves it 12 bars).
 - Texture, bass and bells follow the windows as in a journey, under the same clash rules.
-- The Chords line names the variant and the eight chords: "Big Ship drift" for the breathing pads, "Big Ship chords" for the block chords, as in "B Mixolydian Big Ship chords: Vm7 VIm7 I7 VIm7 Vm7 VIm7 I7 IVmaj7".
+- The Chords line names the variant and the cycle's shape, no numerals: "G Lydian Big Ship chords: eight-chord cycle, tonic shuttle with a turnaround" (block chords) or "G Lydian Big Ship drift: slow cycle, tonic shuttle, soft turnaround" (breathing pads).
 - On 200 songs: 60 cycle songs, no rubs on any pair of pitched tracks, the log matched the variant in every song.
 
 - The windows go into structure.chordPlan, and each SongSection takes the Zen mode, so TonalGovernanceBuilder, the log and the chord display follow.
@@ -227,15 +240,22 @@ The target is zero glaring clashes in the MIDI. Each rule is enforced in the gen
 - **The held breath.** For the last bars of music all four voices take the tonic chord and hold.
 - **Staggered endings.** The pads, Texture and bass don't stop together. One track holds to the end of the music; the other two stop 1 and then 1 to 2 more bars earlier, in an order drawn per song, so all three still sound together for at least 2 bars of the hold.
 
-**Texture: AMB-TEXT-012 Pearl Pedal.** A held tonic drone, with the fifth in about 60 percent of songs (elsewhere the fifth stands in only where the tonic drops), in the registers of section 6.
+**AMB-PADS-016 Shell Voices** (Zack, 2026-11-21), about 40 percent of songs, on the same pad instruments. Airports Breath with only the voices on the chord's 3rd and 7th kept, so the chord is see-through and the bass and Texture supply the root and fifth. It filters the finished breaths, so it adds no note and no draw. Big Ship block chords keep AMB-PADS-015.
+
+**Texture: two rules, one per song (a dial, so a regeneration keeps it): AMB-TEXT-012 Pearl Pedal in 60 percent of songs, AMB-TEXT-011 Low Tide in 40.** Both use the Zen Texture picks.
+
+**AMB-TEXT-012 Pearl Pedal.** A held tonic drone, with the fifth in about 60 percent of songs (elsewhere the fifth stands in only where the tonic drops), in the registers of section 6.
 - Each note lasts 3 to 5 bars, and the next starts exactly where it ends, on the same pitch, so it never gaps.
 - Velocity 40 to 54, nudged by the swell.
 - It ends inside the held breath (staggered endings).
 
-**Bass**, rolled per song:
+**AMB-TEXT-011 Low Tide** (Zack, 2026-11-21). Pearl Pedal's tonic, lighter, because Pearl Pedal is a bit dense all the time. One schedule of notes 2 to 4 bars long with rests of 2 to 4 bars between (a bar longer when the swell is sparse), so it sounds about a third as many steps as Pearl Pedal (measured over 100 songs). Velocity 32 to 44, nudged by the swell. Each note is cut to the windows that keep its pitch, the same ones Pearl Pedal uses (section 6, rule 2), so it can add no clash. The fifth stands in only where a window drops the tonic. It ends with the other Texture lines, inside the held breath.
+
+**Bass**, rolled per song, then Slow Glide in 35 percent of songs (a dial, so a regeneration keeps it):
 - **AMB-BASS-007 Airports Root** (0.60). The chord root, one note per window, velocity 54 to 62. Long windows are re-struck every 8 bars, never leaving a stub under 2 bars. At the window's midpoint, with probability 0.35, it moves to the fifth.
 - **AMB-BASS-008 Plateaux Octave Root** (0.40). The root doubled at the octave for the first 2 bars of the window, then the upper note alone re-struck for the rest. At the midpoint, with the same 0.35 chance, the upper note moves to the fifth. It's fuller, and it carries on a phone speaker.
-- **Sit-outs.** Either rule sits a window out with probability 0.3 × restlessness + 0.25 × max(−swell, 0), never the first or last window and never two windows running.
+- **AMB-BASS-009 Slow Glide** (Zack, 2026-11-21). AMB-BASS-007's notes, but playback strikes one key per run and bends it to each new root or fifth, after AMB-1, whose bass is never re-attacked at a chord change. A run is a stretch of notes with no gap; a sit-out ends it. Each glide is a one-pole approach with a 0.45 s time constant, audible for about 1.5 s. The bass channel's bend range is set to 12 (RPN 0) at each run start and back to 2 for any other song. The key is struck again, at the same bend, after 24 bars, so no sample has to hold for minutes. After a seek the first step re-strikes the run's key at the bend of the note in force. The Vibrato effect rides on the glide's bend. The piano roll, MIDI export and M4A export show and play the written notes, re-struck, with no glide. Code: Playback/ZenBassGlide.swift and PlaybackEngine's stepGlide.
+- **Sit-outs.** Every rule sits a window out with probability 0.3 × restlessness + 0.25 × max(−swell, 0), never the first or last window and never two windows running.
 
 **Swell presets.** AMB-1's bed is slow swells with no audible attacks, and a stock preset re-attacks on every breath. Zen's swell sounds are copies of existing presets in a new soundfont bank (bank 14), each setting the volume envelope's attack to about 5.6 s and release to about 4.5 s. A copy is a new preset record pointing at the existing instruments and samples, so no sample data is copied and no existing program moves; editing a stock preset in place would have changed every style that uses it. They are made by tools/sf2_clone_presets.py and load through the ordinary bank decode in setProgram.
 
@@ -298,7 +318,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 
 - **Title:** Zen has its own titles (AmbientZenTitleGenerator, in AmbientTitleGenerator.swift), gentle jokes on Eno with extra airport humour, at most 19 characters: "Music for Layovers" (30 percent), Eno spoofs such as "Thursday Nap" or "Neroli Ravioli" (35), place plus fraction such as "United Delay 2/1" or "1/1 (Decaf)", a quarter of them an odd number such as "Gate 42/634" or "Lounge 1.31459" (20), and Oblique Strategies twists such as "Honor Thy Nap" (15). The title is the last draw, so no note depends on it.
 - **Style:** "Ambient Zen – 72 bpm, 9 bar outro". There is no Form line, since every song is A and an outro.
-- **Chords:** key, mode, pace and the way home, for example "G Dorian quick 7th chords drifting, home via IV7", or "home on I" when the last body chord is the tonic. The pace reads quick (under 37 s), steady (under 49 s) or slow.
+- **Chords:** key, mode, pace and the way home, for example "G Dorian quick 7th chords drifting, home via IV7", or "home on I" when the last body chord is the tonic, then any pad colours: ", pads with 9ths and triads" or ", pads with 6/9 home". The pace reads quick (under 37 s), steady (under 49 s) or slow.
 - **Zen:** "Breaths:long Echo:medium Bells:sparse Drift:calm Swell:deep". Echo reads light, medium or long, or deep or dry for the extremes. A low octave shows as "Bells:sparse,low" and "Bass:low". The pad colour isn't named, because the Instruments line shows the pads.
 - **Rules,** in track order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums. Drums logs AMB-DRUM-005 Garden Pulse or AMB-DRUM-000 No percussion. Zen's lead rules use LD1 and LD2, because each belongs to one lead.
 - No line per chord change; no style logs one.
@@ -306,7 +326,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 
 ## 12. Regeneration and Evolve
 
-**Regeneration.** Regenerating a Zen track rebuilds the ZenPlan from the seed and regenerates that track, then rebuilds the bells after it on their own seeds, because the sounding check depends on what came before: a bed track rebuilds all three bells, Lead 1 rebuilds Lead 2 and Rhythm, Lead 2 rebuilds Rhythm. A bell track's seed is its override in trackOverrides, or else its Zen index. A bell track with an override always plays, so a regenerated Lead 2 never comes back silent, and a reload's replay gives the same song in any order. Drums regenerate only in a Garden Pulse song; otherwise they stay silent. A regenerated Lead 1 or Lead 2 re-rolls its bell density (sparse, medium or full) from its own seed and logs it as Bells:word; Rhythm keeps the song's density.
+**Regeneration.** Regenerating a Zen track rebuilds the ZenPlan from the seed and regenerates that track, then rebuilds the bells after it on their own seeds, because the sounding check depends on what came before: a bed track rebuilds all three bells, Lead 1 rebuilds Lead 2 and Rhythm, Lead 2 rebuilds Rhythm. A bell track's seed is its override in trackOverrides, or else its Zen index. A bell track with an override always plays, so a regenerated Lead 2 never comes back silent, and a reload's replay gives the same song in any order. Drums regenerate only in a Garden Pulse song; otherwise they stay silent. A regenerated Lead 1 or Lead 2 goes to the opposite of the song's bell density (sparse becomes full, full becomes sparse, medium goes either way on its own seed; always taken from the song's dial so a reload replays it) and logs it as Bells:word; Rhythm keeps the song's density.
 
 **Evolve** follows the normal passes (Zack, 2026-11-21):
 - Pass 1 regenerates Lead 1 and Lead 2 and gives them new instruments.
@@ -323,14 +343,15 @@ Each item is independent and can be built or skipped on its own. Specs are in th
 - **Built:** the deep and dry echo (section 4).
 - **Built:** AMB-PADS-015 Big Ship Cycle (section 5), with breathing pads or block chords.
 - **Dropped:** AMB-PADS-014 Airports 2/1 Field (Zack, 2026-11-21). Base Ambient's prime-length loops over one to three held chords already cover it; ideas for base Ambient are in docs/ambient-plan.md, "Ideas for later".
-- **More Evolve.** A pass could bring a short chord walk of its own, flip the pad colour, or shift one note of the mode (Ionian to Mixolydian and similar), which must re-run section 6, rule 2 against the shifted scale.
-- **AMB-TEXT-011 On Land Bell** as an alternative Texture rule: a distant tower bell on a 29-beat loop, root or fifth only.
+- **Dropped:** More Evolve (Zack, 2026-11-21). The pad colour flip adds too little, since pass 2 already swaps the pads; a new chord walk or a one-note mode shift would need every pitched track rebuilt in the pass, which is too complicated and risky. Evolve stays as in section 12.
+- **Built:** AMB-TEXT-011 Low Tide, a lighter Texture rule in 40 percent of songs (section 7). The On Land Bell idea became this (Zack, 2026-11-21); the bell itself was dropped.
+- **Built:** AMB-PADS-016 Shell Voices and AMB-BASS-009 Slow Glide (section 7), not yet heard.
+- **Known issue:** Saw Bass Swell (14038) in the Zen bass pick list dies to silence about 10 s into a held note, so it gaps under every Zen bass rule. Not yet fixed.
 
 ## 14. On the shelf
 
 These come back only if a listen says Zen is missing them. Details are in the old plan.
 - **The eight named AMB-1 recipes.** The dials do the job.
-- **Bass glide** (a pitch-bend slide between roots). Zack liked it in AMB-1, so expect it back. It is new playback code (RPN bend range, seek handling).
 - **Drift** (a slow per-track pitch wander). A new effect chip and new playback code.
 - **Edge fades on Bass and Texture.** The per-note fade can't tell an edge from a join without new engine logic.
 - **The colour chord** and its clash guards.
@@ -342,7 +363,8 @@ These come back only if a listen says Zen is missing them. Details are in the ol
 
 **Zen's own files** (Sources/Zudio/Generation/Ambient/)
 - AmbientZenPlan.swift: the dials, chord table, window layout, walk, cadence, the Big Ship cycle, Texture and bass keep rules, structure, swell, and the log words.
-- AmbientZenTracks.swift: AMB-PADS-011, AMB-PADS-015 block chords, AMB-TEXT-012, AMB-BASS-007 and AMB-BASS-008.
+- AmbientZenTracks.swift: AMB-PADS-011, AMB-PADS-015 block chords, AMB-PADS-016, AMB-TEXT-011, AMB-TEXT-012, AMB-BASS-007, AMB-BASS-008 and AMB-BASS-009's notes.
+- Playback/ZenBassGlide.swift: AMB-BASS-009's held keys and bends.
 - AmbientZenLoops.swift: the bell loop, the three bell rules, the sounding check and writeBells.
 
 **Branches in shared files**

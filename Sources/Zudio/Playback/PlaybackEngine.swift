@@ -313,6 +313,15 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var bassSlideSecondsPerStep: Double = 0.1
     nonisolated(unsafe) private var bassSlidesSuppressed = false
 
+    // Ambient Zen Slow Glide (ZenBassGlide, AMB-BASS-009): the bass plays one held key per run and
+    // bends to each new pitch. Built with stepEventMap and read on stepTimerQueue. glideSemis is the
+    // bend now sounding, which the Vibrato effect adds to while the glide owns the bass's bend.
+    nonisolated(unsafe) private var zenGlide: ZenBassGlide? = nil
+    nonisolated(unsafe) private var glideSemis: Double = 0
+    nonisolated(unsafe) private var glideToken = 0
+    nonisolated(unsafe) private var glidePrimedScheduler = -1
+    nonisolated(unsafe) private var bassBendRangeWide = false
+
     // Behind-the-beat feel (BeatFixup): seconds the bass and the drum backbeat notes are held
     // back from their grid step. Read in onStep on stepTimerQueue, written under
     // stepTimerQueue.sync by applyBeatFixup. Zero except for a Chill Soho Soul song or a Chill Blues song on an allowed bass.
@@ -582,8 +591,11 @@ final class PlaybackEngine: ObservableObject {
     private func buildStepEventMap(state: SongState) {
         var map:    [Int: [(Int, MIDIEvent)]] = [:]
         var offMap: [Int: [(Int, UInt8)]]    = [:]
+        // A Slow Glide song plays the glide's held keys on the bass in place of the written notes.
+        let glide = ZenBassGlide.make(for: state)
         for trackIndex in 0..<kTrackCount {
-            for ev in state.events(forTrack: trackIndex) {
+            let events = trackIndex == kTrackBass && glide != nil ? glide!.played : state.events(forTrack: trackIndex)
+            for ev in events {
                 map[ev.stepIndex, default: []].append((trackIndex, ev))
                 offMap[ev.stepIndex + ev.durationSteps, default: []].append((trackIndex, ev.note))
             }
@@ -597,6 +609,25 @@ final class PlaybackEngine: ObservableObject {
             noteOffMap   = offMap
             bassSlideMap = slides
             bassSlideSecondsPerStep = state.frame.secondsPerStep
+            // When the held keys change (a new song, or a bass regeneration mid-song), the old key's
+            // note-off may not be in the new map, so the bass is released now and the next step
+            // primes the new run. Any other change (another track regenerated) leaves it sounding.
+            if glide?.played != zenGlide?.played {
+                if glide != nil || zenGlide != nil {
+                    samplers[kTrackBass].sendController(123, withValue: 0, onChannel: gmChannel(kTrackBass))
+                }
+                glideToken += 1             // any glide still ramping stops
+                glidePrimedScheduler = -1
+            }
+            zenGlide = glide
+            // Any other song: the bass's bend goes back to the GM range of 2, centred, so Chill's
+            // slides and the Vibrato effect keep their depth.
+            if glide == nil && bassBendRangeWide {
+                setBassBendRange(2)
+                sendBassBend(0)
+                bassBendRangeWide = false
+                glideSemis = 0
+            }
         }
         beatFixupOffsets = BeatFixup.offsets(for: state)
         applyBeatFixup()
@@ -883,6 +914,11 @@ final class PlaybackEngine: ObservableObject {
                 continue
             }
             samplers[trackIndex].stopNote(note, onChannel: gmChannel(trackIndex))
+        }
+        // Slow Glide: the bend for this step goes out before the key is struck.
+        if let glide = zenGlide {
+            let bassStrikes = noteOns.contains { $0.0 == kTrackBass }
+            stepGlide(glide, step: step, bassStrikes: bassStrikes, schedulerID: schedulerID)
         }
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
         for (trackIndex, ev) in noteOns {
@@ -2268,7 +2304,10 @@ final class PlaybackEngine: ObservableObject {
         for i in 0..<kTrackCount where vibEnabled[i] {
             vibPhase[i] += vibPhaseInc[i]
             let cents   = Double(vibDepth[i]) * sin(vibPhase[i])
-            let bend14  = max(0, min(16383, Int(8192.0 + cents / 200.0 * 8192.0)))
+            // A Slow Glide bass: the wobble rides on the glide's bend, at the glide's ±12 range.
+            let bend14  = i == kTrackBass && bassBendRangeWide
+                ? ZenBassGlide.bendValue(semitones: glideSemis + cents / 100.0)
+                : max(0, min(16383, Int(8192.0 + cents / 200.0 * 8192.0)))
             let ch      = kTrackMIDIChannels[i]
             samplers[i].sendMIDIEvent(0xE0 | ch, data1: UInt8(bend14 & 0x7F), data2: UInt8(bend14 >> 7))
         }
@@ -2339,6 +2378,81 @@ final class PlaybackEngine: ObservableObject {
     /// length on the curve ChillBassSlides.remaining gives. Runs on stepTimerQueue, where the note itself is fired, so the first bend always
     /// precedes the note-on. A stop or seek mid-glide sends the wheel straight back to centre,
     /// so the next note is never left out of tune.
+    // MARK: - Ambient Zen Slow Glide
+
+    /// One step of the Slow Glide, on stepTimerQueue before the step's note-ons. A new scheduler
+    /// (play, seek, tempo change, pass) primes first: a step inside a run strikes the run's key at
+    /// the bend of the note in force, at once, so a seek never lands on a silent or off-pitch bass.
+    nonisolated private func stepGlide(_ glide: ZenBassGlide, step: Int, bassStrikes: Bool, schedulerID: Int) {
+        if glidePrimedScheduler != schedulerID {
+            glidePrimedScheduler = schedulerID
+            glideToken += 1
+            setBassBendRange(12)
+            bassBendRangeWide = true
+            if glide.runStarts.contains(step) {
+                glideSemis = 0
+                sendBassBend(0)
+            } else if let seg = glide.segment(at: step) {
+                glideSemis = seg.bend
+                sendBassBend(seg.bend)
+                if !bassStrikes && !trackLoading[kTrackBass] {
+                    samplers[kTrackBass].startNote(seg.key, withVelocity: seg.velocity, onChannel: gmChannel(kTrackBass))
+                }
+            }
+            return
+        }
+        if glide.runStarts.contains(step) {
+            // A new run: its key is struck at its own pitch. The last run's tail has long died
+            // away in the sit-out, so the centred bend moves nothing still sounding.
+            glideToken += 1
+            setBassBendRange(12)
+            glideSemis = 0
+            sendBassBend(0)
+        }
+        if let target = glide.bends[step] { startGlide(to: target, schedulerID: schedulerID) }
+    }
+
+    /// A one-pole approach from the bend now sounding to `target`, sent every 16 ms over 4 time
+    /// constants, then exactly on target. A newer glide, a new run or a new scheduler stops it.
+    nonisolated private func startGlide(to target: Double, schedulerID: Int) {
+        glideToken += 1
+        let token = glideToken
+        let from  = glideSemis
+        let tau   = ZenBassGlide.tau
+        let total = 4 * tau
+        let ticks = Int(total / 0.016)
+        for k in 1...ticks {
+            let t = total * Double(k) / Double(ticks)
+            stepTimerQueue.asyncAfter(deadline: .now() + t) { [weak self] in
+                guard let self, self.currentSchedulerID == schedulerID, self.glideToken == token else { return }
+                let value = k == ticks ? target : target - (target - from) * exp(-t / tau)
+                self.glideSemis = value
+                self.sendBassBend(value)
+            }
+        }
+    }
+
+    /// The bass's bend, in semitones at the glide's ±12 range. The Vibrato effect, when on, adds
+    /// its own wobble to glideSemis every frame.
+    nonisolated private func sendBassBend(_ semitones: Double) {
+        let v  = ZenBassGlide.bendValue(semitones: semitones)
+        let ch = gmChannel(kTrackBass)
+        samplers[kTrackBass].sendMIDIEvent(0xE0 | ch, data1: UInt8(v & 0x7F), data2: UInt8(v >> 7))
+    }
+
+    /// RPN 0 (pitch-bend range) on the bass channel, then the null RPN so no stray data entry
+    /// changes it. The sampler keeps it across patch loads (checked 2026-11-21).
+    nonisolated private func setBassBendRange(_ semitones: UInt8) {
+        let ch = gmChannel(kTrackBass)
+        let sampler = samplers[kTrackBass]
+        sampler.sendController(101, withValue: 0, onChannel: ch)
+        sampler.sendController(100, withValue: 0, onChannel: ch)
+        sampler.sendController(6, withValue: semitones, onChannel: ch)
+        sampler.sendController(38, withValue: 0, onChannel: ch)
+        sampler.sendController(101, withValue: 127, onChannel: ch)
+        sampler.sendController(100, withValue: 127, onChannel: ch)
+    }
+
     nonisolated private func startBassSlide(_ slide: BassSlide, channel: UInt8, schedulerID: Int) {
         let sampler = samplers[kTrackBass]
         let from    = Double(slide.fromSemitones)
@@ -2449,7 +2563,11 @@ final class PlaybackEngine: ObservableObject {
         vibEnabled[i] = false
         vibPhase[i]   = 0.0
         let ch = kTrackMIDIChannels[i]
-        samplers[i].sendMIDIEvent(0xE0 | ch, data1: 0x00, data2: 0x40)  // reset pitch bend to center
+        if i == kTrackBass && bassBendRangeWide {
+            sendBassBend(glideSemis)   // a Slow Glide bass keeps the glide's bend
+        } else {
+            samplers[i].sendMIDIEvent(0xE0 | ch, data1: 0x00, data2: 0x40)  // reset pitch bend to center
+        }
         stopSharedLFOIfIdle()
         updateSharedLFORate()
     }

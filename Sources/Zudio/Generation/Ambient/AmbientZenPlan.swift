@@ -56,10 +56,10 @@ struct AmbientZenDials: Sendable, Equatable {
     /// percent of songs (Zack, 2026-11-20). An instrument choice only; the notes don't change.
     let lead2SyncsLead1: Bool
     /// AMB-1's bass octave at -1: the bass an octave lower, MIDI 24 to 35 (never higher).
-    /// 35 percent while testing, likely 10 to 15 at release (Zack, 2026-11-21).
+    /// 12 percent of songs (Zack, 2026-11-21).
     let bassLow: Bool
     /// AMB-1's bell octave at -1: all three bell loops an octave lower (never higher).
-    /// 35 percent while testing, likely 10 to 15 at release (Zack, 2026-11-21).
+    /// 12 percent of songs (Zack, 2026-11-21).
     let bellsLow: Bool
     /// The echo's character (Zack, 2026-11-21): usual 75 percent; deep 15 (feedback 79 to 80
     /// percent and the bells 15 points wetter, after AMB-1's Shoreline); dry 10 (feedback 66 to 70
@@ -70,6 +70,20 @@ struct AmbientZenDials: Sendable, Equatable {
     /// The Big Ship cycle (AMB-PADS-015): 30 percent of songs while testing, split evenly between
     /// breathing pads and block chords; likely 20 at release (Zack, 2026-11-21).
     let cycle: ZenCycle
+    /// AMB-TEXT-011 Low Tide plays instead of AMB-TEXT-012 Pearl Pedal: 40 percent of songs
+    /// (Zack, 2026-11-21). A lighter tonic that comes and goes.
+    let lowTide: Bool
+    /// AMB-PADS-016 Shell Voices: breathing pads with only the 3rd and 7th (Zack, 2026-11-21).
+    /// Drawn in 47 percent of songs and ignored under Big Ship block chords, so about 40 percent.
+    let shellVoices: Bool
+    /// AMB-BASS-009 Slow Glide: AMB-BASS-007's notes, played as one held note that bends to each
+    /// new root (Zack, 2026-11-21). 35 percent of songs; playback reads this dial (ZenBassGlide).
+    let slowGlide: Bool
+    /// The pads voice every tonic window as a rootless 6/9 (Ionian and Lydian only): 25 percent of
+    /// drift songs (Zack, 2026-11-21).
+    let homeSixNine: Bool
+    /// The stream for the per-window pad colours (AmbientZenPlan.colourPads).
+    let padColourSeed: UInt64
 
     static func draw(seed: UInt64) -> AmbientZenDials {
         var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: AmbientZenPlan.dialsIndex))
@@ -94,9 +108,9 @@ struct AmbientZenDials: Sendable, Equatable {
         offsets[order[1]] = gapA
         offsets[order[2]] = gapA + gapB
         let lead2Sync = rng.nextDouble() < 0.25
-        // The octave dials (2026-11-21), last, testing shares.
-        let bassLow  = rng.nextDouble() < 0.35
-        let bellsLow = rng.nextDouble() < 0.35
+        // The octave dials (2026-11-21), last: 12 percent each (Zack, 2026-11-21).
+        let bassLow  = rng.nextDouble() < 0.12
+        let bellsLow = rng.nextDouble() < 0.12
         // The echo character (2026-11-21), last.
         let echoRoll = rng.nextDouble()
         let echoCharacter: ZenEchoCharacter = echoRoll < 0.15 ? .deep : echoRoll < 0.25 ? .dry : .usual
@@ -104,11 +118,22 @@ struct AmbientZenDials: Sendable, Equatable {
         // The Big Ship cycle (2026-11-21), last, testing share.
         let cycleRoll = rng.nextDouble()
         let cycle: ZenCycle = cycleRoll < 0.15 ? .breathing : cycleRoll < 0.30 ? .block : .none
+        // The Texture rule (2026-11-21), last: Low Tide 40 percent, Pearl Pedal 60.
+        let lowTide = rng.nextDouble() < 0.40
+        // The pad shell (2026-11-21), last.
+        let shellVoices = rng.nextDouble() < 0.47
+        // The bass glide (2026-11-21), last.
+        let slowGlide = rng.nextDouble() < 0.35
+        // The pad colours (2026-11-21), last.
+        let homeSixNine   = rng.nextDouble() < 0.25
+        let padColourSeed = rng.next()
         return AmbientZenDials(mode: mode, tempo: tempo, chordPaceSeconds: pace, breathLength: breath,
                                padColour: colour, restlessness: restless, bellDensity: density,
                                echoSize: echo, pulse: pulse, outroBars: outro, endOffsets: offsets,
                                lead2SyncsLead1: lead2Sync, bassLow: bassLow, bellsLow: bellsLow,
-                               echoCharacter: echoCharacter, echoAmount: echoAmount, cycle: cycle)
+                               echoCharacter: echoCharacter, echoAmount: echoAmount, cycle: cycle, lowTide: lowTide,
+                               shellVoices: shellVoices, slowGlide: slowGlide,
+                               homeSixNine: homeSixNine, padColourSeed: padColourSeed)
     }
 
     /// Points added to the bells' echo wet mix (Lead 1, Lead 2, Rhythm): +15 deep, -15 dry.
@@ -162,6 +187,19 @@ struct AmbientZenDials: Sendable, Equatable {
     }
 }
 
+/// How the breathing pads voice a window (Zack, 2026-11-21). The chord stays the window's seventh
+/// chord for the bells, Texture, bass and log; only the pads' four notes change.
+enum ZenPadVoicing: Sendable, Equatable {
+    /// Root, 3rd, 5th, 7th.
+    case seventh
+    /// The 9th in place of the root (the bass holds the root).
+    case ninth
+    /// Root, 3rd, 5th and the root again: no 7th.
+    case triad
+    /// The tonic as a rootless 6/9: 6th, 3rd, 5th, 9th.
+    case sixNine
+}
+
 /// One entry of the chord table: a diatonic seventh chord on a degree, with AMB-1's walk weight.
 struct ZenChord: Sendable, Equatable {
     let degree: String
@@ -182,7 +220,12 @@ struct ZenWindow: Sendable, Equatable {
     /// Whether the pedal's tonic and fifth may sound in this window (section 6, rule 2).
     let keepsTonic: Bool
     let keepsFifth: Bool
+    /// The pads' voicing and its four pitch classes (empty for a plain seventh chord).
+    var padVoicing: ZenPadVoicing = .seventh
+    var padTones: [Int] = []
 
+    /// The four pitch classes the breathing pads voice.
+    var voiceTones: [Int] { padTones.isEmpty ? chordTones : padTones }
     var endBar: Int { startBar + lengthBars }
     var rootPC: Int { chordTones[0] }
     /// The chord's own fifth above the root: 7, or 6 for a half-diminished chord.
@@ -219,7 +262,8 @@ struct AmbientZenPlan: Sendable {
     let key: String
     let tempo: Int
     let totalBars: Int
-    let windows: [ZenWindow]
+    /// var only so colourPads can set the pad voicings after the walk.
+    var windows: [ZenWindow]
     /// The swell, one value per bar from -1 (sparse) to +1 (full): AMB-1's arc (plan section 8).
     /// Empty until make or rebuild fills it; swell(atBar:) reads it.
     var swell: [Double] = []
@@ -440,7 +484,63 @@ struct AmbientZenPlan: Sendable {
                                   degree: tonic.degree, type: tonic.type, key: key, mode: dials.mode))
         var plan = AmbientZenPlan(dials: dials, key: key, tempo: tempo, totalBars: totalBars, windows: windows)
         plan.swell = swellCurve(seed: seed, tempo: tempo, totalBars: totalBars, outroStartBar: plan.outroStartBar)
+        plan.colourPads()
         return plan
+    }
+
+    // MARK: - Pad colours (Zack, 2026-11-21)
+
+    /// Share of non-tonic windows whose pads take the 9th in place of the root.
+    static let ninthShare = 0.20
+    /// Share of non-tonic windows whose pads drop the 7th (taken after the 9th's share).
+    static let triadShare = 0.10
+
+    /// Colours the drift's pad voicings: in songs with the 6/9 dial, every tonic window as a
+    /// rootless 6/9 (Ionian and Lydian); in other windows the 9th for the root (20 percent, only
+    /// where the 9th is a safe tension) or a plain triad (10 percent). Not under Big Ship or Shell
+    /// Voices. Every added note is a scale note that sits a semitone from no chord tone, pad tone,
+    /// Texture note or bass note in the window; a colour that would is left plain. One draw per
+    /// window from its own stream, so a rebuild from the song's windows gives the same colours.
+    mutating func colourPads() {
+        guard dials.cycle == .none, !dials.shellVoices else { return }
+        var rng = SeededRNG(seed: dials.padColourSeed)
+        let scale = mode.intervals.map { (tonicPC + $0) % 12 }
+        func near(_ a: Int, _ b: Int) -> Bool { let d = (a - b + 12) % 12; return d == 1 || d == 11 }
+        for i in windows.indices {
+            let roll = rng.nextDouble()
+            let w = windows[i]
+            guard w.chordTones.count == 4, let r = scale.firstIndex(of: w.rootPC) else { continue }
+            let ninth = scale[(r + 1) % 7], sixth = scale[(r + 5) % 7]
+            let ct = w.chordTones
+            var voicing = ZenPadVoicing.seventh
+            var tones: [Int] = []
+            if w.rootPC == tonicPC {
+                if dials.homeSixNine, mode == .Ionian || mode == .Lydian {
+                    voicing = .sixNine; tones = [sixth, ct[1], ct[2], ninth]
+                }
+            } else if roll < Self.ninthShare {
+                if w.safeTensions.contains(ninth) { voicing = .ninth; tones = [ninth, ct[1], ct[2], ct[3]] }
+            } else if roll < Self.ninthShare + Self.triadShare {
+                voicing = .triad; tones = [ct[0], ct[1], ct[2], ct[0]]
+            }
+            guard !tones.isEmpty else { continue }
+            let bed = (pedalNotes(w) + bassNotes(w)).map { $0 % 12 }
+            let added = tones.filter { !ct.contains($0) }
+            let clear = added.allSatisfy { a in
+                !ct.contains { near(a, $0) } && !tones.contains { near(a, $0) } && !bed.contains { near(a, $0) }
+            }
+            if clear { windows[i].padVoicing = voicing; windows[i].padTones = tones }
+        }
+    }
+
+    /// The pad colours in plain words for the Chords line ("" when every window is plain).
+    var padColourWords: String {
+        let kinds = Set(windows.map(\.padVoicing))
+        var parts: [String] = []
+        if kinds.contains(.ninth) { parts.append("9ths") }
+        if kinds.contains(.triad) { parts.append("triads") }
+        if kinds.contains(.sixNine) { parts.append("6/9 home") }
+        return parts.isEmpty ? "" : ", pads with " + parts.joined(separator: " and ")
     }
 
     // MARK: - The Big Ship cycle
@@ -551,6 +651,7 @@ struct AmbientZenPlan: Sendable {
                                   totalBars: song.frame.totalBars, windows: windows)
         plan.swell = swellCurve(seed: song.globalSeed, tempo: tempo, totalBars: song.frame.totalBars,
                                 outroStartBar: plan.outroStartBar)
+        plan.colourPads()
         return plan
     }
 

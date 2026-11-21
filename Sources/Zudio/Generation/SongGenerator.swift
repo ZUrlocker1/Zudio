@@ -1609,7 +1609,7 @@ struct SongGenerator {
         var bassRNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: AmbientZenPlan.bassIndex))
         var padRules: Set<String> = [], texRules: Set<String> = [], bassRules: Set<String> = []
         trackEvents[kTrackPads]    = AmbientZenTracks.pads(plan: plan, rng: &padsRNG, usedRuleIDs: &padRules)
-        trackEvents[kTrackTexture] = AmbientZenTracks.pedal(plan: plan, rng: &pedalRNG, usedRuleIDs: &texRules)
+        trackEvents[kTrackTexture] = AmbientZenTracks.texture(plan: plan, rng: &pedalRNG, usedRuleIDs: &texRules)
         trackEvents[kTrackBass]    = AmbientZenTracks.bass(plan: plan, rng: &bassRNG, usedRuleIDs: &bassRules)
 
         // Step 4: the bells (phase 2), Lead 1, Lead 2 and Rhythm, each reading the bed and the
@@ -1700,16 +1700,18 @@ struct SongGenerator {
         // not a climb or a descent, so the line says "drifting" (Zack, 2026-11-20).
         // The walk always starts on the tonic, so "from I" is left out (Zack, 2026-11-21).
         let home = plan.wayHome.map { ", home via \($0)" } ?? ", home on I"
-        // A Big Ship song names its variant and its eight chords instead: "Big Ship drift" for the
+        // A Big Ship song names its variant and the shape of its cycle (no numerals) instead: "Big Ship drift" for the
         // breathing pads (the subtler one), "Big Ship chords" for the block chords (Zack, 2026-11-21).
         switch plan.dials.cycle {
         case .none:
             log.append(GenerationLogEntry(tag: "Chords", description:
-                "\(frame.key) \(frame.mode.rawValue) \(plan.dials.paceWords) 7th chords drifting\(home)"))
+                "\(frame.key) \(frame.mode.rawValue) \(plan.dials.paceWords) 7th chords drifting\(home)\(plan.padColourWords)"))
         case .breathing, .block:
-            let variant = plan.dials.cycle == .block ? "chords" : "drift"
+            let shape = plan.dials.cycle == .block
+                ? "chords: eight-chord cycle, tonic shuttle with a turnaround"
+                : "drift: slow cycle, tonic shuttle, soft turnaround"
             log.append(GenerationLogEntry(tag: "Chords", description:
-                "\(frame.key) \(frame.mode.rawValue) Big Ship \(variant): \(plan.cycleNumerals)"))
+                "\(frame.key) \(frame.mode.rawValue) Big Ship \(shape)"))
         }
         let swellWords = AmbientZenPlan.swellDepthWords(seed: seed)
         log.append(GenerationLogEntry(tag: "Zen", description: "\(plan.dials.plainWords) Swell:\(swellWords)"))
@@ -1935,7 +1937,7 @@ struct SongGenerator {
         case kTrackLead1:
             if let plan = zenPlan {
                 events = AmbientZenLoops.lead1(plan: plan, band: songState.trackEvents,
-                                               density: AmbientZenLoops.regenBellDensity(seed: newTrackSeed),
+                                               density: AmbientZenLoops.regenBellDensity(seed: newTrackSeed, base: plan.dials.bellDensity),
                                                rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbPiano {
                 events = AmbientLeadGenerator.generateAmbientPianoLead(
@@ -1987,7 +1989,7 @@ struct SongGenerator {
         case kTrackLead2:
             if let plan = zenPlan {
                 events = AmbientZenLoops.lead2(plan: plan, band: songState.trackEvents, forcePlay: true,
-                                               density: AmbientZenLoops.regenBellDensity(seed: newTrackSeed),
+                                               density: AmbientZenLoops.regenBellDensity(seed: newTrackSeed, base: plan.dials.bellDensity),
                                                rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbPiano {
                 return songState
@@ -2139,7 +2141,7 @@ struct SongGenerator {
                 return songState
             } else if let plan = zenPlan {
                 // Zen's texture is always the MIDI pedal: never an audio texture.
-                events = AmbientZenTracks.pedal(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
+                events = AmbientZenTracks.texture(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.texture ?? 7
                 let ambientFiles = Self.ambientAudioFilePool
@@ -2351,7 +2353,7 @@ struct SongGenerator {
         }
         // Ambient Zen: a regenerated Lead 1 or Lead 2 re-rolls its bell density; name it.
         if zenPlan != nil, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
-            let word = AmbientZenLoops.densityWord(AmbientZenLoops.regenBellDensity(seed: newTrackSeed))
+            let word = AmbientZenLoops.densityWord(AmbientZenLoops.regenBellDensity(seed: newTrackSeed, base: zenPlan?.dials.bellDensity ?? 45))
             regenLog.append(GenerationLogEntry(tag: "Zen", description: "Bells:\(word)"))
         }
 
@@ -3872,8 +3874,11 @@ struct SongGenerator {
         // Ambient Zen
         case "AMB-BASS-007":  return "Airports Root"
         case "AMB-BASS-008":  return "Plateaux Octave Root"
+        case "AMB-BASS-009":  return "Slow Glide"
         case "AMB-PADS-011":  return "Airports Breath"
         case "AMB-PADS-015":  return "Big Ship Block Chords"
+        case "AMB-PADS-016":  return "Shell Voices"
+        case "AMB-TEXT-011":  return "Low Tide"
         case "AMB-TEXT-012":  return "Pearl Pedal"
         case "AMB-LD1-011":  return "Airports 1/1 Loop"
         case "AMB-LD2-014":  return "Airports 1/2 Answer"

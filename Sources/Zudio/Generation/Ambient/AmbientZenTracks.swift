@@ -24,7 +24,7 @@ enum AmbientZenTracks {
     static func pads(plan: AmbientZenPlan, rng: inout SeededRNG,
                      usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
         if plan.dials.cycle == .block { return blockPads(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs) }
-        usedRuleIDs.insert("AMB-PADS-011")
+        usedRuleIDs.insert(plan.dials.shellVoices ? "AMB-PADS-016" : "AMB-PADS-011")
         let voicings  = padVoicings(plan: plan)
         let sps       = plan.stepsPerSecond
         let holdStart = plan.heldBreathStartBar * 16
@@ -46,7 +46,7 @@ enum AmbientZenTracks {
         /// chord and sits clear of the new voicing and the pedal.
         func carries(_ pitch: Int, voice: Int, into w: Int) -> Bool {
             let win = plan.windows[w]
-            guard win.chordTones.contains(pitch % 12) else { return false }
+            guard win.voiceTones.contains(pitch % 12) else { return false }
             for (u, other) in voicings[w].enumerated() where u != voice {
                 if [0, 1, 13].contains(abs(pitch - other)) { return false }
             }
@@ -102,8 +102,22 @@ enum AmbientZenTracks {
                                         durationSteps: endStep - holdStart))
             }
         }
+        // AMB-PADS-016 Shell Voices: the same breaths, keeping only the voices on the chord's 3rd
+        // and 7th, so the chord is see-through and the bass and Texture supply the root and fifth.
+        // A filter after every draw, so the draws match AMB-PADS-011 and it adds no new note.
+        if plan.dials.shellVoices {
+            let lastWindow = plan.windows[plan.windows.count - 1]
+            events = events.filter { e in
+                let held = e.stepIndex + e.durationSteps >= endStep
+                let win  = held ? lastWindow : plan.windows[plan.windowIndex(atBar: e.stepIndex / 16)]
+                let pc   = Int(e.note) % 12
+                return pc == win.chordTones[1] || pc == win.chordTones[3]
+            }
+        }
         return abutSamePitch(events)
     }
+
+    // AMB-PADS-016 Shell Voices is AMB-PADS-011's breathing with only the 3rd and 7th kept (above).
 
     // MARK: - Pads: AMB-PADS-015 Big Ship Block Chords
 
@@ -180,7 +194,8 @@ enum AmbientZenTracks {
 
     private static func bestVoicing(_ w: ZenWindow, plan: AmbientZenPlan, previous: [Int]?) -> [Int] {
         let low = 48, high = 77
-        let tones = Array(w.chordTones.prefix(4))
+        // The pad colour's four notes (AmbientZenPlan.colourPads), else the seventh chord.
+        let tones = Array(w.voiceTones.prefix(4))
         // The pedal notes the window keeps and every bass note it may hold (plan.bassNotes).
         let pedal = plan.pedalNotes(w) + plan.bassNotes(w)
         // With no previous voicing, the voices start spread around these centres.
@@ -215,6 +230,54 @@ enum AmbientZenTracks {
             search(0)
         }
         return best
+    }
+
+    // MARK: - Texture: AMB-TEXT-011 Low Tide / AMB-TEXT-012 Pearl Pedal
+
+    /// The song's Texture rule, from its dial (so a regeneration keeps it): Low Tide in 40 percent
+    /// of songs, Pearl Pedal in 60.
+    static func texture(plan: AmbientZenPlan, rng: inout SeededRNG,
+                        usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        plan.dials.lowTide ? lowTide(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs)
+                           : pedal(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs)
+    }
+
+    /// AMB-TEXT-011 Low Tide: Pearl Pedal's tonic, lighter. One schedule of notes 2 to 4 bars long
+    /// with rests of 2 to 4 bars between (a bar longer when the swell is sparse), so it sounds about
+    /// half the time, at velocity 32 to 44. Every note is cut to the windows that keep the pitch,
+    /// the same ones Pearl Pedal uses, so it can add no clash. The fifth stands in only where a
+    /// window drops the tonic.
+    static func lowTide(plan: AmbientZenPlan, rng: inout SeededRNG,
+                        usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        usedRuleIDs.insert("AMB-TEXT-011")
+        let endStep = plan.pedalEndBar * 16
+        // The schedule of sounding spans, in steps.
+        var spans: [(Int, Int)] = []
+        var cursor = 0
+        while cursor < endStep {
+            let len  = (2 + rng.nextInt(upperBound: 3)) * 16
+            let rest = (2 + rng.nextInt(upperBound: 3) + (plan.swell(atBar: cursor / 16) < -0.3 ? 1 : 0)) * 16
+            spans.append((cursor, Swift.min(cursor + len, endStep)))
+            cursor += len + rest
+        }
+        var events: [MIDIEvent] = []
+        for lane in 0..<2 {
+            let note = lane == 0 ? plan.pedalTonicNote : plan.pedalFifthNote
+            for w in plan.windows {
+                let active = lane == 0 ? w.keepsTonic : (w.keepsFifth && !w.keepsTonic)
+                guard active else { continue }
+                let ws = w.startBar * 16, we = Swift.min(w.endBar * 16, endStep)
+                for (s, e) in spans {
+                    let from = Swift.max(s, ws), to = Swift.min(e, we)
+                    guard to - from >= 8 else { continue }
+                    let vel = Double(32 + rng.nextInt(upperBound: 13)) * (1 + 0.1 * plan.swell(atBar: from / 16))
+                    events.append(MIDIEvent(stepIndex: from, note: UInt8(note),
+                                            velocity: UInt8(Swift.max(1, Int(vel.rounded()))),
+                                            durationSteps: to - from))
+                }
+            }
+        }
+        return events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
     }
 
     // MARK: - Texture: AMB-TEXT-012 Pearl Pedal
@@ -259,7 +322,7 @@ enum AmbientZenTracks {
         return abutSamePitch(events)
     }
 
-    // MARK: - Bass: AMB-BASS-007 Airports Root / AMB-BASS-008 Plateaux Octave Root
+    // MARK: - Bass: AMB-BASS-007 Airports Root / AMB-BASS-008 Plateaux Octave Root / AMB-BASS-009 Slow Glide
 
     /// The chord root at MIDI 36 + its pitch class, one note per window, re-struck every 8 bars.
     /// At the window's midpoint it may move to the chord's fifth, but never onto the leading tone.
@@ -267,10 +330,14 @@ enum AmbientZenTracks {
     /// carries on alone. A window change ends the old root exactly where the new one starts.
     static func bass(plan: AmbientZenPlan, rng: inout SeededRNG, usedRuleIDs: inout Set<String>,
                      forceRuleID: String? = nil) -> [MIDIEvent] {
-        let ruleID: String = {
+        let drawn: String = {
             if let f = forceRuleID, f == "AMB-BASS-007" || f == "AMB-BASS-008" { return f }
             return rng.nextDouble() < 0.60 ? "AMB-BASS-007" : "AMB-BASS-008"
         }()
+        // AMB-BASS-009 Slow Glide writes AMB-BASS-007's notes; playback holds one note and bends
+        // it to each new pitch (Playback/ZenBassGlide.swift). The draw above is still made, so no
+        // later draw moves.
+        let ruleID = plan.dials.slowGlide && forceRuleID == nil ? "AMB-BASS-009" : drawn
         usedRuleIDs.insert(ruleID)
         let octave  = ruleID == "AMB-BASS-008"
         let endStep = plan.bassEndBar * 16

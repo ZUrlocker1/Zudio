@@ -61,7 +61,7 @@ enum AmbientZenLoops {
             var rng = SeededRNG(seed: seed)
             var used: Set<String> = []
             let force = seeds[t] != nil
-            let density = seeds[t].map { regenBellDensity(seed: $0) } ?? plan.dials.bellDensity
+            let density = seeds[t].map { regenBellDensity(seed: $0, base: plan.dials.bellDensity) } ?? plan.dials.bellDensity
             switch t {
             case kTrackLead1:
                 tracks[t] = lead1(plan: plan, band: tracks, density: density, rng: &rng, usedRuleIDs: &used)
@@ -76,12 +76,15 @@ enum AmbientZenLoops {
         return rules
     }
 
-    /// A regenerated Lead 1 or Lead 2 re-rolls its bell density (30, 45 or 60, so it can thin or
-    /// fill), from its own seed on a separate stream, so a reload replays it and the loop's own
-    /// draws don't move (Zack, 2026-11-21). Rhythm keeps the song's dial.
-    static func regenBellDensity(seed: UInt64) -> Int {
+    /// A regenerated Lead 1 or Lead 2 goes to the opposite of the song's bell density: sparse
+    /// becomes full and full becomes sparse; a medium song goes to sparse or full on its own seed
+    /// (Zack, 2026-11-21). The opposite is taken from the song's dial, not the track's last
+    /// density, so a reload (which only has the final seed) replays it. Separate stream, so the
+    /// loop's own draws don't move. Rhythm keeps the song's dial.
+    static func regenBellDensity(seed: UInt64, base: Int) -> Int {
         var rng = SeededRNG(seed: seed ^ 0xBE11_DE45)
-        return [30, 45, 60][rng.nextInt(upperBound: 3)]
+        let flip = [30, 60][rng.nextInt(upperBound: 2)]
+        return base <= 30 ? 60 : base >= 60 ? 30 : flip
     }
 
     /// The density in the Zen line's words: sparse, medium or full.
