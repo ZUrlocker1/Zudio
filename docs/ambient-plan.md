@@ -331,7 +331,7 @@ These rules are non-negotiable for anything to sound Ambient:
 
 ---
 
-## Part 5: Proposed Ambient Generator Design
+## Part 5: Ambient Generator Design
 
 ### 5.1 AmbientMusicalFrameGenerator
 
@@ -353,7 +353,6 @@ These rules are non-negotiable for anything to sound Ambient:
 - D minor (10%), A minor (10%), E minor (8%), G minor (7%) — minor subtotal ~35%
 - Other (10%)
 
-The earlier plan (A minor 18%, E minor 15%, D minor 15%, minor-dominant) was derived from genre theory without MIDI evidence. Real Electric Buddha ambient songs strongly favor major and modal-major tonalities.
 
 **Modes:**
 - Aeolian (natural minor): 40% — darkest, most ambient
@@ -575,7 +574,7 @@ Each track lists instruments in two families. At song generation time, AMB-SYNC-
 
 **Lead 1 — primary floating melody**
 - Flute (73) (A), Ocarina (79) (A), Whistle (78) (A), Brightness (100) (E), Calliope Lead (82) (E), Grand Piano (0) (A), Harp (46) (A)
-- Design note: Lead 1 is the primary melody voice. Woodwind and breath timbres give it an organic quality that contrasts with the electronic pad sustain underneath. Pan Flute and Recorder were removed as too similar to Flute.
+- Design note: Lead 1 is the primary melody voice. Woodwind and breath timbres give it an organic quality that contrasts with the electronic pad sustain underneath.
 
 **Lead 2 — shimmer / echo response**
 - Harp (46) (A), Acoustic Guitar (24) (A), FX Crystal (98) (E), Space Voice (91) (E), FX Atmosphere (99) (E)
@@ -630,8 +629,6 @@ Enforced in generator:
 
 ---
 
----
-
 ## Part 10: Key Rules That Prevent Ambient from Sounding Like Noise
 
 - Every note must be diatonic (strictly — no chromatic passing except in `dissonant_haze` mode)
@@ -641,21 +638,6 @@ Enforced in generator:
 - Lead track velocity is typically comparable to or softer than primary pad track velocity; pads are the harmonic foundation
 - Silence is enforced: after any note event, generate at least 2× that note's duration as rest before the next event on the same track (Eno's rule)
 - All loops must be ≥ 4 bars long (shorter feels like a riff, not ambient)
-
----
-
-## Part 11: Verification Criteria (When Implementation Begins)
-
-1. Build: `xcodebuild -scheme Zudio -configuration Debug build`
-2. Generate 10 Ambient songs — none should feel rhythmically driven
-3. Drums: absent 20%, textural (brush) 30%, hand percussion 45%, soft-pulse 5%
-4. All songs: at least 2 pad layers with co-prime loop lengths (verify via status log)
-5. Lead track absent or single floating tone in ≥ 70% of songs
-6. No V7→I resolutions in any generated harmonic sequence
-7. Subjective test: does it sound like background music that can be ignored? (Eno's "as ignorable as it is interesting" criterion)
-8. Continuous Play crossfade: Ambient songs use 6-bar fade, not 4-bar
-9. Style picker shows Motorik | Kosmic | Ambient | Chill — all styles generate correctly
-10. Test Mode (Cmd-T): 1-minute Ambient songs generated for rapid audition
 
 ---
 
@@ -919,7 +901,7 @@ Analysis of 15 Ambient songs (log files + MIDI) identified two structural weakne
 
 ---
 
-### 15.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003) ✓ DONE
+### 15.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003)
 
 **What:** New bass rule where holds alternate between the chord root (even holds) and the perfect
 fifth (root+7 semitones, odd holds). 10% chance any fifth hold becomes a major third instead.
@@ -945,12 +927,12 @@ interval in a drone context — brief and harmonically warm.
 
 ---
 
-### 15.3 Plan B — Bass Chord-Following Fix ✓ DONE
+### 15.3 Plan B — Bass Chord-Following Fix
 
 **What:** `AmbientBassGenerator` now iterates every `TonalGovernanceEntry` in the `tonalMap`
 directly. For each chord window it computes the root pitch class from that window's `chordRoot`
 degree, generates holds within `[window.startBar * 16, window.endBar * 16)`, then moves on to the
-next window. The bass is no longer loop-tiled at all — it produces a single full-song event array.
+next window. The bass is not loop-tiled — it produces a single full-song event array.
 
 **Why this approach (vs. the post-tiling re-pitch alternative):** Cleaner and correct by
 construction. The loop-tile approach would have required detecting which tiled events fall in which
@@ -959,7 +941,7 @@ concatenating is straightforward and requires no post-processing.
 
 **Effect:** In a `modalDrift` (i–♭VII–♭VI) song the bass now correctly plays the tonic root
 during the i section, drops a whole tone (♭VII) for the second section, and drops again (♭VI) for
-the third. Previously it played the tonic root throughout.
+the third.
 
 **Signature change:** `loopBars` parameter removed. `SongGenerator` assigns the result directly
 without calling `AmbientLoopTiler.tile`. Regen path (kTrackBass case) updated to match.
@@ -970,7 +952,7 @@ without calling `AmbientLoopTiler.tile`. Regen path (kTrackBass case) updated to
 
 ---
 
-### 15.4 Plan C — Celestial Phrase (AMB-RTHM-005) ✓ DONE
+### 15.4 Plan C — Celestial Phrase (AMB-RTHM-005)
 
 **What:** A 4–5 note ascending phrase on the Rhythm track using the major pentatonic of the song
 key — regardless of the modal context. Deliberately "major feel": ♭7 and minor 3rd of
@@ -998,7 +980,7 @@ to make room; silent at 60% unchanged).
 
 ---
 
-### 15.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%) ✓ DONE
+### 15.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%)
 
 **What:** A new Lead 1 rule with an intentional melodic arc: low → mid → peak → step-down.
 4 notes with a clear contour (not random scale walking). Uses scale tones biased toward the
@@ -1021,7 +1003,7 @@ and echoPhrase from 20% to 19%).
 
 ---
 
-### 15.6 Plan E — AMB-RTHM-006: Bell Cell ✓ DONE
+### 15.6 Plan E — AMB-RTHM-006: Bell Cell
 
 **What:** A new Rhythm track rule: a 3-note repeating cell — root → fifth → octave — each note
 4 steps long, with long silences (8+ bars) between repetitions. The cell repeats 1–2 times per
@@ -1036,16 +1018,6 @@ of sparse melodic elements to punctuate otherwise static textures.
 **Files to modify:**
 - `Sources/Zudio/Generation/Ambient/AmbientRhythmGenerator.swift` — add `bellCell()` function as AMB-RTHM-006
 - `Sources/Zudio/Generation/SongGenerator.swift` — add log description
-
----
-
-### 15.7 Implementation Order
-
-- Plan B (chord-following bass fix) — ✓ DONE — full-song chord-window iteration, no tiling
-- Plan A (AMB-BASS-003 root+fifth drone) — ✓ DONE — alternating holds, 50% probability
-- Plan C (AMB-RTHM-005 celestial phrase) — ✓ DONE — ascending pentatonic, 5% on Rhythm track
-- Plan D (AMB-LEAD-007 lyric fragment) — ✓ DONE — 4-note arc, 5% on Lead 1
-- Plan E (AMB-RTHM-006 bell cell) — ✓ DONE — root→fifth→octave, 4% on Rhythm track
 
 ---
 
@@ -1179,7 +1151,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 16.6a AMB-LEAD-009 — Magnetik Solo ✓ DONE
+### 16.6a AMB-LEAD-009 — Magnetik Solo
 
 **Rule:** AMB-LEAD-009 (Lead 1, 9%)
 
@@ -1188,7 +1160,7 @@ Inspired by the freely-played analog lead in "Magnetik" (bars 10–18). Two spar
 
 ---
 
-### 16.6b AMB-LEAD-010 — Oxygenerator Solo ✓ DONE
+### 16.6b AMB-LEAD-010 — Oxygenerator Solo
 
 **Rule:** AMB-LEAD-010 (Lead 1, 7%)
 
@@ -1212,22 +1184,6 @@ Inspired by the classic analog pad ornamental melody in "Oxygenerator" (bars 5�
 
 **Files to modify:**
 - `Sources/Zudio/Generation/Ambient/AmbientBassGenerator.swift` — in the AMB-BASS-001 hold loop, add neighbour-tone split with 20% probability
-
----
-
-### 16.8 Implementation Order
-
-Recommended sequencing based on musical impact vs implementation complexity:
-
-- Plan J (Intro/Outro Density Gate) — highest impact, simplest implementation (4 filter lines)
-- Plan H (Structural Silence / Breath Moment) — high impact, uses existing clearBlock pattern
-- Plan G (Dynamic Arc) — high impact, post-processing velocity pass
-- Plan F (Arpeggiated Chord Onsets) — medium impact, clean change isolated to PadsGenerator
-- Plan I (Chord Movement) — highest musical impact, touches StructureGenerator
-- Plan K (Lead 1 Returning Motif) — medium impact, new rule in LeadGenerator
-- Plan L (Bass Neighbour Tones) — subtle but character-defining, isolated to BassGenerator
-
-Plans J, H, and G together address the most common complaint (flat, undifferentiated texture) and can be done in a single session. Plans I and K require more care but are the most musically transformative.
 
 ---
 
@@ -1310,36 +1266,20 @@ At every bar boundary, the lowest note of the pad voicing must match the bass no
 
 ---
 
-## Tonal Clash Fix History
+## Chord movement in base Ambient
 
-### Round 1 — April 2026 (6-song analysis: Bb/C/C# Dorian, F# MinorPentatonic, C/D Aeolian)
-
-**AMB-LEAD-003 — Harold Budd pentatonic shimmer hardcoded MajorPentatonic (HIGH)**
-`AmbientLeadGenerator.swift` line 34 used `Mode.MajorPentatonic.intervals` regardless of `frame.mode`.
-Playing D major pentatonic [D E F# A B] in D Aeolian caused 31% clash (B, F# not in scale).
-Playing F# major pentatonic in F# MinorPentatonic caused 49% clash.
-Fix: minor modes (Aeolian, Dorian, MinorPentatonic) now use `[0,3,5,7,10]`; major modes keep `[0,2,4,7,9]`.
-
-**AMB-RTHM-005 — Celestial phrase always used major pentatonic (HIGH)**
-`AmbientRhythmGenerator.swift` `celestialPhrase` hardcoded `[0,2,4,7,9]` ("deliberately major-feel").
-Caused 74% clash in F# MinorPentatonic (A#/D#/G# vs scale F#/A/B/C#/E) and 24% in C Dorian (E natural).
-Fix: same minor/major pentatonic split based on `frame.mode`.
-
-**AMB-BASS-003 — Major third inflection in minor songs (MEDIUM)**
-10% chance of playing major third above chord root (+4 semitones) regardless of mode.
-For C# root this generates E# = F natural, not in C# Dorian. Showed as 12.5% bass clash.
-Fix: minor modes use minor third (+3 semitones) for the inflection note.
-
-**AMB-DRUM-004 — Hand percussion too dense for ambient (HIGH)**
-Shaker ran 8th-note pulse at 70% bar hit rate ≈ 5.6 hits/bar; plus congas (75%), bongos (35%), maracas (25%).
-Total ≈ 7.8 notes/bar — far above ambient target of ≤1.5/bar.
-Fix: shaker → quarter-note at 30% bar/50% step rate (≈0.6/bar); congas 75%→45%; bongos 35%→20%; maracas 25%→15%.
-
-## Ideas for later: a more musical base Ambient
-
-Noted 2026-11-21, not built. Base Ambient should stay the still one and Zen the one that moves, so each idea keeps the drone character.
-- **More three-chord songs.** Make the modalDrift family (I, then two diatonic chords) more common than its current one roll in five.
-- **Loops that follow the chord.** Tiled loops copy fixed pitches across the song, which is safe only with one to three long chords. Snapping each tiled note to the chord window in force (as Zen's bells do) would let base Ambient carry more chord changes. Any faster harmony needs this first.
-- **A slow cycle, not Big Ship.** Big Ship's 4-bar chords suit Zen (AMB-PADS-015). A base form could repeat a short cycle of two to four chords at 16 bars or more a chord, once loops follow the chord.
-- **Airports 2/1 voices.** Dropped from Zen (2026-11-21) because base Ambient covers it; it could make base Ambient more musical instead. Some songs swap a phrase loop for single swelling notes, one pitch per voice on its own 16 to 32 s loop, so the chords come from whichever notes overlap. The pitch set is the tonic chord plus a 9th or 13th, never two notes a semitone apart.
-- **A guard on existing songs.** Any new form is drawn last, so existing base songs keep their fingerprints (tools/zen_fpcheck.sh).
+Base Ambient only; Ambient Piano and Zen don't share these:
+- **How chords reach the tracks.** The chord plan is the one harmonic source. Every pitched base track (pads, Lead 1 and its section solos, Lead 2, Rhythm, Texture, bass, the Airports voices) passes through AmbientChordFollow (AmbientLoopTiler.swift) on generation and on every regeneration, and each call names its track, which sets its seam (`AmbientChordFollow.seam(for:)`). The passes after it (HarmonicFilter, void fill, breath and intro filters) keep pitch classes or read the same plan; the X-Files whistle is the one deliberate exception.
+- **The follow.** A note sounds as a chord tone or a clear tension (a scale note a semitone from no chord tone and no other clear tension); otherwise it moves to the nearest chord tone. A note held across a change is split there. A rubbing passing note of an eighth or less is dropped, so the line gets a gap, not a repeat.
+- **Seams.** A held note that must change pitch lets go up to a quarter before the change and its new pitch enters late: pads a half note, rolled up two sixteenths a voice; the rest a quarter. The bass enters on the downbeat and on the new chord's root. A split fragment shorter than a quarter is dropped.
+- **The bass names every chord.** Each bass rule starts each new chord on its root: the drone and root-fifth rules (001, 003) and the pendulum (006) restart on the root, and the ECM pluck walk (004) plucks the root on the change's downbeat and walks on from there.
+- **Chord cycles.** Two- and three-chord songs repeat a cycle drawn per song, ending on the tonic. Chord length is drawn per song (`ambientCycleBars`): three- and four-chord cycles 8, 16 or 24 bars (40/40/20), two-chord cycles 16 or 24 (60/40). The cycle: a pair for two-chord songs, three or four chords for three-chord songs, every chord diatonic, tonic first, no maj7 (`ambientCycles` in SongGenerator.swift; for example Dorian i bVII IV, i IV bVII, i bIII IV or i v bVII IV). Single-chord families stay drones. Drawn on their own stream (trackSeed index 141). The log's Chords line names the cycle, and each chord is annotated the first time it comes round.
+- **Family weights (Zack).** One-chord drones 10 percent (droneSingle 0.04, suspendedDrone 0.03, dissonantHaze 0.03), two-chord cycles (droneTwo) 10 percent, three- or four-chord cycles (modalDrift) 80 percent. Ambient Piano and Zen keep the old weights.
+- **7th chords** in 25 percent of songs: minor triads become minor 7ths, major triads dominant 7ths where the mode has the flat 7th; never a major 7th; sus2 stays.
+- **AMB-PADS-014 Airports 2/1** in 20 percent of songs, in place of the pad loop: four voices (the opening chord's root, 3rd, 5th and its 9th or 13th), each on its own loop of 17 to 31 seconds, sounding 45 to 60 percent of it, so the chord is whichever notes overlap.
+- The 7ths and Airports draws come from their own stream (trackSeed index 140), so no other draw moves.
+- **Swell instruments** (Zack, for a smoother, more relaxed sound): base Ambient's pads draw Sweep Pad, Synth Strings, Soundtrack, Warm Swell, Halo Swell and Glass Swell (equal weights), and its bass Cello, French Horn, FM Synth and Metallic Pad, plus Saw Bass Swell and Brass Swell under the held bass rules (001, 003, 005, 006), never under the ECM pluck (004), whose short notes the slow fade-in would swallow. The bass rule is read from the song's log (`instrumentPickPoolStatic` in AppState.swift). Halo Pad and Voice Oohs are out of base's picks but stay in the pool (Zen's pads use Halo Pad; Ambient Piano uses both). Ambient Piano's picks are unchanged.
+- **Lead 1 down an octave** in about a third of songs: once or twice, two or three whole passes of the Lead 1 loop (at most 32 bars) inside the body play an octave lower, then return; never the first pass, never below E3 (a stretch that would go lower stays up). Applied after the HarmonicFilter, whose register pass would lift it back, and on Lead 1 regeneration at the same places. Drawn from the song seed (trackSeed index 142); the log marks "Down an octave for N bars" and "Back up". Section solos are left alone.
+- **Major Pentatonic** songs have a major tonic in base (`ambientPentatonicTonic`); the shared chord-plan builder gives a minor one, which Ambient Piano keeps.
+- **Void fill:** the pad note that fills an empty stretch is a tone of the chord at that bar and ends at the next chord change.
+- **Clash check:** 0 glaring clashes (a semitone, or a minor 9th held 2 beats at C3 or above) in 50 songs over 254 chord changes; no note is re-struck on a change's downbeat except the bass. The X-Files whistle is left unsnapped on purpose.

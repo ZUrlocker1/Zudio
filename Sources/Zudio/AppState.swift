@@ -2823,8 +2823,28 @@ final class AppState: ObservableObject {
                 default: break
                 }
             }
-            // Base Ambient and Ambient Piano draw from the pools as they stood before Zen appended
-            // to them, so no seed moves.
+            // Base Ambient (not Ambient Piano) also draws swell instruments, for a smoother, more
+            // relaxed sound (Zack, 2026-11-21): Warm Swell [7], Halo Swell [8] and Glass Swell [9] on
+            // the pads, and Saw Bass Swell [6] and Brass Swell [7] on the bass, but only under the
+            // held bass rules (001 drone, 003 root and fifth, 005 octave double, 006 pendulum): the
+            // slow fade-in would swallow the ECM pluck's (004) short notes. The song's bass rule is
+            // the last AMB-BASS tag in its log, so a bass regeneration counts.
+            // Out of base, for more swells (Zack, 2026-11-21): Halo Pad [2] (Halo Swell is the same
+            // sound, faded in) and Voice Oohs [2] on the bass (a choir). Both stay in the pool:
+            // Zen's pads use Halo Pad, and Ambient Piano uses both.
+            if let s = state, !s.isAmbientPiano {
+                switch trackIndex {
+                case kTrackPads:
+                    return ([0, 1, 3, 7, 8, 9] as [Int]).filter { $0 < poolCount }
+                case kTrackBass:
+                    let held: Set<String> = ["AMB-BASS-001", "AMB-BASS-003", "AMB-BASS-005", "AMB-BASS-006"]
+                    let rule = s.generationLog.last(where: { $0.tag.hasPrefix("AMB-BASS-") })?.tag ?? ""
+                    return ([0, 1, 3, 4] + (held.contains(rule) ? [6, 7] : [])).filter { $0 < poolCount }
+                default: break
+                }
+            }
+            // Ambient Piano, and base Ambient's other tracks, draw from the pools as they stood
+            // before Zen appended to them.
             switch trackIndex {
             case kTrackPads:    return Array(0..<min(poolCount, 4))
             case kTrackTexture: return Array(0..<min(poolCount, 5))
@@ -4589,10 +4609,14 @@ final class AppState: ObservableObject {
                                                    isChillSoho: songState?.chillSohoVariation == true)
         guard programs.count > 1 else { return }
         let currentIdx = instrumentOverrides[trackIndex] ?? 0
+        // Ambient Zen shuffles within its own short lists, so ⚡ can't bring back what Zen left
+        // out, such as Choir Aahs on Texture (Zack, 2026-11-21). Other styles keep the whole pool.
+        let zenPicks = songState?.isAmbientZen == true
+            ? instrumentPickPool(trackIndex: trackIndex, style: style, poolCount: programs.count) : []
         var newIdx = currentIdx
         var attempts = 0
         repeat {
-            newIdx = Int.random(in: 0..<programs.count)
+            newIdx = zenPicks.isEmpty ? Int.random(in: 0..<programs.count) : zenPicks.randomElement()!
             attempts += 1
         } while newIdx == currentIdx && attempts < 16
         guard newIdx != currentIdx else { return }

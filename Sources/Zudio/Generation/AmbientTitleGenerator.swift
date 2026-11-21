@@ -731,7 +731,7 @@ struct AmbientZenTitleGenerator {
     // 4. Oblique Strategies, Eno and Peter Schmidt's card deck, and Eno's sayings.
     static let obliqueTwists = [
         "Honor Thy Nap", "Use an Old Idea", "Do Nothing Longer", "Gardening, Not Art",
-        "Emphasise the Naps", "Repetition Is Fine", "Ask Your Mother", "Eschew Obfuscation", "Add All The Things", "None Of The Above", "Melody As Rhythm", "Rhythm As Melody", "Chords As Knowledge", "Code Is Not Music", "Love Is Not Random", "Loops Are Not Music", "Scales Not Needed", "Add More Drones","Add Sus4♭9 Chords",
+        "Emphasise the Naps", "Repetition Is Fine", "Ask Your Mother", "Eschew Obfuscation", "Add All The Things", "None Of The Above", "Melody As Rhythm", "Rhythm As Melody", "Chords As Knowledge", "Code Is Music", "Love Is Not Random", "Loops Are Not Music", "Scales Not Needed", "Add More Drones","Add Sus4♭9 Chords",
         "Only One Element", "Water Flowing", "Discard an Axiom", "Go Slowly All Over",
     ].filter { $0.count <= maxLength }
 }

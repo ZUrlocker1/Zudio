@@ -46,7 +46,7 @@ struct AmbientBassGenerator {
 
         switch ruleID {
         case "AMB-BASS-004":
-            return ecmPluckWalk(frame: frame, rng: &rng, scaleNotes: scaleNotes,
+            return ecmPluckWalk(frame: frame, tonalMap: tonalMap, rng: &rng, scaleNotes: scaleNotes,
                                 totalSteps: totalSteps, silentBars: silentBars)
         case "AMB-BASS-005":
             return octaveDouble(frame: frame, tonalMap: tonalMap, rng: &rng,
@@ -81,6 +81,7 @@ struct AmbientBassGenerator {
         var cursor     = 0
         var slotIdx    = 0
         var holdIndex  = 0   // tracks root/fifth alternation for AMB-BASS-003
+        var lastWindow = -1  // a new chord starts the alternation on its root
 
         while cursor < totalSteps {
             let slot = template[slotIdx % template.count]
@@ -89,6 +90,7 @@ struct AmbientBassGenerator {
             let currentBar = cursor / 16
             if dur >= 4, !silentBars.contains(currentBar), let entry = tonalMap.entry(atBar: currentBar) {
                 let cw       = entry.chordWindow
+                if cw.startBar != lastWindow { lastWindow = cw.startBar; holdIndex = 0 }
                 let rootPC   = (frame.keySemitoneValue + degreeSemitone(cw.chordRoot)) % 12
                 let rootNote = closestNote(pitchClass: rootPC, near: 47, low: bounds.low, high: bounds.high)
                 let vel      = UInt8(55 + rng.nextInt(upperBound: 11))   // 55–65
@@ -156,6 +158,7 @@ struct AmbientBassGenerator {
     /// scale tone walking stepwise up or down through the bass register.
     private static func ecmPluckWalk(
         frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         scaleNotes: [Int],
         totalSteps: Int,
@@ -168,10 +171,26 @@ struct AmbientBassGenerator {
         var walkIdx = rng.nextInt(upperBound: Swift.max(1, scaleNotes.count / 3))
         var cursor  = rng.nextInt(upperBound: 16)  // slight rhythmic offset within bar 0
 
+        // Each chord change gets a pluck on its downbeat, on the new root, and the walk goes on
+        // from there, so the bass names every chord (Zack, 2026-11-21).
+        var lastWindow   = tonalMap.entry(atBar: 0)?.chordWindow.startBar ?? 0
+        var pendingRoot  = true   // the song opens on the root too
+        var lastPluckEnd = 0
         while cursor < totalSteps {
+            if let w = tonalMap.entry(atBar: cursor / 16)?.chordWindow, w.startBar != lastWindow {
+                lastWindow = w.startBar
+                pendingRoot = true
+                if w.startBar * 16 >= lastPluckEnd { cursor = w.startBar * 16 }
+            }
             let currentBar = cursor / 16
             if silentBars.contains(currentBar) { cursor += 16; continue }
 
+            if pendingRoot, let w = tonalMap.entry(atBar: currentBar)?.chordWindow {
+                let rootPC = (frame.keySemitoneValue + degreeSemitone(w.chordRoot)) % 12
+                if let i = scaleNotes.indices.filter({ scaleNotes[$0] % 12 == rootPC })
+                    .min(by: { abs($0 - walkIdx) < abs($1 - walkIdx) }) { walkIdx = i }
+                pendingRoot = false
+            }
             let note    = scaleNotes[walkIdx]
             let dur     = 6 + rng.nextInt(upperBound: 5)           // 6–10 steps
             let safeDur = Swift.min(dur, totalSteps - cursor)
@@ -180,6 +199,7 @@ struct AmbientBassGenerator {
                 events.append(MIDIEvent(stepIndex: cursor, note: UInt8(note),
                                         velocity: vel, durationSteps: safeDur))
             }
+            lastPluckEnd = cursor + safeDur
 
             // Stepwise walk: ±1 position (75%) or ±2 (25%), slight upward bias
             let step = rng.nextDouble() < 0.75 ? 1 : 2
@@ -257,6 +277,7 @@ struct AmbientBassGenerator {
         var events:   [MIDIEvent] = []
         var cursor    = 0
         var position  = 0  // 0 = root, 1 = second note
+        var lastWindow = -1  // a new chord swings from its root
 
         // b7 for minor modes, perfect 4th for major/Mixolydian
         let minorModes: Set<Mode> = [.Aeolian, .Dorian, .MinorPentatonic]
@@ -270,6 +291,7 @@ struct AmbientBassGenerator {
             let currentBar = cursor / 16
             if dur >= 4, !silentBars.contains(currentBar), let entry = tonalMap.entry(atBar: currentBar) {
                 let cw       = entry.chordWindow
+                if cw.startBar != lastWindow { lastWindow = cw.startBar; position = 0 }
                 let rootPC   = (frame.keySemitoneValue + degreeSemitone(cw.chordRoot)) % 12
                 let rootNote = closestNote(pitchClass: rootPC, near: 47, low: bounds.low, high: bounds.high)
 

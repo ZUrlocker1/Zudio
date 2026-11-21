@@ -160,11 +160,6 @@ struct AmbientZenDials: Sendable, Equatable {
         }
     }
 
-    /// The chord pace in plain words, for the Chords line of the log.
-    var paceWords: String {
-        chordPaceSeconds < 37 ? "quick" : chordPaceSeconds < 49 ? "steady" : "slow"
-    }
-
     /// The other dials in plain words for the Zen line of the log (the key, mode and chord pace
     /// are on the Chords line).
     var plainWords: String {
@@ -181,9 +176,17 @@ struct AmbientZenDials: Sendable, Equatable {
         // Drift is the restlessness dial: how much the bell loops change each pass and how often
         // the bass sits out (Zack, 2026-11-21). The swell depth is added by the log builder.
         let drift  = restlessness < 0.317 ? "calm" : restlessness < 0.383 ? "medium" : "restless"
-        // A low octave is added to its word: "Bells:sparse,low"; "Bass:low" only when low.
-        return "Breaths:\(breath) Echo:\(echo) Bells:\(bells)\(bellsLow ? ",low" : "") Drift:\(drift)"
-            + (bassLow ? " Bass:low" : "")
+        // A dial at its middle setting ("medium") isn't named (Zack, 2026-11-21). A low octave is
+        // added to its word: "Bells:sparse,low", or "Bells:low" when the density is medium;
+        // "Bass:low" only when low.
+        var parts: [String] = []
+        if breath != "medium" { parts.append("Breaths:\(breath)") }
+        if echo != "medium" { parts.append("Echo:\(echo)") }
+        let bellWords = [bells == "medium" ? nil : bells, bellsLow ? "low" : nil].compactMap { $0 }
+        if !bellWords.isEmpty { parts.append("Bells:" + bellWords.joined(separator: ",")) }
+        if drift != "medium" { parts.append("Drift:\(drift)") }
+        if bassLow { parts.append("Bass:low") }
+        return parts.joined(separator: " ")
     }
 }
 

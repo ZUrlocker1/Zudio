@@ -138,6 +138,68 @@ struct AmbientPadsGenerator {
         return events   // step only increases — events are already in step order
     }
 
+    // MARK: - AMB-PADS-014: Airports 2/1 (Zack, 2026-11-21)
+
+    /// After Eno's 2/1 (Music for Airports): four voices, one pitch each, every voice on its own
+    /// loop of 16 to 32 seconds, a swelling note for 45 to 60 percent of it and then silence, so
+    /// the chord is whichever notes happen to overlap. The pitches are the opening chord's root,
+    /// 3rd and 5th plus its 9th or 13th (a scale note a whole tone from its neighbours), stacked in
+    /// MIDI 48 to 76. Full song, no tiler; each note follows the chord in force like every base
+    /// Ambient loop (AmbientChordFollow), so a voice moves only when the chord takes its note away.
+    static func airportsVoices(frame: GlobalMusicalFrame, chords: [ChordWindow],
+                               rng: inout SeededRNG) -> [MIDIEvent] {
+        guard let first = chords.first else { return [] }
+        let totalSteps = frame.totalBars * 16
+        let sps = Double(frame.tempo) / 15.0
+        let keyPC  = keySemitone(frame.key) % 12
+        let rootPC = (keyPC + degreeSemitone(first.chordRoot)) % 12
+        let chordPCs = Set(first.chordTones.map { (($0 % 12) + 12) % 12 })
+        let scale = Set(frame.mode.intervals.map { (keyPC + $0) % 12 })
+        // Root, 3rd (or the sus2's 2nd) and 5th, in stacked order from the root.
+        let triad = chordPCs.sorted { (($0 - rootPC + 12) % 12) < (($1 - rootPC + 12) % 12) }.prefix(3)
+        // The colour note: the 9th or the 13th, whichever the draw picks and the scale allows.
+        let wantNinth = rng.nextDouble() < 0.5
+        let options = wantNinth ? [2, 9] : [9, 2]
+        let colour = options.map { (rootPC + $0) % 12 }.first { pc in
+            scale.contains(pc) && !chordPCs.contains(pc)
+                && !chordPCs.contains { let d = (pc - $0 + 12) % 12; return d == 1 || d == 11 }
+        }
+        var pcs = Array(triad)
+        if let c = colour { pcs.append(c) }
+        // Stack upward from the root, which sits in MIDI 48 to 59.
+        var pitches: [Int] = []
+        var floor = 48 + rootPC
+        for pc in pcs {
+            var n = floor
+            while n % 12 != pc { n += 1 }
+            pitches.append(n)
+            floor = n + 1
+        }
+        // Stacked from the root, the colour note always lands above the 5th: a 9th, not a 2nd.
+        pitches = pitches.map { $0 > 76 ? $0 - 12 : $0 }
+
+        // Each voice its own period: distinct lengths drawn from 16 to 32 s.
+        var periods = [17.0, 20.5, 23.5, 26.0, 29.5, 31.0]
+        for i in stride(from: periods.count - 1, through: 1, by: -1) { periods.swapAt(i, rng.nextInt(upperBound: i + 1)) }
+        var events: [MIDIEvent] = []
+        for (v, pitch) in pitches.enumerated() {
+            let period = periods[v] * sps
+            let fraction = 0.45 + 0.15 * rng.nextDouble()
+            let vel = 40 + rng.nextInt(upperBound: 13)
+            var t = period * rng.nextDouble()
+            while true {
+                let onset = Int(t.rounded())
+                guard onset < totalSteps - 16 else { break }
+                let len = Swift.min(Int((period * fraction).rounded()), totalSteps - onset)
+                let v2 = UInt8(Swift.max(30, Swift.min(60, vel + rng.nextInt(upperBound: 7) - 3)))
+                events.append(MIDIEvent(stepIndex: onset, note: UInt8(pitch), velocity: v2, durationSteps: len))
+                t += period
+            }
+        }
+        events.sort { $0.stepIndex != $1.stepIndex ? $0.stepIndex < $1.stepIndex : $0.note < $1.note }
+        return AmbientChordFollow.follow(events, chords: chords, track: kTrackPads)
+    }
+
     // MARK: - Ambient Piano Pads (full-song, no loop tiler)
 
     /// Generates full-song pad events paired to the active piano lead rule.

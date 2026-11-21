@@ -28,20 +28,43 @@ struct GenerationLogEntry: Sendable {
         // Motorik Noir Lead 1 from transcriptions (2026-11-14): No Birds turn, Tear Us Apart hook,
         // Transmission figure, Albatross guitar.
         "MOT-LD1-011", "MOT-LD1-012", "MOT-LD1-013", "MOT-LD1-014",
-        // No Ambient rules: Ambient Zen is a new style, so every one of its rules is new, and
-        // none is starred (Zack, 2026-11-21).
+        // No Ambient Zen rules: Zen is a new style, so every one of its rules is new, and none is
+        // starred (Zack, 2026-11-21).
+        // Base Ambient, radically changed (2026-11-21): AMB-PADS-014 Airports 2/1 is new; Modal
+        // cloud's clusters now follow the chord, so they lose their semitone rubs.
+        "AMB-PADS-003", "AMB-PADS-014",
     ]
 
-    /// The testing markers a description can start with. The "F " fix marker is gone (Zack,
-    /// 2026-11-21): a Chords line in F ("F Lydian ...") read as one, and the key moved up beside
-    /// the tag. Mark a rule only when Zack asks.
-    static let testingMarkers = ["* "]
+    /// TESTING ONLY. Rules fixed in the current round, marked with "F " ("AMB-LEAD-003 F  ...").
+    /// Same lifetime as testingMarkedRules.
+    static let fixMarkedRules: Set<String> = [
+        // Base Ambient (2026-11-21): every pitched loop now follows the chord in force, so it no
+        // longer rubs against a later chord (AmbientChordFollow).
+        "AMB-PADS-001", "AMB-PADS-002",
+        "AMB-LEAD-001", "AMB-LEAD-002", "AMB-LEAD-003", "AMB-LEAD-004", "AMB-LEAD-005",
+        "AMB-LEAD-006", "AMB-LEAD-007", "AMB-LEAD-008", "AMB-LEAD-009", "AMB-LEAD-010",
+        "AMB-RTHM-001", "AMB-RTHM-002", "AMB-RTHM-003", "AMB-RTHM-005", "AMB-RTHM-006",
+        "AMB-TEXT-001", "AMB-TEXT-002",
+        "AMB-BASS-001", "AMB-BASS-003", "AMB-BASS-004", "AMB-BASS-005", "AMB-BASS-006",
+    ]
+
+    /// The testing markers a description can start with: "* " new or radically changed, "F "
+    /// fixed. A marker counts only on a rule in one of the two sets (isMarkable), so a Chords line
+    /// in F ("F Lydian ...") never reads as one. Mark a rule only when Zack asks.
+    static let testingMarkers = ["* ", "F "]
+
+    /// Whether a log line's tag is a marked rule, so its description may carry a marker.
+    static func isMarkable(_ tag: String) -> Bool {
+        testingMarkedRules.contains(tag) || fixMarkedRules.contains(tag)
+    }
 
     init(tag: String, description: String, isTitle: Bool = false) {
         self.tag = tag
         let marked = Self.testingMarkers.contains { description.hasPrefix($0) }
         if !marked, Self.testingMarkedRules.contains(tag) {
             self.description = "* " + description
+        } else if !marked, Self.fixMarkedRules.contains(tag) {
+            self.description = "F " + description
         } else {
             self.description = description
         }

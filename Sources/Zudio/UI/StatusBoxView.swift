@@ -262,7 +262,8 @@ struct StatusBoxView: View {
             // The testing marker ("* " new or changed rule; see GenerationLogEntry) moves up beside
             // the rule ID, one space after it and in the same green: "CHL-LD2-004 *  Rhythm trade".
             // The saved file keeps it in the description.
-            let marker = entry.isTitle ? nil
+            // Only a marked rule's line can carry one, so "F Lydian ..." on the Chords line stays put.
+            let marker = entry.isTitle || !GenerationLogEntry.isMarkable(entry.tag) ? nil
                 : GenerationLogEntry.testingMarkers.first { entry.description.hasPrefix($0) }
             let starred = marker != nil
             let description = starred ? String(entry.description.dropFirst(2)) : entry.description

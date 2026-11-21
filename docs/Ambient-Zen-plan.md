@@ -17,7 +17,7 @@ Copyright (c) 2026 Zack Urlocker
 10. The space: reverb, echo, pans and chips
 11. The log
 12. Regeneration and Evolve
-13. Phase 3: variety
+13. Variety
 14. On the shelf
 15. Where it lives in the code
 16. Checks
@@ -47,9 +47,9 @@ What sets it apart from base Ambient, in order of how much you hear it:
 2. Volumes still unmeasured on the bed: the Saw Bass, Pulse and Synth Swell basses have no trim.
 3. By ear: the staggered endings, stop and seek tails with the 4.5 s swell release, and the iPhone speaker.
 4. Moving from a base Ambient song with an audio texture to a Zen song should stop the audio player. Not yet checked in the app.
-5. Phase 3 (section 13): Garden Pulse, the octave dials, the deep and dry echo and the Big Ship cycle are built, not yet heard; the Drums level is by ear.
+5. The variety features (section 13) are built but not all heard yet; the Drums level is by ear.
 6. Before release, the testing values to set back:
-   - Ambient shares: Piano 10 / base 10 / Zen 80 back to Piano 35 / Zen about 30 / base about 35 (section 3, SongGenerator).
+   - Ambient shares: Piano 10 / base 30 / Zen 60 back to Piano 35 / Zen about 30 / base about 35 (section 3, SongGenerator).
    - Big Ship cycle: 30 percent (15 breathing, 15 block) back to about 20, or drop the variant Zack doesn't keep (AmbientZenDials.draw).
    - Then rerun tools/zen_fpcheck.sh, and clean up the SF2.
 
@@ -64,7 +64,7 @@ What sets it apart from base Ambient, in order of how much you hear it:
 - **Long sustain.** Every pad, Texture and bass instrument holds for a long time without dying away.
 
 **Shares.** Zen reuses pianoRuleRoll, which only Piano songs read, so no new draw enters the shared prefix. Piano if pianoRoll < Piano share; Zen if not Piano and pianoRuleRoll < zenShare; otherwise base Ambient.
-- **Testing (now, temporary):** Piano 10, base Ambient 10, Zen 80 (0.10 and zenShare 0.889), marked temporary in SongGenerator.
+- **Testing (now, temporary):** Piano 10, base Ambient 30, Zen 60 (0.10 and zenShare 0.667), marked temporary in SongGenerator.
 - **Release:** Piano 35, Zen about 30 (zenShare about 0.46), base about 35.
 - A Zen song records "Zen" in its forced rules and reloads as Zen whatever the shares are then. A base Ambient seed that falls in the Zen share becomes Zen; that is accepted.
 
@@ -293,7 +293,7 @@ Zen's sounds are appended to the Ambient pools, so base Ambient and Ambient Pian
 
 - **Pads, Rhodes-like:** Warm Pad, Halo Pad, Fantasia, FM Piano, Warm Swell, Halo Swell.
 - **Pads, glass and strings:** Glass Swell, Strings 3 Swell, Strings 5 Swell.
-- **Texture:** Tonewheel, Synth Voice, Space Voice, Solar Swell and Sine Swell, equal weights (the two voices don't sound too much like voices). No Choir Aahs in Zen picks; the picker still offers the whole Ambient pool, as every style does.
+- **Texture:** Tonewheel, Synth Voice, Space Voice, Solar Swell and Sine Swell, equal weights (the two voices don't sound too much like voices). No Choir Aahs in Zen picks or the ⚡ shuffle; the picker still offers the whole Ambient pool, as every style does.
 - **Bass:** Synth Bass 101, Saw Bass Swell, Brass Swell, Pulse Swell, Bass Swell, Synth Swell, Polysynth Swell. All synth, all long-sustaining.
 - **Lead 1:** Vibraphone, Tine EP and Harp, 30 percent each; Echo Drops 10 percent. Echo Drops sounds like a choir, so it never plays two songs running (noRepeatInstruments) and the Lead 2 lock never copies it.
 - **Lead 2:** Tinkling Bells, Christmas Bells, Kalimba, Harp.
@@ -318,8 +318,8 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 
 - **Title:** Zen has its own titles (AmbientZenTitleGenerator, in AmbientTitleGenerator.swift), gentle jokes on Eno with extra airport humour, at most 19 characters: "Music for Layovers" (30 percent), Eno spoofs such as "Thursday Nap" or "Neroli Ravioli" (35), place plus fraction such as "United Delay 2/1" or "1/1 (Decaf)", a quarter of them an odd number such as "Gate 42/634" or "Lounge 1.31459" (20), and Oblique Strategies twists such as "Honor Thy Nap" (15). The title is the last draw, so no note depends on it.
 - **Style:** "Ambient Zen – 72 bpm, 9 bar outro". There is no Form line, since every song is A and an outro.
-- **Chords:** key, mode, pace and the way home, for example "G Dorian quick 7th chords drifting, home via IV7", or "home on I" when the last body chord is the tonic, then any pad colours: ", pads with 9ths and triads" or ", pads with 6/9 home". The pace reads quick (under 37 s), steady (under 49 s) or slow.
-- **Zen:** "Breaths:long Echo:medium Bells:sparse Drift:calm Swell:deep". Echo reads light, medium or long, or deep or dry for the extremes. A low octave shows as "Bells:sparse,low" and "Bass:low". The pad colour isn't named, because the Instruments line shows the pads.
+- **Chords:** key and mode, for example "G Dorian 7th chord drift", then any pad colours: ", pads with 9ths and triads" or ", pads with 6/9 home". The pace and the way home are left out.
+- **Zen:** "Breaths:long Bells:sparse Drift:calm Swell:deep". A dial at its middle setting (medium) isn't named, and a song with every dial at medium reads "Breaths, Echo, Bells, Drift, Swell: medium". Echo reads light or long, or deep or dry for the extremes. A low octave shows as "Bells:sparse,low" ("Bells:low" at medium density) and "Bass:low". The pad colour isn't named, because the Instruments line shows the pads.
 - **Rules,** in track order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums. Drums logs AMB-DRUM-005 Garden Pulse or AMB-DRUM-000 No percussion. Zen's lead rules use LD1 and LD2, because each belongs to one lead.
 - No line per chord change; no style logs one.
 - No Ambient rule carries the "* " testing star: the style is new, so all its rules are (Zack, 2026-11-21).
@@ -336,17 +336,14 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 - Zen never adds the absent Bass or Drums in a pass (the generic drum path would bring in base Ambient percussion), and it skips the new-rule retry, since every Zen track has one rule.
 - Texture stays MIDI: Zen never sets an audio texture, in generation, Evolve or regeneration.
 
-## 13. Phase 3: variety
+## 13. Variety
 
-Each item is independent and can be built or skipped on its own. Specs are in the old plan, sections 6, 10 and 13.
-- **Built:** AMB-DRUM-005 Garden Pulse (section 8) and the bass and bells octave dials (section 4).
-- **Built:** the deep and dry echo (section 4).
-- **Built:** AMB-PADS-015 Big Ship Cycle (section 5), with breathing pads or block chords.
-- **Dropped:** AMB-PADS-014 Airports 2/1 Field (Zack, 2026-11-21). Base Ambient's prime-length loops over one to three held chords already cover it; ideas for base Ambient are in docs/ambient-plan.md, "Ideas for later".
-- **Dropped:** More Evolve (Zack, 2026-11-21). The pad colour flip adds too little, since pass 2 already swaps the pads; a new chord walk or a one-note mode shift would need every pitched track rebuilt in the pass, which is too complicated and risky. Evolve stays as in section 12.
-- **Built:** AMB-TEXT-011 Low Tide, a lighter Texture rule in 40 percent of songs (section 7). The On Land Bell idea became this (Zack, 2026-11-21); the bell itself was dropped.
-- **Built:** AMB-PADS-016 Shell Voices and AMB-BASS-009 Slow Glide (section 7), not yet heard.
-- **Known issue:** Saw Bass Swell (14038) in the Zen bass pick list dies to silence about 10 s into a held note, so it gaps under every Zen bass rule. Not yet fixed.
+- AMB-DRUM-005 Garden Pulse (section 8) and the bass and bells octave dials (section 4).
+- The deep and dry echo (section 4).
+- AMB-PADS-015 Big Ship Cycle (section 5), with breathing pads or block chords.
+- AMB-TEXT-011 Low Tide, a lighter Texture rule in 40 percent of songs (section 7).
+- AMB-PADS-016 Shell Voices and AMB-BASS-009 Slow Glide (section 7).
+- Saw Bass Swell holds its notes (preset sustain 6.4 dB down, as Brass Swell's).
 
 ## 14. On the shelf
 

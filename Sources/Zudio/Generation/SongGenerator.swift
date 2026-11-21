@@ -952,12 +952,188 @@ struct SongGenerator {
 
     // MARK: - Ambient generation path
 
-    // Ambient substyle shares. TEMPORARY testing shares while Ambient Zen is tuned (Zack,
-    // 2026-11-09): Piano 10, base Ambient 10, Zen 80, so Piano is pianoRoll < 0.10 and Zen takes
-    // 0.889 of the rest. RELEASE values: ambientPianoShare = 0.35 and ambientZenShare = 0.46
+    // Ambient substyle shares. TEMPORARY testing shares while base Ambient and Zen are tuned (Zack,
+    // 2026-11-21): Piano 10, base Ambient 30, Zen 60, so Piano is pianoRoll < 0.10 and Zen takes
+    // 0.667 of the rest. RELEASE values: ambientPianoShare = 0.35 and ambientZenShare = 0.46
     // (Piano 35, Zen about 30, base about 35). Put these back before the App Store.
     static let ambientPianoShare = 0.10
-    static let ambientZenShare   = 0.889
+    static let ambientZenShare   = 0.667
+    /// Base Ambient's colour stream (7th chords, Airports 2/1); no other style uses index 140.
+    static let ambientColourIndex = 140
+
+    /// Base Ambient's chord-cycle stream (the cycle, then its chord length).
+    static let ambientCycleIndex = 141
+
+    /// Base Ambient's low Lead 1 stream; no other style uses index 142.
+    static let ambientLowLeadIndex = 142
+    /// The lowest note a dropped Lead 1 may reach: Lead 1's own floor, E3.
+    static let ambientLowLeadFloor = 52
+
+    /// Base Ambient Lead 1 drops an octave for two or three passes of its loop, once or twice in
+    /// about a third of songs (Zack, 2026-11-21). Each stretch is whole passes inside the body,
+    /// never the first, so the figure never changes register mid-phrase; a stretch is at most 32
+    /// bars, and two stretches are at least two passes apart. Drawn from the song seed on its own
+    /// stream, so a Lead 1 regeneration drops at the same places. Returns step ranges.
+    static func ambientLowLeadStretches(seed: UInt64, loopBars: Int, totalBars: Int,
+                                        structure: SongStructure) -> [Range<Int>] {
+        var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: ambientLowLeadIndex))
+        guard loopBars > 0, rng.nextDouble() < 0.35 else { return [] }
+        let count = rng.nextDouble() < 0.6 ? 1 : 2
+        let length = min(rng.nextDouble() < 0.5 ? 2 : 3, max(1, 32 / loopBars))
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd = structure.outroSection?.startBar ?? totalBars
+        let firstPass = max(1, (bodyStart + loopBars - 1) / loopBars)
+        let lastStart = bodyEnd / loopBars - length            // the stretch ends by the outro
+        guard lastStart >= firstPass else { return [] }
+        var starts: [Int] = []
+        let a = firstPass + rng.nextInt(upperBound: lastStart - firstPass + 1)
+        starts.append(a)
+        if count == 2 {
+            let gap = 2
+            let others = (firstPass...lastStart).filter { $0 + length + gap <= a || $0 >= a + length + gap }
+            if !others.isEmpty { starts.append(others[rng.nextInt(upperBound: others.count)]) }
+        }
+        return starts.sorted().map { ($0 * loopBars * 16)..<(($0 + length) * loopBars * 16) }
+    }
+
+    /// Lowers every Lead 1 note that starts in a stretch by an octave. A stretch with any note
+    /// that would fall under `ambientLowLeadFloor` stays up whole. Returns the lead and the
+    /// stretches that dropped.
+    static func ambientLowerLead(_ lead: [MIDIEvent], stretches: [Range<Int>]) -> ([MIDIEvent], [Range<Int>]) {
+        var out = lead
+        var dropped: [Range<Int>] = []
+        for r in stretches {
+            let idx = out.indices.filter { r.contains(out[$0].stepIndex) }
+            guard !idx.isEmpty, idx.allSatisfy({ Int(out[$0].note) - 12 >= ambientLowLeadFloor }) else { continue }
+            for i in idx {
+                let e = out[i]
+                out[i] = MIDIEvent(stepIndex: e.stepIndex, note: e.note - 12, velocity: e.velocity, durationSteps: e.durationSteps)
+            }
+            dropped.append(r)
+        }
+        return (out, dropped)
+    }
+    /// Bars a chord lasts in a base chord cycle, drawn per song (Zack, 2026-11-21): three- and
+    /// four-chord cycles 8, 16 or 24 bars (40/40/20), two-chord cycles 16 or 24 (60/40).
+    static let ambientCycleBars: [Int] = [8, 16, 24]
+    static let ambientCycleBarWeights: [Double] = [0.40, 0.40, 0.20]
+    static let ambientTwoChordBarWeights: [Double] = [0.0, 0.60, 0.40]
+
+    /// Base Ambient chord cycles (Zack, 2026-11-21). Every chord is diatonic to its mode, the
+    /// tonic comes first, and no chord is a major 7th, so the loops that follow the chord never
+    /// hold a semitone. Two-chord songs draw a pair, three-chord songs a cycle of three or four.
+    static func ambientCycles(_ mode: Mode, twoChord: Bool) -> [[(String, ChordType)]] {
+        let M = ChordType.major, m = ChordType.minor, s = ChordType.sus2
+        switch mode {
+        case .Ionian:
+            return twoChord ? [[("1", M), ("4", M)], [("1", M), ("6", m)], [("1", M), ("5", M)]]
+                            : [[("1", M), ("4", M), ("6", m)], [("1", M), ("6", m), ("4", M), ("5", M)],
+                               [("1", M), ("3", m), ("4", M)], [("1", M), ("2", m), ("4", M)], [("1", M), ("4", M), ("5", M)]]
+        case .Mixolydian:
+            return twoChord ? [[("1", M), ("b7", M)], [("1", M), ("4", M)], [("1", M), ("5", m)]]
+                            : [[("1", M), ("b7", M), ("4", M)], [("1", M), ("5", m), ("b7", M), ("4", M)],
+                               [("1", M), ("2", m), ("4", M)], [("1", M), ("4", M), ("6", m)]]
+        case .Dorian:
+            return twoChord ? [[("1", m), ("4", M)], [("1", m), ("b7", M)], [("1", m), ("2", m)]]
+                            : [[("1", m), ("b7", M), ("4", M)], [("1", m), ("4", M), ("b7", M)],
+                               [("1", m), ("b3", M), ("4", M)], [("1", m), ("5", m), ("b7", M), ("4", M)]]
+        case .Aeolian:
+            return twoChord ? [[("1", m), ("b6", M)], [("1", m), ("b7", M)], [("1", m), ("4", m)]]
+                            : [[("1", m), ("b6", M), ("b7", M)], [("1", m), ("b7", M), ("b6", M)],
+                               [("1", m), ("4", m), ("b6", M), ("b7", M)], [("1", m), ("b3", M), ("b7", M)]]
+        case .MajorPentatonic:
+            return twoChord ? [[("1", M), ("6", m)], [("1", M), ("5", s)], [("1", M), ("2", s)]]
+                            : [[("1", M), ("5", s), ("2", s)], [("1", M), ("6", m), ("2", s), ("5", s)],
+                               [("1", M), ("6", m), ("5", s)]]
+        case .MinorPentatonic:
+            return twoChord ? [[("1", m), ("b3", M)], [("1", m), ("4", s)], [("1", m), ("b7", s)]]
+                            : [[("1", m), ("b3", M), ("4", s)], [("1", m), ("b7", s), ("b3", M)],
+                               [("1", m), ("4", s), ("b7", s)]]
+        default:
+            return []
+        }
+    }
+
+    /// Two- and three-chord base songs repeat a drawn cycle, a chord every
+    /// `ambientCycleBars` (drawn per song), and end on the tonic. Single-chord families stay drones.
+    /// Draws come from their own stream (trackSeed index 141), so no other draw moves.
+    static func ambientChordCycle(_ s: SongStructure, frame: GlobalMusicalFrame,
+                                  family: AmbientProgressionFamily, seed: UInt64) -> SongStructure {
+        guard family == .droneTwo || family == .modalDrift else { return s }
+        let cycles = ambientCycles(frame.mode, twoChord: family == .droneTwo)
+        guard !cycles.isEmpty else { return s }
+        var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: ambientCycleIndex))
+        let cycle = cycles[rng.nextInt(upperBound: cycles.count)]
+        let barWeights = family == .droneTwo ? ambientTwoChordBarWeights : ambientCycleBarWeights
+        let total = frame.totalBars, len = ambientCycleBars[rng.weightedPick(barWeights)]
+        var slots: [(start: Int, length: Int, chord: (String, ChordType))] = []
+        var bar = 0, k = 0
+        while bar < total {
+            slots.append((bar, Swift.min(len, total - bar), cycle[k % cycle.count]))
+            bar += len; k += 1
+        }
+        // A last scrap under a bar-pair joins the chord before it; the song ends on the tonic.
+        if slots.count > 1, slots[slots.count - 1].length < 4 {
+            let tail = slots.removeLast()
+            slots[slots.count - 1].length += tail.length
+        }
+        if slots.count > 1 { slots[slots.count - 1].chord = cycle[0] }
+        // Neighbouring slots on one chord merge (the tonic ending after a tonic slot).
+        var merged: [(start: Int, length: Int, chord: (String, ChordType))] = []
+        for sl in slots {
+            if let last = merged.last, last.chord.0 == sl.chord.0, last.chord.1 == sl.chord.1 {
+                merged[merged.count - 1].length += sl.length
+            } else { merged.append(sl) }
+        }
+        let plan = merged.map { sl -> ChordWindow in
+            let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: sl.chord.0, chordType: sl.chord.1,
+                                                     key: frame.key, mode: frame.mode)
+            return ChordWindow(startBar: sl.start, lengthBars: sl.length, chordRoot: sl.chord.0,
+                               chordType: sl.chord.1, chordTones: ct, scaleTensions: st, avoidTones: at)
+        }
+        return SongStructure(sections: s.sections, chordPlan: plan,
+                             introStyle: s.introStyle, outroStyle: s.outroStyle)
+    }
+
+    /// Base Ambient: the shared chord-plan builder gives Major Pentatonic a minor tonic, whose
+    /// minor 3rd is outside the scale. Now that loops follow the chord, that snapped the
+    /// pentatonic's major 3rd down and turned the song minor. Piano keeps the old plan.
+    static func ambientPentatonicTonic(_ s: SongStructure, frame: GlobalMusicalFrame) -> SongStructure {
+        guard frame.mode == .MajorPentatonic else { return s }
+        let plan = s.chordPlan.map { w -> ChordWindow in
+            guard w.chordRoot == "1", w.chordType == .minor else { return w }
+            let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: "1", chordType: .major,
+                                                     key: frame.key, mode: frame.mode)
+            return ChordWindow(startBar: w.startBar, lengthBars: w.lengthBars, chordRoot: "1",
+                               chordType: .major, chordTones: ct, scaleTensions: st, avoidTones: at)
+        }
+        return SongStructure(sections: s.sections, chordPlan: plan,
+                             introStyle: s.introStyle, outroStyle: s.outroStyle)
+    }
+
+    /// Base Ambient's 7th chords (Zack, 2026-11-21): each minor triad becomes a minor 7th and each
+    /// major triad a dominant 7th where the mode has that 7th. Never a major 7th, whose 7th sits a
+    /// semitone under the root, so no two chord tones rub. sus2 chords stay as they are.
+    static func ambientSevenths(_ s: SongStructure, frame: GlobalMusicalFrame) -> SongStructure {
+        let keyPC = keySemitone(frame.key) % 12
+        let scale = Set(frame.mode.intervals.map { (keyPC + $0) % 12 })
+        let plan = s.chordPlan.map { w -> ChordWindow in
+            let rootPC = (keyPC + degreeSemitone(w.chordRoot)) % 12
+            let type: ChordType
+            switch w.chordType {
+            case .minor: type = .min7
+            case .major: type = .dom7
+            default:     return w
+            }
+            guard scale.contains((rootPC + 10) % 12) else { return w }
+            let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: w.chordRoot, chordType: type,
+                                                     key: frame.key, mode: frame.mode)
+            return ChordWindow(startBar: w.startBar, lengthBars: w.lengthBars, chordRoot: w.chordRoot,
+                               chordType: type, chordTones: ct, scaleTensions: st, avoidTones: at)
+        }
+        return SongStructure(sections: s.sections, chordPlan: plan,
+                             introStyle: s.introStyle, outroStyle: s.outroStyle)
+    }
 
     private static func generateAmbient(
         seed: UInt64,
@@ -1012,7 +1188,7 @@ struct SongGenerator {
         let (rawFrame, percStylePicked, ambientProgFamily, loopLengths) = AmbientMusicalFrameGenerator.generate(
             rng: &rng, keyOverride: keyOverride,
             tempoOverride: isAmbientPiano ? pianoTempoOverride : tempoOverride,
-            moodOverride: moodOverride
+            moodOverride: moodOverride, pianoFamilies: isAmbientPiano
         )
         let percussionStyle = forcePercussionStyle ?? percStylePicked
 
@@ -1025,9 +1201,21 @@ struct SongGenerator {
         }
 
         // Step 2 — Ambient structure (intro/body/outro + chord plan)
-        let structure = AmbientStructureGenerator.generate(
+        var structure = AmbientStructureGenerator.generate(
             frame: frame, ambientProgFamily: ambientProgFamily, rng: &rng
         )
+        // Base Ambient colour (Zack, 2026-11-21), on its own stream so no other draw moves:
+        // 7th chords in 25 percent of songs, AMB-PADS-014 Airports 2/1 in 20 percent.
+        var ambColourRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: Self.ambientColourIndex))
+        let ambSevenths  = ambColourRNG.nextDouble() < 0.25
+        let ambAirports  = ambColourRNG.nextDouble() < 0.20
+        if !isAmbientPiano {
+            structure = Self.ambientChordCycle(structure, frame: frame, family: ambientProgFamily, seed: seed)
+            structure = Self.ambientPentatonicTonic(structure, frame: frame)
+        }
+        if !isAmbientPiano && ambSevenths {
+            structure = Self.ambientSevenths(structure, frame: frame)
+        }
 
         // Step 3 — Tonal governance map (same builder as Motorik/Kosmic)
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
@@ -1183,7 +1371,15 @@ struct SongGenerator {
         trackEvents[kTrackPads] = AmbientLoopTiler.tile(events: padLoop,
                                                          loopBars: loopLengths.pads,
                                                          totalBars: frame.totalBars,
-                                                         silentBars: dropoutZones[kTrackPads] ?? [])
+                                                         silentBars: dropoutZones[kTrackPads] ?? [], chords: structure.chordPlan, track: kTrackPads)
+        // AMB-PADS-014 Airports 2/1 (Zack, 2026-11-21): 20 percent of base songs swap the pad loop
+        // for single swelling notes on their own long loops. The pad loop above is still drawn,
+        // so the pads stream and the Lead 1 fallback test stay as they were.
+        if ambAirports && forcePadsRuleID == nil && !padLoop.isEmpty {
+            padRules = ["AMB-PADS-014"]
+            trackEvents[kTrackPads] = AmbientPadsGenerator.airportsVoices(
+                frame: frame, chords: structure.chordPlan, rng: &ambColourRNG)
+        }
 
         // Bass — rhythm template tiled at loopLengths.bass; pitch resolved from tonal map per note
         var bassRules: Set<String> = []
@@ -1193,6 +1389,8 @@ struct SongGenerator {
                                                                   usedRuleIDs: &bassRules,
                                                                   forceRuleID: forceBassRuleID,
                                                                   silentBars: dropoutZones[kTrackBass] ?? [])
+        // The bass follows the chord too, so an approach note never sits a semitone from the pads.
+        trackEvents[kTrackBass] = AmbientChordFollow.follow(trackEvents[kTrackBass], chords: structure.chordPlan, track: kTrackBass)
 
         // Drums (stochastic full-song — no tiling)
         var drumRules: Set<String> = []
@@ -1224,19 +1422,19 @@ struct SongGenerator {
         let isAmbSectionSolo = lead1Rules.contains("AMB-LEAD-009") || lead1Rules.contains("AMB-LEAD-010")
         let isMinimalistLead = lead1Rules.contains("AMB-LEAD-001") || lead1Rules.contains("AMB-LEAD-002")
         if isAmbSectionSolo {
-            // Section solos return full-song events — skip the loop tiler entirely.
-            trackEvents[kTrackLead1] = lead1Loop
+            // Section solos return full-song events — skip the loop tiler, but follow the chord.
+            trackEvents[kTrackLead1] = AmbientChordFollow.follow(lead1Loop, chords: structure.chordPlan, track: kTrackLead1)
         } else if isMinimalistLead {
             // Floating tone / echo phrase are already very sparse — skip the dropout zone
             // so the handful of notes they produce aren't further suppressed.
             trackEvents[kTrackLead1] = AmbientLoopTiler.tile(events: lead1Loop,
                                                               loopBars: loopLengths.lead1,
-                                                              totalBars: frame.totalBars)
+                                                              totalBars: frame.totalBars, chords: structure.chordPlan, track: kTrackLead1)
         } else {
             trackEvents[kTrackLead1] = AmbientLoopTiler.tile(events: lead1Loop,
                                                               loopBars: loopLengths.lead1,
                                                               totalBars: frame.totalBars,
-                                                              silentBars: dropoutZones[kTrackLead1] ?? [])
+                                                              silentBars: dropoutZones[kTrackLead1] ?? [], chords: structure.chordPlan, track: kTrackLead1)
         }
 
         // Lead 2 (AMB-LEAD-005: sparse tonal cell from Lead 1 pitch classes) — no dropout zone; already very sparse
@@ -1247,7 +1445,7 @@ struct SongGenerator {
                                                             usedRuleIDs: &lead2Rules)
         trackEvents[kTrackLead2] = AmbientLoopTiler.tile(events: lead2Loop,
                                                           loopBars: loopLengths.lead2,
-                                                          totalBars: frame.totalBars)
+                                                          totalBars: frame.totalBars, chords: structure.chordPlan, track: kTrackLead2)
 
         // Rhythm
         var rhythmRules: Set<String> = []
@@ -1258,7 +1456,7 @@ struct SongGenerator {
         trackEvents[kTrackRhythm] = AmbientLoopTiler.tile(events: rythmLoop,
                                                             loopBars: loopLengths.rhythm,
                                                             totalBars: frame.totalBars,
-                                                            silentBars: dropoutZones[kTrackRhythm] ?? [])
+                                                            silentBars: dropoutZones[kTrackRhythm] ?? [], chords: structure.chordPlan, track: kTrackRhythm)
 
         // Ambient audio texture: when drums are absent, replace the MIDI texture track with an
         // audio file. LP + light reverb applied by AudioTexturePlayer for Ambient style.
@@ -1278,7 +1476,7 @@ struct SongGenerator {
             trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoop,
                                                                  loopBars: loopLengths.texture,
                                                                  totalBars: frame.totalBars,
-                                                                 silentBars: dropoutZones[kTrackTexture] ?? [])
+                                                                 silentBars: dropoutZones[kTrackTexture] ?? [], chords: structure.chordPlan, track: kTrackTexture)
         }
 
         // Hollow guard A: if bass, rhythm, and texture are all absent (and no audio texture),
@@ -1296,7 +1494,7 @@ struct SongGenerator {
             trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoopH,
                                                                 loopBars: loopLengths.texture,
                                                                 totalBars: frame.totalBars,
-                                                                silentBars: dropoutZones[kTrackTexture] ?? [])
+                                                                silentBars: dropoutZones[kTrackTexture] ?? [], chords: structure.chordPlan, track: kTrackTexture)
             texRules.formUnion(texRulesH)
         }
 
@@ -1311,10 +1509,9 @@ struct SongGenerator {
                                                            usedRuleIDs: &bassRulesH,
                                                            forceRuleID: "AMB-BASS-001",
                                                            silentBars: dropoutZones[kTrackBass] ?? [])
-            trackEvents[kTrackBass] = AmbientLoopTiler.tile(events: bassLoopH,
-                                                              loopBars: loopLengths.bass,
-                                                              totalBars: frame.totalBars,
-                                                              silentBars: dropoutZones[kTrackBass] ?? [])
+            // The bass generator writes the whole song, so it is followed, not tiled
+            // (tiling stacked a fresh copy every loop length).
+            trackEvents[kTrackBass] = AmbientChordFollow.follow(bassLoopH, chords: structure.chordPlan, track: kTrackBass)
             bassRules.formUnion(bassRulesH)
         }
 
@@ -1332,7 +1529,7 @@ struct SongGenerator {
             trackEvents[kTrackRhythm] = AmbientLoopTiler.tile(events: rythmLoopH,
                                                                 loopBars: loopLengths.rhythm,
                                                                 totalBars: frame.totalBars,
-                                                                silentBars: dropoutZones[kTrackRhythm] ?? [])
+                                                                silentBars: dropoutZones[kTrackRhythm] ?? [], chords: structure.chordPlan, track: kTrackRhythm)
         }
 
         // Plan J: Strip Rhythm and Texture events from intro and outro bars.
@@ -1437,6 +1634,15 @@ struct SongGenerator {
         // Post-processing: harmonic filter only (no Density/Arrangement/PatternEvolver/DrumVariation)
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
+        // Lead 1 down an octave for a few passes (Zack, 2026-11-21). After the harmonic filter, whose
+        // register pass would lift it back above the pads; before the whistle, which stays as written.
+        var lowLeadStretches: [Range<Int>] = []
+        if !isAmbSectionSolo {
+            (trackEvents[kTrackLead1], lowLeadStretches) = ambientLowerLead(trackEvents[kTrackLead1],
+                stretches: ambientLowLeadStretches(seed: seed, loopBars: loopLengths.lead1,
+                                                   totalBars: frame.totalBars, structure: structure))
+        }
+
         // X-Files whistle — injected AFTER harmonic filter so the melody is not scale-snapped.
         // 5% chance (75% in test mode) of appearing once in the 30–60 second window.
         // Plays once, starting at bar 2 of the block; phrase spills into bar 3 (bars 1 and 4 silent).
@@ -1505,12 +1711,20 @@ struct SongGenerator {
                                            low: kRegisterBounds[kTrackPads]!.low,
                                            high: kRegisterBounds[kTrackPads]!.high)
                 guard !pool.isEmpty else { continue }
-                // Prefer a pitch already used by Pads nearby for tonal continuity
-                let refNote = trackEvents[kTrackPads]
-                    .min(by: { abs($0.stepIndex - fillStep) < abs($1.stepIndex - fillStep) })
-                    .map { $0.note } ?? pool[pool.count / 2]
+                // Prefer a pitch already used by Pads nearby for tonal continuity, moved to the
+                // nearest tone of the chord at the fill (it may come from another chord).
+                let nearby: UInt8? = trackEvents[kTrackPads]
+                    .min(by: { abs($0.stepIndex - fillStep) < abs($1.stepIndex - fillStep) })?.note
+                var refNote: UInt8 = pool[pool.count / 2]
+                if let n = nearby {
+                    let target = Int(n)
+                    refNote = pool.min(by: { abs(Int($0) - target) < abs(Int($1) - target) }) ?? n
+                }
+                // Clipped at the next chord change, so the fill never rubs against the new chord.
+                let windowEnd = (entry.chordWindow.startBar + entry.chordWindow.lengthBars) * 16
                 trackEvents[kTrackPads].append(
-                    MIDIEvent(stepIndex: fillStep, note: refNote, velocity: 40, durationSteps: 20))
+                    MIDIEvent(stepIndex: fillStep, note: refNote, velocity: 40,
+                              durationSteps: Swift.max(1, Swift.min(20, windowEnd - fillStep))))
             }
             // Sort once after all void fills rather than after each insert
             if !voids.isEmpty {
@@ -1535,11 +1749,17 @@ struct SongGenerator {
             forceLeadRuleID: forceLeadRuleID, forcePercussionStyle: forcePercussionStyle
         )
 
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
+        var stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
                                                     frame: frame, xFilesBars: ambientXFilesBars,
                                                     breathSilenceBar: breathSilenceBar,
                                                     breathSilenceLenBars: breathSilenceLenBars,
-                                                    isAmbient: true, includeDrumFills: false)
+                                                    isAmbient: true, includeDrumFills: false,
+                                                    nameChordsOnce: true)
+        for r in lowLeadStretches {
+            stepAnnotations[r.lowerBound, default: []].append(GenerationLogEntry(tag: "Lead 1",
+                description: "Down an octave for \(r.count / 16) bars"))
+            stepAnnotations[r.upperBound, default: []].append(GenerationLogEntry(tag: "Lead 1", description: "Back up"))
+        }
 
         // Derive the 4-bar block step range for PlaybackEngine delay muting.
         let ambientXFilesBlockRange: Range<Int>? = ambientXFilesBars.first.map {
@@ -1593,7 +1813,8 @@ struct SongGenerator {
         let dials    = AmbientZenDials.draw(seed: seed)
         let zenTempo = AmbientZenPlan.zenTempo(dials: dials, tempoOverride: tempoOverride)
         let (rawFrame, _, ambientProgFamily, _) = AmbientMusicalFrameGenerator.generate(
-            rng: &rng, keyOverride: keyOverride, tempoOverride: zenTempo, moodOverride: moodOverride)
+            rng: &rng, keyOverride: keyOverride, tempoOverride: zenTempo, moodOverride: moodOverride,
+            pianoFamilies: true)   // the original family weights, so Zen's stored family doesn't move
         var frame = rawFrame.withMode(dials.mode)
 
         // Step 2: the ZenPlan, the structure (A and a 6 to 12 bar outro) and the tonal map.
@@ -1699,13 +1920,13 @@ struct SongGenerator {
         // The walk is a weighted random drift from the tonic (never the same chord twice running),
         // not a climb or a descent, so the line says "drifting" (Zack, 2026-11-20).
         // The walk always starts on the tonic, so "from I" is left out (Zack, 2026-11-21).
-        let home = plan.wayHome.map { ", home via \($0)" } ?? ", home on I"
+        // The pace and the way home are left out too: they say little from song to song (Zack, 2026-11-21).
         // A Big Ship song names its variant and the shape of its cycle (no numerals) instead: "Big Ship drift" for the
         // breathing pads (the subtler one), "Big Ship chords" for the block chords (Zack, 2026-11-21).
         switch plan.dials.cycle {
         case .none:
             log.append(GenerationLogEntry(tag: "Chords", description:
-                "\(frame.key) \(frame.mode.rawValue) \(plan.dials.paceWords) 7th chords drifting\(home)\(plan.padColourWords)"))
+                "\(frame.key) \(frame.mode.rawValue) 7th chord drift\(plan.padColourWords)"))
         case .breathing, .block:
             let shape = plan.dials.cycle == .block
                 ? "chords: eight-chord cycle, tonic shuttle with a turnaround"
@@ -1714,7 +1935,11 @@ struct SongGenerator {
                 "\(frame.key) \(frame.mode.rawValue) Big Ship \(shape)"))
         }
         let swellWords = AmbientZenPlan.swellDepthWords(seed: seed)
-        log.append(GenerationLogEntry(tag: "Zen", description: "\(plan.dials.plainWords) Swell:\(swellWords)"))
+        // Medium dials aren't named; a song with every dial at medium says so in one phrase (Zack, 2026-11-21).
+        let zenWords = [plan.dials.plainWords, swellWords == "medium" ? "" : "Swell:\(swellWords)"]
+            .filter { !$0.isEmpty }.joined(separator: " ")
+        log.append(GenerationLogEntry(tag: "Zen", description:
+            zenWords.isEmpty ? "Breaths, Echo, Bells, Drift, Swell: medium" : zenWords))
         // In track order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass.
         for ruleID in (0..<kTrackCount).flatMap({ (rulesByTrack[$0] ?? []).sorted() }) {
             log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
@@ -1864,6 +2089,7 @@ struct SongGenerator {
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     rng: &rng, loopBars: songState.ambientLoopLengths?.bass ?? 11,
                     usedRuleIDs: &usedRules)
+                events = AmbientChordFollow.follow(events, chords: songState.structure.chordPlan, track: kTrackBass)
             } else if isKosmic {
                 var ignored: [Int] = []
                 events = KosmicBassGenerator.generate(
@@ -1916,7 +2142,8 @@ struct SongGenerator {
                 let loop = AmbientPadsGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
-                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
+                                           chords: songState.structure.chordPlan, track: kTrackPads)
             } else if isKosmic {
                 events = KosmicPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1954,8 +2181,15 @@ struct SongGenerator {
                     structure: songState.structure)
                 let isSectionSolo = regenRules.contains("AMB-LEAD-009") || regenRules.contains("AMB-LEAD-010")
                 usedRules.formUnion(regenRules)
-                events = isSectionSolo ? loop
-                    : AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                events = isSectionSolo ? AmbientChordFollow.follow(loop, chords: songState.structure.chordPlan, track: kTrackLead1)
+                    : AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
+                                           chords: songState.structure.chordPlan, track: kTrackLead1)
+                // The same low stretches as the song (they come from the song seed).
+                if !isSectionSolo {
+                    events = ambientLowerLead(events, stretches: ambientLowLeadStretches(
+                        seed: songState.globalSeed, loopBars: loopBars,
+                        totalBars: songState.frame.totalBars, structure: songState.structure)).0
+                }
             } else if isKosmic {
                 // lead1BaseRule is read by nothing that plays. The X-Files bars matter to Lead 2,
                 // which keeps out of them: a Lead 2 regen finds them by replaying Lead 1 on its seed.
@@ -2000,7 +2234,8 @@ struct SongGenerator {
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     lead1Events: lead1Loop, loopBars: loopBars,
                     rng: &rng, usedRuleIDs: &usedRules)
-                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
+                                           chords: songState.structure.chordPlan, track: kTrackLead2)
             } else if isKosmic {
                 // Drift has no Lead 2, as Noir has none (regen and Evolve's first pass gave it one
                 // until 2026-11-11).
@@ -2106,7 +2341,8 @@ struct SongGenerator {
                 let loop = AmbientRhythmGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
-                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
+                                           chords: songState.structure.chordPlan, track: kTrackRhythm)
             } else if isKosmic {
                 events = KosmicArpeggioGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -2159,7 +2395,8 @@ struct SongGenerator {
                     let loop = AmbientTextureGenerator.generate(
                         frame: songState.frame, tonalMap: songState.tonalMap,
                         loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
-                    events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                    events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
+                                           chords: songState.structure.chordPlan, track: kTrackTexture)
                     regenAmbientAudioTexture = nil
                     regenAmbientAudioOffset  = 0
                 }
@@ -3806,7 +4043,20 @@ struct SongGenerator {
 
         // Chord plan — key/mode + progression family
         let progLabel = ambientProgressionFamilyLabel(ambientProgFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progLabel)))
+        if !isAmbientPiano && (ambientProgFamily == .droneTwo || ambientProgFamily == .modalDrift)
+            && structure.chordPlan.count > 1 {
+            // A base chord cycle names its chords in order, once each.
+            var names: [String] = []
+            for w in structure.chordPlan {
+                let n = chordName(key: frame.key, degree: w.chordRoot, type: w.chordType)
+                if !names.contains(n) { names.append(n) }
+            }
+            log.append(GenerationLogEntry(tag: "Chords", description:
+                chordsDescription(key: frame.key, mode: frame.mode, familyLabel: "Chord cycle")
+                + " " + names.joined(separator: " ")))
+        } else {
+            log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progLabel)))
+        }
 
         // Loop lengths — omitted for Ambient Piano (full-song events, no tiler)
         if !isAmbientPiano {
@@ -3864,6 +4114,7 @@ struct SongGenerator {
         case "AMB-PADS-001":    return "Sustained chord layer"
         case "AMB-PADS-002":    return "Slow cascade"
         case "AMB-PADS-003":    return "Modal cloud"
+        case "AMB-PADS-014":    return "Airports 2/1"
         // Bass
         case "AMB-BASS-001":  return "Loscil drone root"
         case "AMB-BASS-000":  return "No bass"
@@ -3955,6 +4206,7 @@ struct SongGenerator {
         breathSilenceLenBars: Int = 0,
         isAmbient: Bool = false,
         includeDrumFills: Bool = true,
+        nameChordsOnce: Bool = false,
         solo: SoloWindows = .none,
         soloRuleID: String? = nil,
         chillBreakdownStyle: ChillBreakdownStyle? = nil,
@@ -4699,10 +4951,13 @@ struct SongGenerator {
         // Ambient chord shift annotations — fire at each chord boundary after bar 0.
         // First window is the opening tonic; subsequent windows are shifts or returns.
         if isAmbient && structure.chordPlan.count > 1 {
+            // A base chord cycle names each chord once, the first time it comes round.
             let first = structure.chordPlan[0]
+            var named: Set<String> = []
             for window in structure.chordPlan.dropFirst() {
                 let name = chordName(window.chordRoot, window.chordType)
                 let isReturn = window.chordRoot == first.chordRoot && window.chordType == first.chordType
+                guard !nameChordsOnce || named.insert((isReturn ? "R " : "") + name).inserted else { continue }
                 fireBar(window.startBar, tag: isReturn ? "Return" : "Chord shift", desc: name)
             }
         }

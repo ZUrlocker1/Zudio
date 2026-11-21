@@ -6,11 +6,11 @@
 
 - **Ambient Zen, phase 2: the bells and the swell** — (2026-11-21, build 139) Three bell loops of 13, 17 and 23 beats phase against each other over the bed, and a slow swell makes them sparser or fuller over the song. Zen follows the normal Evolve passes.
 
-- **Ambient Zen, phase 3: Garden Pulse and low octaves** — (2026-11-21, build 139) One Zen song in ten has a very quiet drum pulse of kick and hats on drifting patterns (AMB-DRUM-005), and some songs play the bass or the bells an octave lower. Now and then a song has a deep or a dry echo, all shown in the Zen line. Some Zen songs now loop one 8-chord cycle at 4 bars a chord, after Eno's The Big Ship. A lighter Texture rule, Low Tide (AMB-TEXT-011), plays in 40 percent of Zen songs. Shell Voices (AMB-PADS-016) plays only the 3rd and 7th of each chord in about 40 percent of songs, and Slow Glide (AMB-BASS-009) holds the bass and bends it to each new root in 35 percent. Slow Glide changes playback: a new pitch-bend path on the bass channel, Zen only. In drift songs the pads now and then play a 9th in place of the root or a plain triad, and some Ionian and Lydian songs voice home as a 6/9; the Chords line names them.
+- **Ambient Zen, phase 3: Garden Pulse and low octaves** — (2026-11-21, build 139) One Zen song in ten has a very quiet drum pulse of kick and hats on drifting patterns (AMB-DRUM-005), and some songs play the bass or the bells an octave lower. Now and then a song has a deep or a dry echo. Some Zen songs now loop one 8-chord cycle at 4 bars a chord, after Eno's The Big Ship.
 
 - **Ambient Zen titles** — (2026-11-21, build 139) Zen songs get their own short titles, gentle jokes on Eno and air travel: "Music for Rebooking", "Thursday Nap", "United Delay 2/1", "1/1 (Decaf)", and now and then an odd number such as "Gate 7/11" or "Lounge 24/7".
 
-- **Evolve log order** — (2026-11-21, build 139) In every style an Evolve pass logs each track's new instrument under its REGEN line, above its rules, as a manual regen does.
+- **Base Ambient: more musical** — (2026-11-21, build 139) Base Ambient songs now move through short chord cycles with smooth changes, and the bass names each new chord. Pads and held basses can play soft swell instruments, some songs use 7th chords or Airports 2/1 voices, and Lead 1 now and then drops an octave for a few passes.
 
 - **Minor improvements to Chill, 2026-11-20.** Chill leads and bass repeat fewer notes, and the Mac Track View Generation Log is now resizable. 
 
@@ -19,6 +19,9 @@
 - **Resizable Generation Log on Mac** — (2026-11-20, build 139) In Track View, drag the Generation Log bar up to grow the log over the track rows, from the bottom row up; a grip at its right end and the up-down cursor show where to grab, and a double-click resets it. The height is remembered between launches. Mac only.
 
 - **Fewer repeated notes in Chill leads and bass** — (2026-11-20, build 139) Chill leads and bass repeat the same note less often to avoid unnecessary "flattening" of melodies when avoiding tonal clashes.
+
+- **Evolve log order** — (2026-11-21, build 139) In every style an Evolve pass logs each track's new instrument under its REGEN line, above its rules, as a manual regen does.
+
 
 ## V 3.0 (Build 138) — Chill jazz leads and chord progressions
 

@@ -12,7 +12,8 @@ struct AmbientMusicalFrameGenerator {
         rng: inout SeededRNG,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil
+        moodOverride: Mood? = nil,
+        pianoFamilies: Bool = false
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle,
           ambientProgFamily: AmbientProgressionFamily, loopLengths: AmbientLoopLengths) {
 
@@ -23,7 +24,7 @@ struct AmbientMusicalFrameGenerator {
         let mode       = pickMode(rng: &rng)
         let total      = pickTotalBars(tempo: tempo, rng: &rng)
         let percStyle  = pickPercussionStyle(rng: &rng)
-        let ambFamily  = pickAmbientProgressionFamily(rng: &rng)
+        let ambFamily  = pickAmbientProgressionFamily(rng: &rng, piano: pianoFamilies)
         let loops      = pickLoopLengths(rng: &rng)
 
         let frame = GlobalMusicalFrame(
@@ -75,9 +76,13 @@ struct AmbientMusicalFrameGenerator {
         return styles[rng.weightedPick(weights)]
     }
 
-    private static func pickAmbientProgressionFamily(rng: inout SeededRNG) -> AmbientProgressionFamily {
+    /// `piano`: Ambient Piano keeps the original weights, so its songs don't change.
+    private static func pickAmbientProgressionFamily(rng: inout SeededRNG, piano: Bool) -> AmbientProgressionFamily {
         let families: [AmbientProgressionFamily] = [.droneSingle, .droneTwo, .modalDrift, .suspendedDrone, .dissonantHaze]
-        let weights:  [Double]                   = [0.25,         0.30,      0.20,        0.15,            0.10]
+        if piano { return families[rng.weightedPick([0.25, 0.30, 0.20, 0.15, 0.10])] }
+        // Base (Zack, 2026-11-21): one-chord drones 10 percent, two-chord cycles 10 percent, and
+        // three- or four-chord cycles the rest, now that the loops follow the chord.
+        let weights:  [Double]                   = [0.04,         0.10,      0.80,        0.03,            0.03]
         return families[rng.weightedPick(weights)]
     }
 
