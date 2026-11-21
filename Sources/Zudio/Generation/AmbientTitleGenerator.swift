@@ -659,7 +659,13 @@ struct AmbientZenTitleGenerator {
             if rng.nextDouble() < 0.12 {
                 title = pick(fractionSpecials, &rng)
             } else {
-                title = pick(fractionPlaces, &rng) + " " + pick(fractions, &rng)
+                // A quarter of the time an odd number in place of Airports' fractions (Zack,
+                // 2026-11-21), only one that fits after the place.
+                let place = pick(fractionPlaces, &rng)
+                let room  = maxLength - place.count - 1
+                let odd   = oddFractions.filter { $0.count <= room }
+                let useOdd = rng.nextDouble() < 0.25 && !odd.isEmpty
+                title = place + " " + (useOdd ? pick(odd, &rng) : pick(fractions, &rng))
             }
         } else {
             title = pick(obliqueTwists, &rng)
@@ -714,6 +720,10 @@ struct AmbientZenTitleGenerator {
         "Boarding", "Red-Eye", "Upgrade List", "Diverted", "Holding",
     ]
     static let fractions = ["1/1", "1/2", "2/1", "2/2"]
+    static let oddFractions = [
+        "1/37", "42/634", "1.31459", "7/11", "24/7", "1/0", "0/0", "2/3.5", "π/2", "1/∞", "13/8",
+        "86/1", "1.0001", "3/1-ish", "9¾", "0.999…", "10/6", "221B", "867-5309",
+    ]
     static let fractionSpecials = [
         "1/1 (Decaf)", "2/1 (Oat Milk)", "1/2 (Half-Caf)", "2/2 (Gate Lice)", "1/1 (Delayed)",
     ]
@@ -721,7 +731,7 @@ struct AmbientZenTitleGenerator {
     // 4. Oblique Strategies, Eno and Peter Schmidt's card deck, and Eno's sayings.
     static let obliqueTwists = [
         "Honor Thy Nap", "Use an Old Idea", "Do Nothing Longer", "Gardening, Not Art",
-        "Emphasise the Naps", "Repetition Is Fine", "Ask Your Body", "Remove Ambiguities",
-        "Only One Element", "Water", "Discard an Axiom", "Go Slowly All Over",
+        "Emphasise the Naps", "Repetition Is Fine", "Ask Your Mother", "Eschew Obfuscation", "Add All The Things", "None Of The Above", "Melody As Rhythm", "Rhythm As Melody", "Chords As Knowledge", "Code Is Not Music", "Love Is Not Random", "Loops Are Not Music", "Scales Not Needed", "Add More Drones","Add Sus4♭9 Chords",
+        "Only One Element", "Water Flowing", "Discard an Axiom", "Go Slowly All Over",
     ].filter { $0.count <= maxLength }
 }

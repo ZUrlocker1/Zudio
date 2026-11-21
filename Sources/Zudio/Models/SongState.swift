@@ -28,10 +28,8 @@ struct GenerationLogEntry: Sendable {
         // Motorik Noir Lead 1 from transcriptions (2026-11-14): No Birds turn, Tear Us Apart hook,
         // Transmission figure, Albatross guitar.
         "MOT-LD1-011", "MOT-LD1-012", "MOT-LD1-013", "MOT-LD1-014",
-        // Ambient Zen phase 1 (2026-11-20): the bed.
-        "AMB-PADS-011", "AMB-TEXT-012", "AMB-BASS-007", "AMB-BASS-008",
-        // Ambient Zen phase 2 (2026-11-20): the bells.
-        "AMB-LD1-011", "AMB-LD2-014", "AMB-RTHM-007",
+        // No Ambient rules: Ambient Zen is a new style, so every one of its rules is new, and
+        // none is starred (Zack, 2026-11-21).
     ]
 
     /// The testing markers a description can start with. The "F " fix marker is gone (Zack,

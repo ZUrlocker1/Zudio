@@ -17,6 +17,17 @@ enum ZenPadColour: Sendable, Equatable {
     case rhodes, glassStrings
 }
 
+/// The echo dial's character: the usual echo, or an occasional deep or dry one (Zack, 2026-11-21).
+enum ZenEchoCharacter: Sendable, Equatable {
+    case usual, deep, dry
+}
+
+/// The harmony plan (Zack, 2026-11-21): AMB-1's drift, or the Big Ship cycle with breathing pads
+/// or with block chords.
+enum ZenCycle: Sendable, Equatable {
+    case none, breathing, block
+}
+
 /// The per-song dials that stand in for AMB-1's knobs (plan section 4). Drawn from index 120.
 struct AmbientZenDials: Sendable, Equatable {
     let mode: Mode
@@ -33,7 +44,7 @@ struct AmbientZenDials: Sendable, Equatable {
     let bellDensity: Int
     /// 0.75 to 0.90, sets the echo feedback.
     let echoSize: Double
-    /// Phase 3: on in about 40 percent of songs.
+    /// AMB-DRUM-005 Garden Pulse plays: 10 percent of songs (Zack, 2026-11-21).
     let pulse: Bool
     /// The outro's length, 6 to 12 bars (Zack, 2026-11-20).
     let outroBars: Int
@@ -44,6 +55,21 @@ struct AmbientZenDials: Sendable, Equatable {
     /// Lead 2 plays on Lead 1's instrument, as AMB-1 plays all its bell loops on one voice: 25
     /// percent of songs (Zack, 2026-11-20). An instrument choice only; the notes don't change.
     let lead2SyncsLead1: Bool
+    /// AMB-1's bass octave at -1: the bass an octave lower, MIDI 24 to 35 (never higher).
+    /// 35 percent while testing, likely 10 to 15 at release (Zack, 2026-11-21).
+    let bassLow: Bool
+    /// AMB-1's bell octave at -1: all three bell loops an octave lower (never higher).
+    /// 35 percent while testing, likely 10 to 15 at release (Zack, 2026-11-21).
+    let bellsLow: Bool
+    /// The echo's character (Zack, 2026-11-21): usual 75 percent; deep 15 (feedback 79 to 80
+    /// percent and the bells 15 points wetter, after AMB-1's Shoreline); dry 10 (feedback 66 to 70
+    /// and the bells 15 points drier). One dial, so a song is never extreme both ways.
+    let echoCharacter: ZenEchoCharacter
+    /// 0 to 1: where the feedback sits inside a deep or dry echo's range.
+    let echoAmount: Double
+    /// The Big Ship cycle (AMB-PADS-015): 30 percent of songs while testing, split evenly between
+    /// breathing pads and block chords; likely 20 at release (Zack, 2026-11-21).
+    let cycle: ZenCycle
 
     static func draw(seed: UInt64) -> AmbientZenDials {
         var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: AmbientZenPlan.dialsIndex))
@@ -56,7 +82,7 @@ struct AmbientZenDials: Sendable, Equatable {
         let restless = 0.25 + 0.20 * rng.nextDouble()
         let density  = [30, 45, 60][rng.nextInt(upperBound: 3)]
         let echo     = 0.75 + 0.15 * rng.nextDouble()
-        let pulse    = rng.nextDouble() < 0.40
+        let pulse    = rng.nextDouble() < 0.10
         // New draws go last, so no earlier dial moves. The outro, then the order the tracks stop in.
         let outro    = 6 + rng.nextInt(upperBound: 7)
         let held     = AmbientZenPlan.heldBreathBars(outroBars: outro)
@@ -68,14 +94,46 @@ struct AmbientZenDials: Sendable, Equatable {
         offsets[order[1]] = gapA
         offsets[order[2]] = gapA + gapB
         let lead2Sync = rng.nextDouble() < 0.25
+        // The octave dials (2026-11-21), last, testing shares.
+        let bassLow  = rng.nextDouble() < 0.35
+        let bellsLow = rng.nextDouble() < 0.35
+        // The echo character (2026-11-21), last.
+        let echoRoll = rng.nextDouble()
+        let echoCharacter: ZenEchoCharacter = echoRoll < 0.15 ? .deep : echoRoll < 0.25 ? .dry : .usual
+        let echoAmount = rng.nextDouble()
+        // The Big Ship cycle (2026-11-21), last, testing share.
+        let cycleRoll = rng.nextDouble()
+        let cycle: ZenCycle = cycleRoll < 0.15 ? .breathing : cycleRoll < 0.30 ? .block : .none
         return AmbientZenDials(mode: mode, tempo: tempo, chordPaceSeconds: pace, breathLength: breath,
                                padColour: colour, restlessness: restless, bellDensity: density,
                                echoSize: echo, pulse: pulse, outroBars: outro, endOffsets: offsets,
-                               lead2SyncsLead1: lead2Sync)
+                               lead2SyncsLead1: lead2Sync, bassLow: bassLow, bellsLow: bellsLow,
+                               echoCharacter: echoCharacter, echoAmount: echoAmount, cycle: cycle)
     }
 
-    /// Echo feedback in AVAudioUnitDelay's percent: 0.5 + 0.32 x echo size, 74 to 79.
-    var echoFeedbackPercent: Float { Float((0.5 + 0.32 * echoSize) * 100) }
+    /// Points added to the bells' echo wet mix (Lead 1, Lead 2, Rhythm): +15 deep, -15 dry.
+    var bellEchoWetShift: Float {
+        switch echoCharacter {
+        case .usual: return 0
+        case .deep:  return 15
+        case .dry:   return -15
+        }
+    }
+
+    /// How far the bell loops sit below AMB-1's base notes: 12 when the bells are low.
+    var bellShift: Int { bellsLow ? -12 : 0 }
+    /// How far the bass sits below MIDI 36 + root: 12 when the bass is low.
+    var bassShift: Int { bassLow ? -12 : 0 }
+
+    /// Echo feedback in AVAudioUnitDelay's percent: 0.5 + 0.32 x echo size, 74 to 79; a deep echo
+    /// 79 to 80, a dry one 66 to 70.
+    var echoFeedbackPercent: Float {
+        switch echoCharacter {
+        case .usual: return Float((0.5 + 0.32 * echoSize) * 100)
+        case .deep:  return Float(79 + 1 * echoAmount)
+        case .dry:   return Float(66 + 4 * echoAmount)
+        }
+    }
 
     /// The chord pace in plain words, for the Chords line of the log.
     var paceWords: String {
@@ -87,12 +145,20 @@ struct AmbientZenDials: Sendable, Equatable {
     var plainWords: String {
         // The pad colour isn't named: the Instruments line already shows the pads (Zack, 2026-11-21).
         let breath = breathLength < 53 ? "short" : breathLength < 62 ? "medium" : "long"
-        let echo   = echoSize < 0.80 ? "light" : echoSize < 0.85 ? "medium" : "deep"
+        // "deep" and "dry" name the occasional extremes; the usual echo reads light, medium or long.
+        let echo: String
+        switch echoCharacter {
+        case .deep:  echo = "deep"
+        case .dry:   echo = "dry"
+        case .usual: echo = echoSize < 0.80 ? "light" : echoSize < 0.85 ? "medium" : "long"
+        }
         let bells  = bellDensity <= 30 ? "sparse" : bellDensity <= 45 ? "medium" : "full"
         // Drift is the restlessness dial: how much the bell loops change each pass and how often
         // the bass sits out (Zack, 2026-11-21). The swell depth is added by the log builder.
         let drift  = restlessness < 0.317 ? "calm" : restlessness < 0.383 ? "medium" : "restless"
-        return "Breaths: \(breath), Echo: \(echo), Bells: \(bells), Drift: \(drift)"
+        // A low octave is added to its word: "Bells:sparse,low"; "Bass:low" only when low.
+        return "Breaths:\(breath) Echo:\(echo) Bells:\(bells)\(bellsLow ? ",low" : "") Drift:\(drift)"
+            + (bassLow ? " Bass:low" : "")
     }
 }
 
@@ -135,6 +201,8 @@ struct AmbientZenPlan: Sendable {
     /// The bell loops' default seeds (a regenerated bell track uses its override instead). 126 is
     /// the plan's spare; 127 stays the pulse's, so Lead 2 and Rhythm take 128 and 129.
     static let lead1Index  = 126
+    /// AMB-DRUM-005 Garden Pulse's stream.
+    static let pulseIndex  = 127
     static let lead2Index  = 128
     static let rhythmIndex = 129
 
@@ -303,6 +371,16 @@ struct AmbientZenPlan: Sendable {
         var rng   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: walkIndex))
         let bodyEnd = Swift.max(4, totalBars - dials.outroBars)
 
+        // AMB-PADS-015 Big Ship Cycle: the cycle replaces the drift (it reads the walk stream,
+        // which only the drift reads otherwise).
+        if dials.cycle != .none, bodyEnd >= 16 {
+            var plan = AmbientZenPlan(dials: dials, key: key, tempo: tempo, totalBars: totalBars,
+                                      windows: cycleWindows(rng: &rng, dials: dials, key: key,
+                                                            bodyEnd: bodyEnd, totalBars: totalBars))
+            plan.swell = swellCurve(seed: seed, tempo: tempo, totalBars: totalBars, outroStartBar: plan.outroStartBar)
+            return plan
+        }
+
         // Window lengths first: the chord pace x random 0.7 to 1.3, in whole bars, at least 4.
         func drawLength() -> Int {
             let secs = dials.chordPaceSeconds * (0.7 + 0.6 * rng.nextDouble())
@@ -363,6 +441,53 @@ struct AmbientZenPlan: Sendable {
         var plan = AmbientZenPlan(dials: dials, key: key, tempo: tempo, totalBars: totalBars, windows: windows)
         plan.swell = swellCurve(seed: seed, tempo: tempo, totalBars: totalBars, outroStartBar: plan.outroStartBar)
         return plan
+    }
+
+    // MARK: - The Big Ship cycle
+
+    /// Bars per chord in the Big Ship cycle (Zack, 2026-11-09: 2 bars was too fast).
+    static let cycleChordBars = 4
+    /// The cycle's slots: A B T B A B T C, where 3 is the tonic, so the tonic comes round twice
+    /// and C turns the cycle round (Eno's The Big Ship: Am F C F Am F C G).
+    static let cycleSlots = [0, 1, 3, 1, 0, 1, 3, 2]
+
+    /// The Big Ship windows: A, B and C drawn from the chord table on the walk weights without
+    /// repeats or the tonic, then the cycle at 4 bars a chord. The body is a whole number of chord
+    /// pairs, so it always ends on B or C, each of which goes to T in the cycle itself; the
+    /// leftover bars join the outro's tonic.
+    static func cycleWindows(rng: inout SeededRNG, dials: AmbientZenDials, key: String,
+                             bodyEnd: Int, totalBars: Int) -> [ZenWindow] {
+        let table = chordTable(dials.mode)
+        let tonic = table[0]
+        var pool  = Array(table.dropFirst())
+        var picks: [ZenChord] = []
+        for _ in 0..<3 {
+            let total = pool.reduce(0) { $0 + $1.weight }
+            let chord = rng.pick(pool, weights: pool.map { $0.weight / total })
+            picks.append(chord)
+            pool.removeAll { $0.degree == chord.degree }
+        }
+        let chords = picks + [tonic]
+        let pair   = 2 * cycleChordBars
+        let body   = (bodyEnd / pair) * pair
+        var windows: [ZenWindow] = []
+        var start = 0, slot = 0
+        while start < body {
+            let c = chords[cycleSlots[slot % cycleSlots.count]]
+            windows.append(makeWindow(start: start, length: cycleChordBars, degree: c.degree, type: c.type,
+                                      key: key, mode: dials.mode))
+            start += cycleChordBars
+            slot  += 1
+        }
+        windows.append(makeWindow(start: start, length: Swift.max(1, totalBars - start),
+                                  degree: tonic.degree, type: tonic.type, key: key, mode: dials.mode))
+        return windows
+    }
+
+    /// The cycle in numerals for the Chords line: its eight chords, one pass.
+    var cycleNumerals: String {
+        windows.prefix(Self.cycleSlots.count).map { Self.numeral(degree: $0.degree, type: $0.type) }
+            .joined(separator: " ")
     }
 
     // MARK: - The swell (plan section 8)

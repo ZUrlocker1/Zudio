@@ -1334,3 +1334,12 @@ Fix: minor modes use minor third (+3 semitones) for the inflection note.
 Shaker ran 8th-note pulse at 70% bar hit rate ≈ 5.6 hits/bar; plus congas (75%), bongos (35%), maracas (25%).
 Total ≈ 7.8 notes/bar — far above ambient target of ≤1.5/bar.
 Fix: shaker → quarter-note at 30% bar/50% step rate (≈0.6/bar); congas 75%→45%; bongos 35%→20%; maracas 25%→15%.
+
+## Ideas for later: a more musical base Ambient
+
+Noted 2026-11-21, not built. Base Ambient should stay the still one and Zen the one that moves, so each idea keeps the drone character.
+- **More three-chord songs.** Make the modalDrift family (I, then two diatonic chords) more common than its current one roll in five.
+- **Loops that follow the chord.** Tiled loops copy fixed pitches across the song, which is safe only with one to three long chords. Snapping each tiled note to the chord window in force (as Zen's bells do) would let base Ambient carry more chord changes. Any faster harmony needs this first.
+- **A slow cycle, not Big Ship.** Big Ship's 4-bar chords suit Zen (AMB-PADS-015). A base form could repeat a short cycle of two to four chords at 16 bars or more a chord, once loops follow the chord.
+- **Airports 2/1 voices.** Dropped from Zen (2026-11-21) because base Ambient covers it; it could make base Ambient more musical instead. Some songs swap a phrase loop for single swelling notes, one pitch per voice on its own 16 to 32 s loop, so the chords come from whichever notes overlap. The pitch set is the tonic chord plus a 9th or 13th, never two notes a semitone apart.
+- **A guard on existing songs.** Any new form is drawn last, so existing base songs keep their fingerprints (tools/zen_fpcheck.sh).

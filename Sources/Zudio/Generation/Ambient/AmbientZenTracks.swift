@@ -23,6 +23,7 @@ enum AmbientZenTracks {
     /// pedal and bass stop 1 to 2 bars apart, in an order drawn per song (dials.endOffsets).
     static func pads(plan: AmbientZenPlan, rng: inout SeededRNG,
                      usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        if plan.dials.cycle == .block { return blockPads(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs) }
         usedRuleIDs.insert("AMB-PADS-011")
         let voicings  = padVoicings(plan: plan)
         let sps       = plan.stepsPerSecond
@@ -99,6 +100,49 @@ enum AmbientZenTracks {
             } else {
                 events.append(MIDIEvent(stepIndex: holdStart, note: UInt8(hold[v]), velocity: velocity(holdStart),
                                         durationSteps: endStep - holdStart))
+            }
+        }
+        return abutSamePitch(events)
+    }
+
+    // MARK: - Pads: AMB-PADS-015 Big Ship Block Chords
+
+    /// The Big Ship's pads (Eno, Another Green World): all four voices strike together on each
+    /// chord and hold it, on the same voicings as the breathing pads. A voice whose note the next
+    /// chord keeps holds on rather than striking again, so the common tones stay put and the rest
+    /// move by the smallest step. Then the held breath, as in AMB-PADS-011.
+    static func blockPads(plan: AmbientZenPlan, rng: inout SeededRNG,
+                          usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        usedRuleIDs.insert("AMB-PADS-015")
+        let voicings  = padVoicings(plan: plan)
+        let holdStart = plan.heldBreathStartBar * 16
+        let endStep   = plan.padsEndBar * 16
+        func velocity(_ step: Int) -> UInt8 {
+            let v = Double(50 + Int((40 * (0.6 + 0.4 * rng.nextDouble())).rounded()))
+            return UInt8(Swift.max(1, Swift.min(127, Int((v * (1 + 0.1 * plan.swell(atBar: step / 16))).rounded()))))
+        }
+        var events: [MIDIEvent] = []
+        var current: [Int?] = [nil, nil, nil, nil]   // each voice's sounding event, by index
+        // Each chord, then the held breath's voicing from holdStart to the end of the pads.
+        var chords: [(start: Int, end: Int, voicing: [Int])] = []
+        for (w, win) in plan.windows.enumerated() where win.startBar * 16 < holdStart {
+            chords.append((win.startBar * 16, Swift.min(win.endBar * 16, holdStart), voicings[w]))
+        }
+        chords.append((holdStart, endStep, voicings[voicings.count - 1]))
+        for chord in chords where chord.end > chord.start {
+            for v in 0..<4 {
+                // Every voice draws its velocity, held or struck, so the draws never shift.
+                let vel = velocity(chord.start)
+                if let i = current[v], Int(events[i].note) == chord.voicing[v],
+                   events[i].stepIndex + events[i].durationSteps == chord.start {
+                    let e = events[i]
+                    events[i] = MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity,
+                                          durationSteps: chord.end - e.stepIndex)
+                } else {
+                    current[v] = events.count
+                    events.append(MIDIEvent(stepIndex: chord.start, note: UInt8(chord.voicing[v]),
+                                            velocity: vel, durationSteps: chord.end - chord.start))
+                }
             }
         }
         return abutSamePitch(events)
@@ -293,7 +337,80 @@ enum AmbientZenTracks {
                 }
             }
         }
+        // A low bass (dials.bassLow) plays every note an octave down, MIDI 24 to 35 and its octave.
+        // The plan's clash reference stays at the usual octave: moving the bass 12 further from
+        // the pads and Texture (48 and up) can't make a new semitone or minor 9th against them.
+        let shift = plan.dials.bassShift
+        if shift != 0 {
+            events = events.map { MIDIEvent(stepIndex: $0.stepIndex, note: UInt8(Int($0.note) + shift),
+                                            velocity: $0.velocity, durationSteps: $0.durationSteps) }
+        }
         return abutSamePitch(events)
+    }
+
+    // MARK: - Drums: AMB-DRUM-005 Garden Pulse
+
+    /// AMB-1's pulse, very quiet, on the Brush Kit: a kick (36), closed hat (42) and open hat (46)
+    /// on Euclidean patterns of 16, 12 and 7 steps, 2, 2 and 1 hits (AMB-1's Garden), rotated 0, 2
+    /// and 3, each running on its own cycle so the three drift against each other. Each bar, AMB-1's
+    /// evolve: now and then a rest of 2 to 4 bars or a long one of 8 to 16, and now and then one pattern turns a step or
+    /// gains or loses a hit (within one of its home count). Velocity is AMB-1's, about 9 to 58.
+    /// The swell thins it: the open hat drops below a swell of 0 and the closed hat below -0.4,
+    /// so a sparse stretch is the kick alone. It plays from bar 4 to the pads' held breath.
+    static func gardenPulse(plan: AmbientZenPlan, rng: inout SeededRNG,
+                            usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        usedRuleIDs.insert("AMB-DRUM-005")
+        let notes: [UInt8] = [36, 42, 46]
+        let lengths  = [16, 12, 7]
+        let home     = [2, 2, 1]
+        var hits     = home
+        var rotation = [0, 2, 3]
+        func euclid(_ k: Int, _ n: Int, _ i: Int) -> Bool { k > 0 && (i * k) % n < k }
+
+        let startBar = 4
+        let endBar   = plan.heldBreathStartBar
+        var restLeft = 0
+        var events: [MIDIEvent] = []
+        for bar in startBar..<Swift.max(startBar, endBar) {
+            // AMB-1's per-bar evolve, with r = restlessness.
+            let r = plan.dials.restlessness
+            if restLeft > 0 {
+                restLeft -= 1
+            } else if rng.nextDouble() < 0.02 * r {
+                // Half the rests are AMB-1's 2 to 4 bars, half a long passage of 8 to 16 (Zack, 2026-11-21).
+                restLeft = rng.nextDouble() < 0.5 ? 2 + rng.nextInt(upperBound: 3) : 8 + rng.nextInt(upperBound: 9)
+            }
+            if rng.nextDouble() < 0.25 * r {
+                let p = rng.nextInt(upperBound: 3)
+                if rng.nextDouble() < 0.5 {
+                    rotation[p] = (rotation[p] + (rng.nextDouble() < 0.5 ? 1 : lengths[p] - 1)) % lengths[p]
+                } else {
+                    let up = rng.nextDouble() < 0.5
+                    let n  = hits[p] + (up ? 1 : -1)
+                    if n >= Swift.max(1, home[p] - 1) && n <= Swift.min(lengths[p], home[p] + 1) { hits[p] = n }
+                }
+            }
+            let resting = restLeft > 0
+            let swell   = plan.swell(atBar: bar)
+            let arc     = Swift.max(0.3, Swift.min(1.15, 1 + 1.3 * swell))
+            for s in 0..<16 {
+                let step = bar * 16 + s
+                for p in 0..<3 {
+                    // Cycle position from the pulse's start, so each pattern keeps its own period.
+                    let i = ((step - startBar * 16) + rotation[p]) % lengths[p]
+                    guard euclid(hits[p], lengths[p], i) else { continue }
+                    // Every hit draws its velocity, sounding or not, so a rest or a thinned hat
+                    // doesn't shift the draws after it.
+                    let level = (i == 0 ? 0.95 : 0.6) + 0.25 * rng.nextDouble()
+                    if resting { continue }
+                    if p == 2 && swell < 0 { continue }
+                    if p == 1 && swell < -0.4 { continue }
+                    let vel = Swift.max(1, Int((level * arc * 50).rounded()))
+                    events.append(MIDIEvent(stepIndex: step, note: notes[p], velocity: UInt8(vel), durationSteps: 2))
+                }
+            }
+        }
+        return events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
     }
 
     // MARK: - Joins

@@ -61,17 +61,32 @@ enum AmbientZenLoops {
             var rng = SeededRNG(seed: seed)
             var used: Set<String> = []
             let force = seeds[t] != nil
+            let density = seeds[t].map { regenBellDensity(seed: $0) } ?? plan.dials.bellDensity
             switch t {
             case kTrackLead1:
-                tracks[t] = lead1(plan: plan, band: tracks, rng: &rng, usedRuleIDs: &used)
+                tracks[t] = lead1(plan: plan, band: tracks, density: density, rng: &rng, usedRuleIDs: &used)
             case kTrackLead2:
-                tracks[t] = lead2(plan: plan, band: tracks, forcePlay: force, rng: &rng, usedRuleIDs: &used)
+                tracks[t] = lead2(plan: plan, band: tracks, forcePlay: force, density: density,
+                                  rng: &rng, usedRuleIDs: &used)
             default:
                 tracks[t] = rhythm(plan: plan, band: tracks, forcePlay: force, rng: &rng, usedRuleIDs: &used)
             }
             rules[t] = used
         }
         return rules
+    }
+
+    /// A regenerated Lead 1 or Lead 2 re-rolls its bell density (30, 45 or 60, so it can thin or
+    /// fill), from its own seed on a separate stream, so a reload replays it and the loop's own
+    /// draws don't move (Zack, 2026-11-21). Rhythm keeps the song's dial.
+    static func regenBellDensity(seed: UInt64) -> Int {
+        var rng = SeededRNG(seed: seed ^ 0xBE11_DE45)
+        return [30, 45, 60][rng.nextInt(upperBound: 3)]
+    }
+
+    /// The density in the Zen line's words: sparse, medium or full.
+    static func densityWord(_ density: Int) -> String {
+        density <= 30 ? "sparse" : density <= 45 ? "medium" : "full"
     }
 
     /// The bed and the bells already written that a bell track must keep clear of.
@@ -84,24 +99,26 @@ enum AmbientZenLoops {
 
     /// AMB-LD1-011 Airports 1/1 Loop, every Zen song. Enters at bar 2 to 4 and leaves at the
     /// pads' held breath, last of the three.
-    static func lead1(plan: AmbientZenPlan, band: [[MIDIEvent]], rng: inout SeededRNG,
+    static func lead1(plan: AmbientZenPlan, band: [[MIDIEvent]], density: Int, rng: inout SeededRNG,
                       usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
         usedRuleIDs.insert("AMB-LD1-011")
-        let entry = 2 + rng.nextInt(upperBound: 3)
-        return loop(lead1Spec, plan: plan, entryBar: entry, endBar: exitBars(plan).lead1,
+        let drawn = 2 + rng.nextInt(upperBound: 3)
+        let entry = plan.dials.cycle != .none ? cycleEntry(plan, half: 1, fallback: drawn, exit: exitBars(plan).lead1) : drawn
+        return loop(lead1Spec, plan: plan, density: density, entryBar: entry, endBar: exitBars(plan).lead1,
                     others: neighbours(band, for: kTrackLead1), skipOnsets: [], rng: &rng)
     }
 
     /// AMB-LD2-014 Airports 1/2 Answer (0.85), softer, dropping any note on a beat where Lead 1
     /// strikes. Otherwise AMB-LD2-000 No lead 2. Enters at bar 6 to 8, leaves 4 bars before Lead 1.
-    static func lead2(plan: AmbientZenPlan, band: [[MIDIEvent]], forcePlay: Bool, rng: inout SeededRNG,
-                      usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+    static func lead2(plan: AmbientZenPlan, band: [[MIDIEvent]], forcePlay: Bool, density: Int,
+                      rng: inout SeededRNG, usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
         let plays = rng.nextDouble() < 0.85 || forcePlay
         guard plays else { usedRuleIDs.insert("AMB-LD2-000"); return [] }
         usedRuleIDs.insert("AMB-LD2-014")
-        let entry = 6 + rng.nextInt(upperBound: 3)
+        let drawn = 6 + rng.nextInt(upperBound: 3)
+        let entry = plan.dials.cycle != .none ? cycleEntry(plan, half: 2, fallback: drawn, exit: exitBars(plan).lead2) : drawn
         let lead1Onsets = Set(band[kTrackLead1].map { $0.stepIndex })
-        return loop(lead2Spec, plan: plan, entryBar: entry, endBar: exitBars(plan).lead2,
+        return loop(lead2Spec, plan: plan, density: density, entryBar: entry, endBar: exitBars(plan).lead2,
                     others: neighbours(band, for: kTrackLead2), skipOnsets: lead1Onsets, rng: &rng)
     }
 
@@ -112,8 +129,18 @@ enum AmbientZenLoops {
         let plays = rng.nextDouble() < 0.80 || forcePlay
         guard plays else { usedRuleIDs.insert("AMB-RTHM-000"); return [] }
         usedRuleIDs.insert("AMB-RTHM-007")
-        return loop(rhythmSpec, plan: plan, entryBar: 9, endBar: exitBars(plan).rhythm,
+        let entry = plan.dials.cycle != .none ? cycleEntry(plan, half: 3, fallback: 9, exit: exitBars(plan).rhythm) : 9
+        return loop(rhythmSpec, plan: plan, density: plan.dials.bellDensity, entryBar: entry, endBar: exitBars(plan).rhythm,
                     others: neighbours(band, for: kTrackRhythm), skipOnsets: [], rng: &rng)
+    }
+
+    /// A Big Ship song's layers come in by addition at half-cycles (16 bars): Lead 1 at the first,
+    /// Lead 2 at the second, Rhythm at the third. A layer whose half-cycle leaves it under 12 bars
+    /// before its exit comes in at the latest half-cycle that does, or at its usual bar.
+    static func cycleEntry(_ plan: AmbientZenPlan, half: Int, fallback: Int, exit: Int) -> Int {
+        let halfBars = 4 * AmbientZenPlan.cycleChordBars
+        for h in stride(from: half, through: 1, by: -1) where exit - h * halfBars >= 12 { return h * halfBars }
+        return fallback
     }
 
     /// The bars the bells stop at, in reverse order of entry: Lead 1 at the pads' held breath,
@@ -132,7 +159,7 @@ enum AmbientZenLoops {
     }
 
     /// One bell loop walked pass by pass from `entryBar` until `endBar`.
-    static func loop(_ spec: Spec, plan: AmbientZenPlan, entryBar: Int, endBar: Int,
+    static func loop(_ spec: Spec, plan: AmbientZenPlan, density: Int, entryBar: Int, endBar: Int,
                      others: [MIDIEvent], skipOnsets: Set<Int>, rng: inout SeededRNG) -> [MIDIEvent] {
         let startStep = entryBar * 16
         let endStep   = endBar * 16
@@ -174,7 +201,7 @@ enum AmbientZenLoops {
             let swell = plan.swell(atBar: bar)
 
             // 1. Add or remove notes to meet the target.
-            let raw    = Double(plan.dials.bellDensity) * 0.05 * (1 + 0.8 * swell)
+            let raw    = Double(density) * 0.05 * (1 + 0.8 * swell)
             let target = Swift.max(spec.minCount, Swift.min(spec.maxCount,
                              Int((Swift.max(0, Swift.min(5, raw)) + rng.nextDouble()).rounded(.down))))
             var filled = slots.indices.filter { slots[$0] != nil }
@@ -259,16 +286,16 @@ enum AmbientZenLoops {
         let w = plan.windows[plan.windowIndex(atBar: step / 16)]
         var k = offset
         if !isChordStep(k) {
-            let pc = pitch(k, window: w, plan: plan, base: spec.baseNote) % 12
+            let pc = pitch(k, window: w, plan: plan, base: spec.baseNote + plan.dials.bellShift) % 12
             let strong = step % 16 == 0 || step % 16 == 8
             if spec.chordTonesOnly || strong || !w.safeTensions.contains(pc) { k -= 1 }
         }
-        let p = pitch(k, window: w, plan: plan, base: spec.baseNote)
+        let p = pitch(k, window: w, plan: plan, base: spec.baseNote + plan.dials.bellShift)
         if !rubs(p) { return p }
         // The nearest chord tones either side, within an octave and a half.
         let candidates = stride(from: k - 6, through: k + 10, by: 1)
             .filter { isChordStep($0) && $0 != k }
-            .map { pitch($0, window: w, plan: plan, base: spec.baseNote) }
+            .map { pitch($0, window: w, plan: plan, base: spec.baseNote + plan.dials.bellShift) }
             .filter { $0 != p }
             .sorted { (abs($0 - p), $0) < (abs($1 - p), $1) }
         return candidates.first { !rubs($0) }

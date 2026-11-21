@@ -158,7 +158,15 @@ final class PlaybackEngine: ObservableObject {
     private let zenDelayLowpass: [Float]  = [2600, 2600, 1800, 2600, 1800, -1,  -1,  -1]
     private let zenDelayBeats:   [Double] = [2.0,  1.5,  2.0,  1.5,  2.0,  1.0, 1.0, 1.0]
     /// The Ambient delay wet table in force: Zen's in an Ambient Zen song.
-    private var ambientDelayWetTable: [Float] { cachedIsAmbientZen ? zenDelayWet : ambientDelayWet }
+    /// A deep or dry echo moves the bells' wet mix (Lead 1, Lead 2, Rhythm) 15 points either way.
+    private var ambientDelayWetTable: [Float] {
+        guard cachedIsAmbientZen else { return ambientDelayWet }
+        let shift = songState.map { AmbientZenDials.draw(seed: $0.globalSeed).bellEchoWetShift } ?? 0
+        guard shift != 0 else { return zenDelayWet }
+        var table = zenDelayWet
+        for t in [kTrackLead1, kTrackLead2, kTrackRhythm] where t < table.count && table[t] >= 0 { table[t] += shift }
+        return table
+    }
 
     // Per-track base volumes — persisted so applyMuteState restores the right level, not 1.0
     private var trackBaseVolume = Array(repeating: Float(1.0), count: kTrackCount)

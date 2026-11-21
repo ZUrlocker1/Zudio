@@ -2795,15 +2795,10 @@ final class AppState: ObservableObject {
                 case kTrackPads:
                     let colour = state.map { AmbientZenDials.draw(seed: $0.globalSeed).padColour } ?? .rhodes
                     return (colour == .rhodes ? [4, 2, 5, 6, 7, 8] : [9, 10, 11]).filter { $0 < poolCount }
-                // Texture: Tonewheel [5], Solar Wind Swell [8] and Sine Swell [9], 17 entries each (85
-                // percent), then the voices Choir Aahs [2] (5) and Space Voice [7] (4), 15 percent in
-                // all. Synth Voice [6] is out (Zack, 2026-11-21: a voice on Texture is a wall of sound). Zack, 2026-11-20: choir only on
-                // the pedal, no MIDI patch repeats across Zen tracks (Warm Pad and Bowed Glass are
-                // on Pads, Sine Wave moved here from Bass, Polysynth Swell moved to Bass), synth only.
-                case kTrackTexture:
-                    return (Array(repeating: 5, count: 17) + Array(repeating: 8, count: 17)
-                            + Array(repeating: 9, count: 17) + Array(repeating: 2, count: 5)
-                            + Array(repeating: 7, count: 4)).filter { $0 < poolCount }
+                // Texture: Tonewheel [5], Synth Voice [6], Space Voice [7], Solar Wind Swell [8] and
+                // Sine Swell [9], equal weights: the two voices don't sound too much like voices.
+                // No Choir Aahs [2] in Zen picks; the picker offers the whole pool, as in every style (Zack, 2026-11-21).
+                case kTrackTexture: return [5, 6, 7, 8, 9].filter { $0 < poolCount }
                 // Bass, all synth and all long-sustaining: Synth Bass 101 [5] and the swell copies Saw
                 // Bass [6], Brass [7], Pulse Bass [8], Lead Bass [9], Synth Bass 3 [10] and Polysynth [11]. No Voice
                 // Oohs (choir is pedal only), no Cello (base Ambient's), no Sine Wave (now the pedal's
@@ -2823,6 +2818,8 @@ final class AppState: ObservableObject {
                 // Rhythm: Glockenspiel [0], Celesta [1], Tinker Bell [4], Synth Chime [8], Christmas
                 // Bells [9] (2026-11-21, to audition beside Lead 2's).
                 case kTrackRhythm:  return [0, 1, 4, 8, 9].filter { $0 < poolCount }
+                // Drums: AMB-DRUM-005 Garden Pulse plays on the Brush Kit [1] (2026-11-21).
+                case kTrackDrums:   return [1].filter { $0 < poolCount }
                 default: break
                 }
             }
@@ -3068,7 +3065,26 @@ final class AppState: ObservableObject {
         evolvePhaseToken        += 1   // ensure scrollbar recreates even if next song has same totalBars
     }
 
-    /// Switches each fresh track to a different instrument and sends a program change immediately.
+    /// Switches the fresh tracks' instruments and logs the pass, each Instrument line under its
+    /// track's ⚡ REGEN line and above its rules, as a manual regen logs (Zack, 2026-11-21).
+    private func switchEvolveInstrumentsAndLog(freshTracks: [Int], pass: SongState) {
+        let lines = switchEvolveInstruments(freshTracks: freshTracks, pass: pass)
+        var merged: [GenerationLogEntry] = []
+        var placed = Set<Int>()
+        for entry in pass.generationLog {
+            merged.append(entry)
+            guard entry.tag == "⚡ REGEN" else { continue }
+            for (track, line) in lines where !placed.contains(track)
+                && track < kTrackNames.count && kTrackNames[track] == entry.description {
+                merged.append(line)
+                placed.insert(track)
+            }
+        }
+        appendToLog(merged + lines.filter { !placed.contains($0.0) }.map(\.1))
+    }
+
+    /// Switches each fresh track to a different instrument and sends a program change immediately,
+    /// returning the Instrument lines in track order for the caller to log.
     /// Chill's leads take the instruments `pass` was generated for; every other track draws from
     /// its substyle's own pick list.
     ///
@@ -3076,11 +3092,11 @@ final class AppState: ObservableObject {
     /// superset of all three forms (2026-10-13), that put Recorder, Flute and Synth Brass on the
     /// leads of a Blues song, a Sweep Pad and a Jazz Guitar in its pass 2, and played leads
     /// written for an alto sax's register on whatever patch was drawn.
-    private func switchEvolveInstruments(freshTracks: [Int], pass: SongState) {
-        guard let anchor = evolveAnchorState else { return }
+    private func switchEvolveInstruments(freshTracks: [Int], pass: SongState) -> [(Int, GenerationLogEntry)] {
+        guard let anchor = evolveAnchorState else { return [] }
         let style = anchor.style
         let isSoho = anchor.chillSohoVariation
-        var entries: [GenerationLogEntry] = []
+        var entries: [(Int, GenerationLogEntry)] = []
         for trackIndex in freshTracks {
             let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
             guard programs.count > 1 else { continue }
@@ -3098,13 +3114,12 @@ final class AppState: ObservableObject {
             let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
             let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
             let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
-            entries.append(GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false))
+            entries.append((trackIndex, GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)",
+                                                           isTitle: false)))
         }
         instrumentChangeToken += 1
-        if !entries.isEmpty {
-            appendToLog(entries)
-            evolveInstrumentsChanged = true
-        }
+        if !entries.isEmpty { evolveInstrumentsChanged = true }
+        return entries
     }
 
     /// A random pool index for `trackIndex` from the substyle's own pick list for `song`, other
@@ -3603,8 +3618,7 @@ final class AppState: ObservableObject {
                 description: "Shifting to \(anchor.frame.key) \(comp.rawValue) (\(evolvePass1Bars) bars)",
                 isTitle: false)])
         } else {
-            switchEvolveInstruments(freshTracks: [kTrackLead1, kTrackLead2], pass: pass1)
-            appendToLog(pass1.generationLog)
+            switchEvolveInstrumentsAndLog(freshTracks: [kTrackLead1, kTrackLead2], pass: pass1)
         }
     }
 
@@ -3633,8 +3647,7 @@ final class AppState: ObservableObject {
                 description: "Back to \(anchor.frame.key) \(anchor.frame.mode.rawValue) (\(evolvePass2Bars) bars)",
                 isTitle: false)])
         } else {
-            switchEvolveInstruments(freshTracks: [kTrackPads, kTrackRhythm], pass: pass2)
-            appendToLog(pass2.generationLog)
+            switchEvolveInstrumentsAndLog(freshTracks: [kTrackPads, kTrackRhythm], pass: pass2)
         }
     }
 
