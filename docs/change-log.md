@@ -8,6 +8,8 @@
 
 - **Ambient Zen, phase 2: the bells and the swell** — (2026-11-21, build 139) Three bell loops of 13, 17 and 23 beats phase against each other over the bed (AMB-LD1-011, AMB-LD2-014, AMB-RTHM-007), and a slow swell makes them sparser or fuller over the song. Zen follows the normal Evolve passes. Testing shares are temporary: Zen 80 percent of Ambient songs.
 
+- **Ambient Zen titles** — (2026-11-21, build 139) Zen songs get their own short titles, gentle jokes on Eno and air travel: "Music for Rebooking", "Thursday Nap", "United Delay 2/1", "1/1 (Decaf)".
+
 - **"Chords F" fixed in the log** — (2026-11-21, build 139) A Chords line in the key of F was mistaken for the old "F " fix marker. The marker is gone.
 
 - **Ambient Lead 1 no-repeat fix** — (2026-11-21, build 139) Stereo Piano and Ocarina can no longer play Lead 1 in two Ambient songs running.

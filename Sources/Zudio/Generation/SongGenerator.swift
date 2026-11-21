@@ -1642,7 +1642,8 @@ struct SongGenerator {
             tonalMap  = TonalGovernanceBuilder.build(frame: frame, structure: structure)
         }
 
-        let title = AmbientTitleGenerator.generate(rng: &rng)
+        // Zen's own Eno-joke titles (Zack, 2026-11-21); the last draw, so no note depends on it.
+        let title = AmbientZenTitleGenerator.generate(rng: &rng)
         let log = buildAmbientZenLog(title: title, seed: seed, frame: frame, structure: structure, plan: plan,
                                      rulesByTrack: [kTrackLead1: bellRules[kTrackLead1] ?? [],
                                                     kTrackLead2: bellRules[kTrackLead2] ?? [],

@@ -11,8 +11,11 @@ struct SongLogExporter {
 
     /// Writes a temp .zudio file and returns its URL for sharing (nil on failure).
     static func shareURL(for song: SongState) -> URL? {
+        // A "/" or ":" in a title (Ambient Zen's "Gate 1/1") would make a path, not a file name.
+        let stem = song.title.replacingOccurrences(of: "/", with: "-")
+                             .replacingOccurrences(of: ":", with: "-")
         let tmpBase = FileManager.default.temporaryDirectory
-            .appendingPathComponent(song.title)
+            .appendingPathComponent(stem)
             .appendingPathExtension("midi")
         try? export(song, midiURL: tmpBase)
         let shareURL = tmpBase.deletingPathExtension().appendingPathExtension("zudio")

@@ -633,3 +633,95 @@ struct AmbientTitleGenerator {
         },
     ]
 }
+
+// MARK: - Ambient Zen titles
+
+/// Ambient Zen's own titles: gentle jokes on Brian Eno's ambient work, with extra airport humour
+/// because Zack often plays Zudio while travelling (2026-11-21). Four families:
+///   1. Music for [somewhere]  — Music for Layovers, Music for Rebooking
+///   2. Eno spoofs             — Thursday Nap, Another Beige Room, Neroli Ravioli
+///   3. Place + fraction       — Gate 1/1, United Delay 2/1, 1/1 (Decaf), after Airports' 1/1
+///   4. Oblique Strategies     — Honor Thy Nap, Gardening, Not Art
+/// Every title is at most `maxLength` characters so it isn't truncated. The title is the last
+/// draw on the song's main stream, so no note depends on it.
+struct AmbientZenTitleGenerator {
+
+    static let maxLength = 19
+
+    static func generate(rng: inout SeededRNG) -> String {
+        let roll = rng.nextDouble()
+        let title: String
+        if roll < 0.30 {
+            title = "Music for " + pick(musicForPlaces, &rng)
+        } else if roll < 0.65 {
+            title = pick(spoofs, &rng)
+        } else if roll < 0.85 {
+            if rng.nextDouble() < 0.12 {
+                title = pick(fractionSpecials, &rng)
+            } else {
+                title = pick(fractionPlaces, &rng) + " " + pick(fractions, &rng)
+            }
+        } else {
+            title = pick(obliqueTwists, &rng)
+        }
+        return title.count <= maxLength ? title : "Music for Layovers"
+    }
+
+    private static func pick(_ list: [String], _ rng: inout SeededRNG) -> String {
+        list[rng.nextInt(upperBound: list.count)]
+    }
+
+    // 1. After Music for Airports. Each fits "Music for " + place in 19 characters (place <= 9).
+    static let musicForPlaces = [
+        "Carports", "Layovers", "Lobbies", "Gate 23", "Elevators", "Dentists", "Baggage",
+        "Naps", "Hold", "Parking", "Delays", "Rebooking", "Standby", "Upgrades", "Gate C17",
+        "Seat 23C", "Seat 37E", "Boarding", "Tarmacs", "Red-Eyes", "TSA Lines", "Jet Lag",
+        "Group 9", "Customs", "Carousels", "Gate B12", "Group 5", "Pre-Check",
+    ]
+
+    // 2. One Eno title bent each.
+    static let spoofs = [
+        "Discreet Snacks",      // Discreet Music
+        "Thursday Nap",         // Thursday Afternoon
+        "Another Beige Room",   // Another Green World
+        "Before & After Tea",   // Before and After Science
+        "On Hold",              // On Land
+        "Taking Tiger Naps",    // Taking Tiger Mountain
+        "Here Come the Naps",   // Here Come the Warm Jets
+        "Plateaux of Mild",     // The Plateaux of Mirror
+        "Lux Lite",             // Lux
+        "Apollo Snooze",        // Apollo
+        "Oat Milk Sea",         // Small Craft on a Milk Sea
+        "The Pearl Barley",     // The Pearl
+        "Big Ship, Small Tub",  // Big Ship
+        "Ascent (Escalator)",   // An Ending (Ascent)
+        "Dunwich Beach Towel",  // Dunwich Beach, Autumn, 1960
+        "Neroli Ravioli",       // Neroli
+        "Ambient 1½",           // Ambient 1
+        "Reflection (Glare)",   // Reflection
+        "By This Carousel",     // By This River
+        "Under Fluorescents",   // Under Stars
+        "Lantern Mall",         // Lantern Marsh
+        "Fickle Wi-Fi",         // Fickle Sun
+        "Music for Thinkpads",  // Music for Thinking
+    ].filter { $0.count <= maxLength }
+
+    // 3. After Music for Airports' 1/1, 1/2, 2/1 and 2/2.
+    static let fractionPlaces = [
+        "Gate", "Lounge", "Carport", "Terminal", "Car Wash", "Baggage", "Security", "Layover",
+        "Tarmac", "Jet Bridge", "Concourse B", "Seat 23C", "FAA Shutdown", "United Delay",
+        "Delta Delay", "Premier 1K", "Cancelled", "Rebooked", "Gate Change", "Standby",
+        "Boarding", "Red-Eye", "Upgrade List", "Diverted", "Holding",
+    ]
+    static let fractions = ["1/1", "1/2", "2/1", "2/2"]
+    static let fractionSpecials = [
+        "1/1 (Decaf)", "2/1 (Oat Milk)", "1/2 (Half-Caf)", "2/2 (Gate Lice)", "1/1 (Delayed)",
+    ]
+
+    // 4. Oblique Strategies, Eno and Peter Schmidt's card deck, and Eno's sayings.
+    static let obliqueTwists = [
+        "Honor Thy Nap", "Use an Old Idea", "Do Nothing Longer", "Gardening, Not Art",
+        "Emphasise the Naps", "Repetition Is Fine", "Ask Your Body", "Remove Ambiguities",
+        "Only One Element", "Water", "Discard an Axiom", "Go Slowly All Over",
+    ].filter { $0.count <= maxLength }
+}

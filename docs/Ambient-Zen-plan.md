@@ -276,6 +276,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 
 ## 11. The log
 
+- **Title:** Zen has its own titles (AmbientZenTitleGenerator, in AmbientTitleGenerator.swift), gentle jokes on Eno with extra airport humour, at most 19 characters: "Music for Layovers" (30 percent), Eno spoofs such as "Thursday Nap" or "Neroli Ravioli" (35), place plus fraction such as "United Delay 2/1" or "1/1 (Decaf)" (20), and Oblique Strategies twists such as "Honor Thy Nap" (15). The title is the last draw, so no note depends on it.
 - **Style:** "Ambient Zen – 72 bpm, 9 bar outro". There is no Form line, since every song is A and an outro.
 - **Chords:** key, mode, pace and the way home, for example "G Dorian quick 7th chords drifting, home via IV7", or "home on I" when the last body chord is the tonic. The pace reads quick (under 37 s), steady (under 49 s) or slow.
 - **Zen:** "Breaths: long, Echo: medium, Bells: sparse, Drift: calm, Swell: deep". The pad colour isn't named, because the Instruments line shows the pads.
