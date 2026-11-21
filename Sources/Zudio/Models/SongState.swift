@@ -28,22 +28,21 @@ struct GenerationLogEntry: Sendable {
         // Motorik Noir Lead 1 from transcriptions (2026-11-14): No Birds turn, Tear Us Apart hook,
         // Transmission figure, Albatross guitar.
         "MOT-LD1-011", "MOT-LD1-012", "MOT-LD1-013", "MOT-LD1-014",
+        // Ambient Zen phase 1 (2026-11-20): the bed.
+        "AMB-PADS-011", "AMB-TEXT-012", "AMB-BASS-007", "AMB-BASS-008",
+        // Ambient Zen phase 2 (2026-11-20): the bells.
+        "AMB-LD1-011", "AMB-LD2-014", "AMB-RTHM-007",
     ]
 
-    /// TESTING ONLY. Existing rules changed to stop clashing with the band (docs/clash-fix.md),
-    /// marked with "F " instead of "* " so Zack can tell a fix from a new rule. Emptied on
-    /// 2026-11-15 (Zack); the "* " marks stay.
-    static let fixMarkedRules: Set<String> = []
-
-    /// The testing markers a description can start with.
-    static let testingMarkers = ["* ", "F "]
+    /// The testing markers a description can start with. The "F " fix marker is gone (Zack,
+    /// 2026-11-21): a Chords line in F ("F Lydian ...") read as one, and the key moved up beside
+    /// the tag. Mark a rule only when Zack asks.
+    static let testingMarkers = ["* "]
 
     init(tag: String, description: String, isTitle: Bool = false) {
         self.tag = tag
         let marked = Self.testingMarkers.contains { description.hasPrefix($0) }
-        if !marked, Self.fixMarkedRules.contains(tag) {
-            self.description = "F " + description
-        } else if !marked, Self.testingMarkedRules.contains(tag) {
+        if !marked, Self.testingMarkedRules.contains(tag) {
             self.description = "* " + description
         } else {
             self.description = description
@@ -146,6 +145,9 @@ struct SongState: Sendable {
     let isAmbientPiano: Bool
     /// Ambient Piano rule selected at generation time. "AMB-PNO-001" / "AMB-PNO-002" / "AMB-PNO-003"; "" otherwise.
     let ambientPianoRule: String
+    /// Ambient-only: true when the Ambient Zen sub-style is active (AMB-1 / Music for Airports
+    /// homage: breathing pads over a moving chord journey). See docs/Ambient-Zen-plan.md.
+    let isAmbientZen: Bool
     /// Chill-only: audio texture filename selected at generation time (nil = no texture).
     let chillAudioTexture: String?
     /// Chill-only: playback start offset in seconds (0, 15, 30, or 45) for audio texture.
@@ -179,6 +181,7 @@ struct SongState: Sendable {
     /// (e.g. "Chill Blues" instead of "Chill"). Add new substyle cases here as they are implemented.
     var displayStyleName: String {
         if isAmbientPiano { return "Ambient Piano" }
+        if isAmbientZen { return "Ambient Zen" }
         if chillBluesVariation { return "Chill Blues" }
         if chillSohoVariation { return "Chill Soho" }
         if motorikNoirVariation { return "Motorik Noir" }
@@ -242,6 +245,7 @@ struct SongState: Sendable {
         isKosmicSpace: Bool = false,
         isAmbientPiano: Bool = false,
         ambientPianoRule: String = "",
+        isAmbientZen: Bool = false,
         chillAudioTexture: String? = nil,
         chillAudioTextureOffset: Int = 0,
         ambientAudioTexture: String? = nil,
@@ -286,6 +290,7 @@ struct SongState: Sendable {
         self.isKosmicSpace           = isKosmicSpace
         self.isAmbientPiano          = isAmbientPiano
         self.ambientPianoRule        = ambientPianoRule
+        self.isAmbientZen            = isAmbientZen
         self.chillAudioTexture        = chillAudioTexture
         self.chillAudioTextureOffset  = chillAudioTextureOffset
         self.ambientAudioTexture      = ambientAudioTexture
@@ -328,6 +333,7 @@ struct SongState: Sendable {
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  isAmbientZen: isAmbientZen,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -357,6 +363,7 @@ struct SongState: Sendable {
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  isAmbientZen: isAmbientZen,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -386,6 +393,7 @@ struct SongState: Sendable {
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  isAmbientZen: isAmbientZen,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: texture, ambientAudioTextureOffset: offset,
                   forcedRules: forcedRules,
@@ -415,6 +423,7 @@ struct SongState: Sendable {
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  isAmbientZen: isAmbientZen,
                   chillAudioTexture: texture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -456,6 +465,7 @@ struct SongState: Sendable {
                   isKosmicDrift: anchor.isKosmicDrift, isDriftDreamscape: anchor.isDriftDreamscape,
                   isKosmicSpace: anchor.isKosmicSpace,
                   isAmbientPiano: anchor.isAmbientPiano, ambientPianoRule: anchor.ambientPianoRule,
+                  isAmbientZen: anchor.isAmbientZen,
                   chillAudioTexture: anchor.chillAudioTexture,
                   chillAudioTextureOffset: anchor.chillAudioTextureOffset,
                   ambientAudioTexture: anchor.ambientAudioTexture,
@@ -492,6 +502,7 @@ struct SongState: Sendable {
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  isAmbientZen: isAmbientZen,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -534,6 +545,7 @@ struct SongState: Sendable {
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             isKosmicSpace: isKosmicSpace,
             isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  isAmbientZen: isAmbientZen,
             chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
             ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
             forcedRules: forcedRules,

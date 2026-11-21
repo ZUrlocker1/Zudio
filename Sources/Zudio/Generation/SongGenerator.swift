@@ -34,7 +34,8 @@ struct SongGenerator {
         forceBluesVariation:  Bool    = false,
         forceSohoVariation:   Bool    = false,
         forbidSohoVariation:  Bool    = false,
-        forceAmbientPianoRule: String? = nil
+        forceAmbientPianoRule: String? = nil,
+        forceAmbientZen:      Bool    = false
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
@@ -48,7 +49,8 @@ struct SongGenerator {
                         forceBluesVariation: forceBluesVariation,
                         forceSohoVariation: forceSohoVariation,
                         forbidSohoVariation: forbidSohoVariation,
-                        forceAmbientPianoRule: forceAmbientPianoRule)
+                        forceAmbientPianoRule: forceAmbientPianoRule,
+                        forceAmbientZen: forceAmbientZen)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
@@ -70,7 +72,8 @@ struct SongGenerator {
         forceBluesVariation:  Bool    = false,
         forceSohoVariation:   Bool    = false,
         forbidSohoVariation:  Bool    = false,
-        forceAmbientPianoRule: String? = nil
+        forceAmbientPianoRule: String? = nil,
+        forceAmbientZen:      Bool    = false
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -95,7 +98,8 @@ struct SongGenerator {
                                    forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
                                    forceBridge: forceBridge,
                                    useBrushKit: useBrushKit,
-                                   forceAmbientPianoRule: forceAmbientPianoRule)
+                                   forceAmbientPianoRule: forceAmbientPianoRule,
+                                   forceAmbientZen: forceAmbientZen)
         case .chill:
             return ChillBassSlides.annotated(generateChill(
                                  seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
@@ -948,6 +952,13 @@ struct SongGenerator {
 
     // MARK: - Ambient generation path
 
+    // Ambient substyle shares. TEMPORARY testing shares while Ambient Zen is tuned (Zack,
+    // 2026-11-09): Piano 10, base Ambient 10, Zen 80, so Piano is pianoRoll < 0.10 and Zen takes
+    // 0.889 of the rest. RELEASE values: ambientPianoShare = 0.35 and ambientZenShare = 0.46
+    // (Piano 35, Zen about 30, base about 35). Put these back before the App Store.
+    static let ambientPianoShare = 0.10
+    static let ambientZenShare   = 0.889
+
     private static func generateAmbient(
         seed: UInt64,
         keyOverride: String? = nil,
@@ -961,7 +972,8 @@ struct SongGenerator {
         forcePercussionStyle:  PercussionStyle? = nil,
         forceBridge:           Bool    = false,
         useBrushKit:           Bool    = false,
-        forceAmbientPianoRule: String? = nil
+        forceAmbientPianoRule: String? = nil,
+        forceAmbientZen:      Bool    = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -969,7 +981,15 @@ struct SongGenerator {
         // pianoRuleRoll is consumed regardless so non-piano songs produce the same frame as before.
         let pianoRoll     = rng.nextDouble()
         let pianoRuleRoll = rng.nextDouble()
-        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.35
+        // Ambient Zen reuses pianoRuleRoll, which only Piano songs read, so no new draw enters the
+        // shared prefix and base Ambient and Ambient Piano songs keep their seeds. A saved Zen song
+        // forces Zen on reload, so it stays Zen whatever the shares are then.
+        let isAmbientPiano = !forceAmbientZen
+            && (forceAmbientPianoRule != nil || pianoRoll < Self.ambientPianoShare)
+        if forceAmbientZen || (!isAmbientPiano && pianoRuleRoll < Self.ambientZenShare) {
+            return generateAmbientZen(seed: seed, rng: &rng, keyOverride: keyOverride,
+                                      tempoOverride: tempoOverride, moodOverride: moodOverride)
+        }
         let pianoRule: String = {
             if let f = forceAmbientPianoRule { return f }
             return pianoRuleRoll < 0.35 ? "AMB-PNO-001" : (pianoRuleRoll < 0.65 ? "AMB-PNO-002" : "AMB-PNO-003")
@@ -1557,6 +1577,132 @@ struct SongGenerator {
     }
 
 
+    // MARK: - Ambient Zen generation path
+
+    /// Ambient Zen (docs/Ambient-Zen-plan.md): an early return from generateAmbient, as Ambient
+    /// Piano is. The bed: AMB-PADS-011 on Pads, AMB-TEXT-012 on Texture and AMB-BASS-007 or 008
+    /// on Bass. The bells: AMB-LD1-011 on Lead 1, AMB-LD2-014 or AMB-LD2-000 on Lead 2 and AMB-RTHM-007
+    /// or silence on Rhythm. Drums stay empty until phase 3.
+    /// `rng` is the song stream after the two substyle rolls; only the frame and title read it.
+    private static func generateAmbientZen(
+        seed: UInt64, rng: inout SeededRNG,
+        keyOverride: String?, tempoOverride: Int?, moodOverride: Mood?
+    ) -> SongState {
+        // Step 1: the dials, then the Ambient frame at the Zen tempo, so the bar count is the
+        // Ambient length (180 to 315 s) at that tempo. The key comes from the frame's own draw.
+        let dials    = AmbientZenDials.draw(seed: seed)
+        let zenTempo = AmbientZenPlan.zenTempo(dials: dials, tempoOverride: tempoOverride)
+        let (rawFrame, _, ambientProgFamily, _) = AmbientMusicalFrameGenerator.generate(
+            rng: &rng, keyOverride: keyOverride, tempoOverride: zenTempo, moodOverride: moodOverride)
+        var frame = rawFrame.withMode(dials.mode)
+
+        // Step 2: the ZenPlan, the structure (A and a 6 to 12 bar outro) and the tonal map.
+        let plan      = AmbientZenPlan.make(seed: seed, key: frame.key, tempo: frame.tempo,
+                                            totalBars: frame.totalBars)
+        var structure = plan.structure()
+        var tonalMap  = TonalGovernanceBuilder.build(frame: frame, structure: structure)
+
+        // Step 3: the bed, each track on its own stream from the Zen block.
+        var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
+        var padsRNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: AmbientZenPlan.padsIndex))
+        var pedalRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: AmbientZenPlan.pedalIndex))
+        var bassRNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: AmbientZenPlan.bassIndex))
+        var padRules: Set<String> = [], texRules: Set<String> = [], bassRules: Set<String> = []
+        trackEvents[kTrackPads]    = AmbientZenTracks.pads(plan: plan, rng: &padsRNG, usedRuleIDs: &padRules)
+        trackEvents[kTrackTexture] = AmbientZenTracks.pedal(plan: plan, rng: &pedalRNG, usedRuleIDs: &texRules)
+        trackEvents[kTrackBass]    = AmbientZenTracks.bass(plan: plan, rng: &bassRNG, usedRuleIDs: &bassRules)
+
+        // Step 4: the bells (phase 2), Lead 1, Lead 2 and Rhythm, each reading the bed and the
+        // bells before it for the sounding check. All of them stop before the pads' held breath.
+        let bellRules = AmbientZenLoops.writeBells(plan: plan, globalSeed: seed, seeds: [:], tracks: &trackEvents)
+
+        // Trim to the last note of the three tracks plus the tail, as Ambient Piano trims. One
+        // track holds to the end of the music by design, so this only ever cuts a song whose
+        // tracks all ended early.
+        let lastPadEnd = [kTrackPads, kTrackTexture, kTrackBass].flatMap { trackEvents[$0] }
+            .map { $0.stepIndex + $0.durationSteps }.max() ?? 0
+        let trimBars = (lastPadEnd + 15) / 16 + AmbientZenPlan.tailBars
+        if lastPadEnd > 0, trimBars < frame.totalBars, trimBars > plan.outroStartBar {
+            frame = frame.withTotalBars(trimBars)
+            let cut = trimBars * 16
+            for t in trackEvents.indices {
+                trackEvents[t] = trackEvents[t].filter { $0.stepIndex < cut }.map {
+                    MIDIEvent(stepIndex: $0.stepIndex, note: $0.note, velocity: $0.velocity,
+                              durationSteps: Swift.min($0.durationSteps, cut - $0.stepIndex))
+                }
+            }
+            var plan2 = AmbientZenPlan(dials: plan.dials, key: plan.key, tempo: plan.tempo,
+                                       totalBars: trimBars, windows: plan.windows.compactMap { w in
+                guard w.startBar < trimBars else { return nil }
+                return AmbientZenPlan.makeWindow(start: w.startBar, length: Swift.min(w.endBar, trimBars) - w.startBar,
+                                                 degree: w.degree, type: w.type, key: plan.key, mode: plan.mode)
+            })
+            plan2.swell = Array(plan.swell.prefix(trimBars))
+            structure = plan2.structure()
+            tonalMap  = TonalGovernanceBuilder.build(frame: frame, structure: structure)
+        }
+
+        let title = AmbientTitleGenerator.generate(rng: &rng)
+        let log = buildAmbientZenLog(title: title, seed: seed, frame: frame, structure: structure, plan: plan,
+                                     rulesByTrack: [kTrackLead1: bellRules[kTrackLead1] ?? [],
+                                                    kTrackLead2: bellRules[kTrackLead2] ?? [],
+                                                    kTrackPads: padRules,
+                                                    kTrackRhythm: bellRules[kTrackRhythm] ?? [],
+                                                    kTrackTexture: texRules, kTrackBass: bassRules,
+                                                    // No percussion in Zen (phase 3 may add a pulse).
+                                                    kTrackDrums: ["AMB-DRUM-000"]])
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
+                                                   frame: frame, isAmbient: true, includeDrumFills: false)
+        // Recorded so a saved Zen song reloads as Zen whatever the shares are by then.
+        let forced: [String: String] = ["Zen": "true"]
+        return SongState(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            trackEvents: trackEvents, globalSeed: seed, trackOverrides: [:],
+            title: title, form: .singleA, style: .ambient,
+            percussionStyle: .absent, kosmicProgFamily: .static_drone,
+            generationLog: log, stepAnnotations: stepAnnotations,
+            ambientProgFamily: ambientProgFamily, ambientLoopLengths: nil,
+            ambientXFilesBlockRange: nil,
+            ambientUseBrushKit: false,
+            isAmbientPiano: false,
+            isAmbientZen: true,
+            ambientAudioTexture: nil,
+            ambientAudioTextureOffset: 0,
+            forcedRules: forced,
+            keyOverride: keyOverride,
+            tempoOverride: tempoOverride,
+            moodOverride: moodOverride
+        )
+    }
+
+    /// The Ambient Zen log: the style line, the form, the key and mode, the dials in plain words,
+    /// then the rules in track order. No line per chord change: no other style logs one.
+    private static func buildAmbientZenLog(
+        title: String, seed: UInt64, frame: GlobalMusicalFrame, structure: SongStructure, plan: AmbientZenPlan,
+        rulesByTrack: [Int: Set<String>]
+    ) -> [GenerationLogEntry] {
+        var log: [GenerationLogEntry] = []
+        log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
+        // The outro length rides on the Style line, as there is no Form line (Zack, 2026-11-21).
+        let outro = structure.outroSection.map { ", \($0.lengthBars) bar outro" } ?? ""
+        log.append(GenerationLogEntry(tag: "Style", description: "Ambient Zen – \(frame.tempo) bpm\(outro)"))
+        // No Form line: every Zen song is one section and an outro, so it says nothing (Zack,
+        // 2026-11-20). The key and mode sit on the Chords line only, with the pace and the way home.
+        // The walk is a weighted random drift from the tonic (never the same chord twice running),
+        // not a climb or a descent, so the line says "drifting" (Zack, 2026-11-20).
+        // The walk always starts on the tonic, so "from I" is left out (Zack, 2026-11-21).
+        let home = plan.wayHome.map { ", home via \($0)" } ?? ", home on I"
+        log.append(GenerationLogEntry(tag: "Chords", description:
+            "\(frame.key) \(frame.mode.rawValue) \(plan.dials.paceWords) 7th chords drifting\(home)"))
+        let swellWords = AmbientZenPlan.swellDepthWords(seed: seed)
+        log.append(GenerationLogEntry(tag: "Zen", description: "\(plan.dials.plainWords), Swell: \(swellWords)"))
+        // In track order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass.
+        for ruleID in (0..<kTrackCount).flatMap({ (rulesByTrack[$0] ?? []).sorted() }) {
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+        }
+        return log
+    }
+
     // MARK: - Per-track regenerate
 
     /// The held notes of the song's current tracks, for a regenerated Chill track to keep clear of
@@ -1594,6 +1740,11 @@ struct SongGenerator {
         let isAmbient = songState.style == .ambient
         let isChill    = songState.style == .chill
         let isAmbPiano = isAmbient && songState.isAmbientPiano
+        // Ambient Zen: every track but Drums rebuilds the song's ZenPlan and regenerates from it.
+        // The bells after the regenerated track are rebuilt on their own seeds (zenBells below),
+        // because their sounding check read the track that changed.
+        let isAmbZen   = isAmbient && songState.isAmbientZen
+        let zenPlan    = isAmbZen ? AmbientZenPlan.rebuild(from: songState) : nil
         let ambLoopLengths = songState.ambientLoopLengths
         // Motorik: the substyle and sync a generated song's passes take, so a regenerated track is
         // made and post-processed as generation makes it (found 2026-11-11: regen took no sync, so a
@@ -1635,7 +1786,7 @@ struct SongGenerator {
         var chillRhythmSwitchRegen: (bar: Int, ruleID: String)? = nil
         switch trackIndex {
         case kTrackDrums:
-            if isAmbPiano {
+            if isAmbPiano || isAmbZen {
                 return songState
             } else if isAmbient {
                 let regenPercStyle = AmbientMusicalFrameGenerator.pickPercussionStyle(rng: &rng)
@@ -1684,6 +1835,8 @@ struct SongGenerator {
         case kTrackBass:
             if isAmbPiano {
                 return songState
+            } else if let plan = zenPlan {
+                events = AmbientZenTracks.bass(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbient {
                 events = AmbientBassGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
@@ -1734,6 +1887,8 @@ struct SongGenerator {
                     pianoRule: songState.ambientPianoRule,
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     totalBars: songState.frame.totalBars, rng: &rng, usedRuleIDs: &usedRules)
+            } else if let plan = zenPlan {
+                events = AmbientZenTracks.pads(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.pads ?? 8
                 let loop = AmbientPadsGenerator.generate(
@@ -1758,7 +1913,10 @@ struct SongGenerator {
                 events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade)
             }
         case kTrackLead1:
-            if isAmbPiano {
+            if let plan = zenPlan {
+                events = AmbientZenLoops.lead1(plan: plan, band: songState.trackEvents, rng: &rng,
+                                               usedRuleIDs: &usedRules)
+            } else if isAmbPiano {
                 events = AmbientLeadGenerator.generateAmbientPianoLead(
                     pianoRule: songState.ambientPianoRule,
                     frame: songState.frame, totalBars: songState.frame.totalBars,
@@ -1806,7 +1964,10 @@ struct SongGenerator {
                 regenSolo = lead1.solo
             }
         case kTrackLead2:
-            if isAmbPiano {
+            if let plan = zenPlan {
+                events = AmbientZenLoops.lead2(plan: plan, band: songState.trackEvents, forcePlay: true,
+                                               rng: &rng, usedRuleIDs: &usedRules)
+            } else if isAmbPiano {
                 return songState
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.lead2 ?? 13
@@ -1911,7 +2072,10 @@ struct SongGenerator {
                 }
             }
         case kTrackRhythm:
-            if isAmbPiano {
+            if let plan = zenPlan {
+                events = AmbientZenLoops.rhythm(plan: plan, band: songState.trackEvents, forcePlay: true,
+                                                rng: &rng, usedRuleIDs: &usedRules)
+            } else if isAmbPiano {
                 return songState
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.rhythm ?? 5
@@ -1951,6 +2115,9 @@ struct SongGenerator {
         case kTrackTexture:
             if isAmbPiano {
                 return songState
+            } else if let plan = zenPlan {
+                // Zen's texture is always the MIDI pedal: never an audio texture.
+                events = AmbientZenTracks.pedal(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.texture ?? 7
                 let ambientFiles = Self.ambientAudioFilePool
@@ -2218,8 +2385,28 @@ struct SongGenerator {
             newStepAnnotations = notes
         }
 
+        // Ambient Zen: the bells after the regenerated track, rebuilt on their own seeds against
+        // the new track. A bell track with an override always plays, so this is the same rebuild
+        // a reload's replay makes, in whatever order the overrides replay.
+        var zenBells: [[MIDIEvent]]? = nil
+        if let plan = zenPlan, trackIndex != kTrackRhythm, trackIndex != kTrackDrums {
+            var band = songState.trackEvents
+            band[trackIndex] = events
+            let seeds = songState.trackOverrides.filter { [kTrackLead1, kTrackLead2, kTrackRhythm].contains($0.key) }
+            let from = trackIndex == kTrackLead1 ? kTrackLead2 : trackIndex == kTrackLead2 ? kTrackRhythm : kTrackLead1
+            AmbientZenLoops.writeBells(plan: plan, globalSeed: songState.globalSeed, seeds: seeds,
+                                       tracks: &band, from: from)
+            zenBells = band
+        }
+
         var updated = songState.replacingEvents(events, forTrack: trackIndex, appendingLog: regenLog,
                                                  replacingStepAnnotations: newStepAnnotations)
+        if let bells = zenBells {
+            for t in [kTrackLead1, kTrackLead2, kTrackRhythm] where t != trackIndex
+                && bells[t] != songState.trackEvents[t] {
+                updated = updated.replacingEvents(bells[t], forTrack: t)
+            }
+        }
         if ambientAudioTextureChanged {
             updated = updated.withAmbientAudioTexture(regenAmbientAudioTexture, offset: regenAmbientAudioOffset)
         }
@@ -3655,6 +3842,15 @@ struct SongGenerator {
         case "AMB-BASS-004":  return "ECM pluck"
         case "AMB-BASS-005":  return "Octave double"
         case "AMB-BASS-006":  return "Slow pendulum"
+        // Ambient Zen
+        case "AMB-BASS-007":  return "Airports Root"
+        case "AMB-BASS-008":  return "Plateaux Octave Root"
+        case "AMB-PADS-011":  return "Airports Breath"
+        case "AMB-TEXT-012":  return "Pearl Pedal"
+        case "AMB-LD1-011":  return "Airports 1/1 Loop"
+        case "AMB-LD2-014":  return "Airports 1/2 Answer"
+        case "AMB-LD2-000":  return "No lead 2"
+        case "AMB-RTHM-007":  return "Lux Glass"
         // Lead 1
         case "AMB-LEAD-001":  return "Eno floating tone"
         case "AMB-LEAD-002":  return "Echo phrase"

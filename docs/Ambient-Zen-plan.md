@@ -1,7 +1,7 @@
 # Ambient Zen — substyle plan (simplified)
 Copyright (c) 2026 Zack Urlocker
 
-*Status: plan, simplified 2026-11-14 and revised the same day with the harmony and clash rules and the Zudio implementation map. No composed phrases: the bells use AMB-1's loop code and scale approach (Zack, 2026-11-14). Nothing is built. Phase 1 is next, after Zack's go-ahead. The full 2026-11-09 plan, with the AMB-1 code reading, the Eno research and every number, is kept in [Ambient-Zen-plan-old-2026-11-09.md](Ambient-Zen-plan-old-2026-11-09.md). Use it as a reference, not as the spec. Where the two disagree, this plan wins.*
+*Status: plan, simplified 2026-11-14 and revised the same day with the harmony and clash rules and the Zudio implementation map. No composed phrases: the bells use AMB-1's loop code and scale approach (Zack, 2026-11-14). Revised 2026-11-20: no intro, swell presets as SF2 copies. Phase 1 started 2026-11-20 (Zack's go-ahead). The full 2026-11-09 plan, with the AMB-1 code reading, the Eno research and every number, is kept in [Ambient-Zen-plan-old-2026-11-09.md](Ambient-Zen-plan-old-2026-11-09.md). Use it as a reference, not as the spec. Where the two disagree, this plan wins.*
 
 **Contents**
 
@@ -27,7 +27,7 @@ But it must have the key characteristics which we can learn from the manual and 
 soothing, evolving background music that is pleasant and ever changing.  We want the rich underlying drones 
 of bass and pads. We want the elegant shifting of chord tones across instruments. We want the randomness of 
 bells and similar sounds so that it is captivating and beautiful as the original AMB-1. 
-However, since Zudio does not have dials, we will somwhat randomly assign certain values so that there is 
+However, since Zudio does not have dials, we will somewhat randomly assign certain values so that there is 
 sufficient variation song to song.
 
 The sound: pad voices that breathe in and out on their own cycles so the chord forms and dissolves, a low bed that never stops, a slow chord journey that leaves home and comes back, and soft bells on loops of unequal length that slide past each other, all in a long hall with a long, darkening echo. It evolves over minutes: the bells thin out and fill in, and the chords drift.
@@ -56,7 +56,7 @@ Most of the sound comes from four mechanisms: the moving chords, the breathing p
 - **iPhone parity.** Any effect default set in TrackRowView is mirrored in AppState.restoreDefaultEffects.
 - **Long sustain.** Every pad, pedal and bass instrument must hold for a long time without dying away. We can use techniques from Kosmic or Ambient for long sustains. 
 
-**Shares.** Zen reuses the unused pianoRuleRoll, so no new draw enters the shared prefix. Piano if pianoRoll < 0.35, Zen if not Piano and pianoRuleRoll < zenShare, otherwise base Ambient. Testing: Piano 10, base Ambient 10, Zen 80 (pianoRoll < 0.10, zenShare = 0.889), marked in the code as temporary (Zack, 2026-11-09). Release: Piano 35, Zen about 30 (zenShare about 0.46), base about 35. A base Ambient seed that falls in the Zen share becomes Zen on reload; that is accepted.
+**Shares.** Zen reuses pianoRuleRoll, which only Piano songs read (to pick their Piano rule), so no new draw enters the shared prefix. Piano if pianoRoll < 0.35, Zen if not Piano and pianoRuleRoll < zenShare, otherwise base Ambient. Testing: Piano 10, base Ambient 10, Zen 80 (pianoRoll < 0.10, zenShare = 0.889), marked in the code as temporary (Zack, 2026-11-09). Release: Piano 35, Zen about 30 (zenShare about 0.46), base about 35. A base Ambient seed that falls in the Zen share becomes Zen on reload; that is accepted.
 
 ## 4. The ZenPlan: one picture of the song
 
@@ -68,13 +68,12 @@ Zudio normally rolls each track's rule on its own. Zen works only if every track
 - The pedal's pitch set per window (section 6).
 - The swell, one value per bar (phase 2).
 
-**The dials, in place of recipes.** Each song draws these from its seed. Unlike AMB-1 Zudio has no dials for thes
-so they are to be randomly genarated. 
+**The dials, in place of recipes.** Each song draws these from its seed. Unlike AMB-1, Zudio has no dials for these, so they are generated randomly.
 1. **Mode:** Ionian 0.22, Dorian 0.22, Aeolian 0.20, Mixolydian 0.18, Lydian 0.18. Lydian is Zen's own; base Ambient doesn't draw it.
 2. **Tempo:** 62 to 88 bpm, triangular, peak 72. The floor is 62 because the Ambient frame clamps there.
 3. **Chord pace:** a mean window of 25 to 60 s.
 4. **Breath length:** AMB-1's Swell knob, 45 to 70 (section 7).
-5. **Pad colour:** Rhodes-like 0.55 or Voices 0.45.
+5. **Pad colour:** Rhodes-like 0.55 or glass and strings 0.45 (was voices; choir removed from pads 2026-11-20).
 6. **Restlessness:** 0.25 to 0.45. This is how much the bell loops change from pass to pass. It's kept low because the Eno records repeat literally.
 7. **Bell density** (phase 2): sparse 30, medium 45 or full 60.
 8. **Echo size** (phase 1): 75 to 90, which sets echo feedback.
@@ -146,7 +145,7 @@ The bell loops draw from their own track RNGs.
 Zen computes its own safe set. The shared NotePoolBuilder's scaleTensions includes the avoid notes (it marks F as a tension of Cmaj7), and its avoidTones covers only chromatic notes, so Zen must not use either for bells.
 
 **The journey**
-- The first window is the tonic and covers the intro plus one full window. The last window is the tonic and covers the outro.
+- The first window is the tonic and is one full window long. The last window is the tonic and covers the outro.
 - In between: AMB-1's weighted walk over the weights above, excluding the current chord. Ionian and Lydian give vii weight 0.
 - Each window lasts the chord pace × random 0.7 to 1.3, converted to bars (bars = seconds × tempo / 240) and rounded to a whole bar, at least 4 bars. At 72 bpm a bar is 3.3 s, so windows run about 6 to 24 bars. A 3 to 5 minute song gets about 3 to 8 chords.
 - **The way home (new; AMB-1 never comes home).** The window before the outro tonic is drawn from a cadence list instead of the walk, so the return sounds like an arrival:
@@ -205,8 +204,7 @@ The goal is to hear whether the core works before building anything else: a song
 
 **Plumbing, structure and the ZenPlan.** Sections 4, 5 and 11.
 - The song uses the Ambient frame length (180 to 315 s) at the Zen tempo.
-- It has an 8-bar intro, one body section A and a 12-bar outro.  Question: DO we really need intro, outro? 
-if its not necessary we can remove those.  
+- It has one body section A and an outro of 6 to 12 bars (drawn per song, uniform; Zack, 2026-11-20), with no intro (Zack, 2026-11-20). The pads, pedal and bass start at bar 1; the outro carries the cadence window's arrival and the held breath.
 - The song is trimmed to its last pad note plus 2 bars, the way Ambient Piano trims. If the reverb and echo wash is cut short, the tail becomes 4 bars.
 
 **Pads: AMB-PADS-011 Airports Breath.** Four voices, each breathing on its own cycle (AMB-1's numbers).
@@ -215,12 +213,13 @@ if its not necessary we can remove those.
 - **Start.** Voice 1 starts at once. Voices 2 to 4 start (1 − 0.9), (1 − 0.82) and (1 − 0.95) of a first cycle later, all within about 3 s. The cycles then drift apart.
 - **Breath.** One MIDI note per breath. The note-off falls at 90 percent of the cycle, so each voice rests briefly and the rests rarely line up. Velocity = 50 + 40 × peak, with the peak random 0.6 to 1.0.
 - **Chord change.** If a sounding voice's pitch class is in the new chord, it carries on to the end of its breath. If not, its note ends at the change, and its next breath starts 1 s later on its new target, with a cycle at 85 percent of the usual length. A resting voice takes its new target at its next breath. This is the bass-leads, pads-lag effect. Never snap the pads to the chord change.
-- **Outro: the held breath.** At the start of the final 6 bars, all four voices take the tonic chord and hold to the last bar. The pedal joins them and ends with them.
+- **Outro: the held breath.** At the start of the final 4 to 6 bars of music (6, or the outro less the 2-bar tail when that is fewer), all four voices take the tonic chord and hold. **Staggered endings (2026-11-20):** the pads, pedal and bass do not stop together. One track holds to the end of the music; the other two stop 1 and then 1 to 2 more bars earlier, in an order drawn per song from the seed (dials.endOffsets, at most held breath less 2 bars, so all three still sound together for at least 2 bars of the hold).
 
 **Pads must swell, not strike.** AMB-1's bed is slow swells: each voice rises over 4 to 7 s, so the four voices merge into one level wash with no audible attacks. A stock preset re-attacks on every breath. Phase 1 therefore builds both of these and compares them at the listening stop:
 1. **Stock presets** with the list below. Warm Pad (0.8 s attack) and Halo Pad come first because they attack slowest.
-2. **Swell presets.** Copies of Warm Pad, Halo Pad, Concert Choir and Space Voice in a new soundfont bank. Each copy sets SF2 generator 34 (attackVolEnv) to 3000 timecents (about 5.6 s) and generator 38 (releaseVolEnv) to 2600 (about 4.5 s).  Question: Do we really need to make a copy? Or can we work with the existing SF2 file overriding 
-playback settings as necessary?
+2. **Swell presets.** Copies of Warm Pad, Halo Pad, Concert Choir and Space Voice in a new soundfont bank. Each copy sets SF2 generator 34 (attackVolEnv) to 3000 timecents (about 5.6 s) and generator 38 (releaseVolEnv) to 2600 (about 4.5 s).
+   - **Why copies (decided 2026-11-20).** The sampler has no API to change a preset's envelope at playback, a track-wide volume ramp would swell and duck all four voices together, and editing Warm Pad in place would change base Ambient and every style that uses it. A copy is a new preset record in a new bank pointing at the existing instruments and samples: no sample data is copied. Each copy is about 200 to 350 bytes, about 1 KB for all four on a 21.2 MB file.
+   - Preset-level generators add to the instrument's own value, so each copy sets the offset that brings the total to about 3000 (attack) and 2600 (release). Instrument attacks today: Warm Pad −386, Concert Choir −2786, Halo Pad and Space Voice −3986. If the sampler ignores preset-level envelope generators, copy the instrument records as well, still with no sample data (a few KB).
    - The note-off moves to 55 percent of the cycle, so the release supplies the fall and the voice goes quiet near 90 percent.
    - The tool is a sibling of tools/sf2_copy_presets.py, which appends presets and keeps every existing byte, so no existing program moves.
    - This is a soundfont edit and needs no playback code.
@@ -257,9 +256,9 @@ playback settings as necessary?
 
 **Instruments**, short lists to start. New entries are appended to each Ambient pool in all four places, with base Ambient's pick list held to its old indices so existing seeds don't move:
 - **Pads, Rhodes-like:** Warm Pad 89, Halo Pad 94, Fantasia 88, FM Electric Piano 5.
-- **Pads, voices:** Concert Choir 52, Synth Voice 54, Space Voice 91.
-- **Texture pedal:** Warm Pad 89, Tonewheel Organ 16, Choir Aahs 52, Bowed Glass 92.
-- **Bass:** Sine Wave 8080, Fretless 35, Synth Bass 101 1038, Voice Oohs 54.
+- **Pads, glass and strings (swell copies, bank 14):** Glass Swell 14092, Strings 3 Swell 14050, Strings 5 Swell 14051, Slow Strings Swell 14049. Choir voices are out of the pads (Zack, 2026-11-20).
+- **Texture pedal:** Tonewheel Organ 16, Solar Wind Swell 14088 and Sine Swell 14080 (about 27 percent each), and the only choir on any Zen track: Choir Aahs 52, Synth Voice 54, Space Voice 91, about 6.7 percent each (20 percent together). No MIDI patch repeats across Zen tracks and no organic instruments (2026-11-20). Volumes by ear: Solar Wind Swell 0.8, Sine Swell 0.7 (the Ambient Texture boost is 2.0).
+- **Bass:** Synth Bass 101 1038 and five synth swell copies: Saw Bass Swell 14038 (Mean Saw Bass), Brass Swell 14062 (Synth Brass 1, volume 0.25, lowered from 0.40), Pulse Bass Swell 14039, Lead Bass Swell 14087 (volume 0.56) Synth Bass 3 Swell 14037 and Polysynth Swell 14090 (moved from the pedal 2026-11-20, volume 0.5). No Voice Oohs, Cello, Sine Wave or Fretless Bass (2026-11-20).
 
 All passed the sustain check in the old plan (section 11).
 
@@ -276,6 +275,27 @@ All passed the sustain check in the old plan (section 11).
 
 If the bed doesn't work, rethink before phase 2.
 
+### Phase 1 as built (2026-11-20)
+
+Built and checked by script; not yet heard. Uncommitted.
+
+- **Files.** New: Generation/Ambient/AmbientZenPlan.swift (dials, chord table, layout, walk, cadence, pedal and bass keep rules, structure, chord names) and AmbientZenTracks.swift (AMB-PADS-011, AMB-TEXT-012, AMB-BASS-007, AMB-BASS-008). Branches in SongGenerator (roll, generateAmbientZen, Zen log, regenerateTrack), SongState (isAmbientZen, "Ambient Zen"), AppState (reload, pools, pick lists, effect defaults, Evolve), PlaybackEngine (setAmbientMode Zen branch) and TrackRowView.
+- **Shares.** SongGenerator.ambientPianoShare and ambientZenShare, set to the testing values 0.10 and 0.889 and marked temporary; the release values 0.35 and 0.46 are in the comment.
+- **Reload.** A Zen song records "Zen" in its forced rules and reloads as Zen whatever the shares are then. A base Ambient song saved at testing shares with a piano roll between 0.10 and 0.35 reloads as Ambient Piano at release shares.
+- **Song shape.** The Ambient frame at the Zen tempo; section A, then the 6 to 12 bar outro. The music ends 2 bars before the song (the reverb tail); the held breath is the 6 bars before that. The trim is in place but never cuts, because the pads always hold to the end of the music.
+- **Layout.** Window lengths are drawn first, then the chords. The last body window (the cadence) takes whatever is left, so it can run up to 3 bars past the pace. The cadence draw skips the chord already playing.
+- **Pad breaths.** The note-off is at 90 percent of the cycle for every preset, stock and swell alike: the MIDI is written once and the picker chooses the sound, so the 55 percent swell timing is not used. Voicings are fixed per window (no randomness), so regenerating Pads changes only the breathing. A carried voice must also sit clear (not 0, 1 or 13 semitones) of the new voicing, the pedal and every bass note the window may hold.
+- **Bass and pads.** The voicing cost and the carry check also avoid every note either bass rule may hold in the window (root, its octave, both fifths). This was the one glaring clash found in testing: AMB-BASS-008's upper A3 against a pad G#3 over Amaj7.
+- **Pedal and bass.** A pedal note also drops when it sits 1 or 13 semitones from a bass note the window may hold. Only Aeolian's bVI in C to Eb does this (the pedal fifth G3 under the bass octave Ab3); the tonic holds.
+- **Same-pitch joins abut.** The pedal's next note and the bass re-strikes start exactly where the last note ends, with no 1-beat overlap: the sampler's note-off for the old note would cut the new one. Playback fires a step's note-offs before its note-ons, so the join is seamless. The 1-beat overlap is kept where the pitch changes (root to fifth, and AMB-BASS-008's lower note under the upper re-strike).
+- **Bass details.** Re-strikes every 8 bars, never leaving a stub under 2 bars. The fifth folds down an octave when it would pass MIDI 47 (59 for AMB-BASS-008's upper note). AMB-BASS-008 moves to the fifth with the same 0.35 chance as 007. The bass never sits out two windows running (the first build left a 37-bar gap).
+- **Log (2026-11-20).** "Ambient Zen – N bpm"; "Chords": key, mode, "seventh chords", the chord pace and the way home as a Roman numeral, for example "D Aeolian quick 7th chords drifting, home via IVm7" (updated 2026-11-20; "home on I" when the last body chord is the tonic); a "Zen" line with the other dials only, for example "Breaths: long, Echo: light, Bells: sparse" (the pad colour is left to the Instruments line, Zack, 2026-11-21); then the three rules, each marked "* ". No Form line (every song is A and an outro), no key and mode on the Zen line, no line per chord change (Zack, 2026-11-20: no style logs one).
+- **Instruments.** Appended to the Ambient pools (base Ambient keeps picking from its old indices): Pads add Warm Pad, Fantasia, FM Piano, Warm Swell, Halo Swell, Concert Choir, Synth Voice, Space Voice, Choir Swell, Voice Swell; Texture adds Warm Pad and Tonewheel; Bass adds Sine Wave, Fretless Bass, Synth Bass 101. Zen pads draw by the colour dial: Rhodes-like (Warm Pad, Halo Pad, Fantasia, FM Piano, Warm Swell, Halo Swell) or voices (Glass Swell, Strings 3 Swell, Strings 5 Swell, Slow Strings Swell; the choir voices were removed from the picker 2026-11-20). The Swell presets are bank 14 (program 14089 and so on) and load through the ordinary bank decode in setProgram.
+- **Effects.** Chips: Rhythm shows Pan, Delay, Hall and Texture Pan, Delay, Reverb (its Hall chip is labelled Reverb); Bass shows Sweep, Trem, Reverb. Defaults: Pads Hall, Trem, Sweep and a hidden Delay (the 15 percent echo, which has no chip of its own); Texture Delay, Reverb; Bass Reverb, Trem; leads Delay, Hall; Rhythm Delay, Hall, Pan; Drums none. TrackRowView and AppState.restoreDefaultEffects (iPhone) carry the same table. Bass tremolo is 0.08 Hz at depth 0.15 (not in the plan; by ear). Rhythm auto-pan is one sweep per 8 bars. Tonewheel on Texture is trimmed to 0.8 (the Ambient Texture boost is 2.0). The bass sweep, if switched on, is an ordinary LFO in Zen, not tied to the fade.
+- **Evolve.** A Zen pass copies the song's first bars and regenerates nothing (no absent-track additions). Pass 1 swaps the Pads instrument, pass 2 the Texture instrument, both from the Zen lists. Superseded 2026-11-21: Zen now follows the normal passes (see phase 2 as built).
+- **Checks.** Base Ambient and Ambient Piano are identical on seeds 1 to 300 at testing and release shares. tools/clash_scan.py on 200 Zen songs: no clashes at all. A stricter script (any two Pads, Texture or Bass notes 1 or 13 semitones apart for half a beat or more, chord tones included) also finds none. Reload after Pads and Bass regenerations reproduces every song.
+- **Not checked.** Whether AVAudioUnitSampler honours the Swell presets' envelopes, stuck notes or tails after Stop or a seek, and the iPhone speaker check. All need the app and an ear.
+
 ## 8. Phase 2: the bells and the swell
 
 **The bell loop helper.** One helper (AmbientZenLoops.swift) shared by Lead 1, Lead 2 and Rhythm. It walks the song one pass at a time, never tiling.
@@ -290,10 +310,10 @@ If the bed doesn't work, rethink before phase 2.
 - **Octave ring.** With probability 0.08 + 0.12 × max(swell, 0), the same note sounds an octave up at 40 percent velocity.
 - **Every note** passes section 6, rule 7.
 
-**AMB-LEAD-011 Airports 1/1 Loop** on Lead 1, every Zen song. The plain AMB-1 loop: generic note count, velocity 40 to 80 (AMB-1's 50 to 99 percent mapped to MIDI as 40 + 0.8 × (percent − 50)), and per-pass changes.
+**AMB-LD1-011 Airports 1/1 Loop** on Lead 1, every Zen song. The plain AMB-1 loop: generic note count, velocity 40 to 80 (AMB-1's 50 to 99 percent mapped to MIDI as 40 + 0.8 × (percent − 50)), and per-pass changes.
 - Source: Music for Airports 1/1.
 
-**AMB-LEAD-014 Airports 1/2 Answer** on Lead 2 (0.85). The AMB-1 loop, softer (velocity 42 to 70), dropping any note on a beat where Lead 1 sounds. In the other 15 percent of songs Lead 2 rests, logged as AMB-LEAD-016 Silent.
+**AMB-LD2-014 Airports 1/2 Answer** on Lead 2 (0.85). The AMB-1 loop, softer (velocity 42 to 70), dropping any note on a beat where Lead 1 sounds. In the other 15 percent of songs Lead 2 rests, logged as AMB-LD2-000 No lead 2 (the "-000" convention, as AMB-RTHM-000 No rhythm; Zack, 2026-11-20).
 
 **AMB-RTHM-007 Lux Glass** on Rhythm (0.80). One to three short high notes (2 to 4 steps) per 23-beat loop, velocity 35 to 60, chord tones only. Rhythm is silent in the other 20 percent of songs.
 
@@ -301,18 +321,18 @@ If the bed doesn't work, rethink before phase 2.
 - A value per bar from −1 (sparse) to +1 (full).
 - Every 50 to 150 s a new target is drawn: random −1 to 1 × (0.6 + 0.4 × random), pushed 0.25 further from the middle, clamped.
 - The value eases toward the target with a 35 s time constant, then is scaled by 0.5 to 0.9 per song.
-- It is held at −0.5 or below in the intro and outro.
+- It is held at −0.5 or below for the first 8 bars and in the outro.
 - It sets the bell note counts, the rest chance, the octave ring and the bass sit-outs, and it nudges pad and pedal velocity by ±10 percent.
 
 **Entries and exits.**
-- Lead 1 enters at a random bar from 2 to 4, Lead 2 at bar 6 to 8, and Rhythm at the end of the intro.
+- Lead 1 enters at a random bar from 2 to 4, Lead 2 at bar 6 to 8, and Rhythm at bar 9.
 - In the outro they leave in reverse order: Rhythm first, Lead 2 about 4 bars later, then Lead 1 after one last pass, about 3 bars from the end.
 - All of them are gone before the pads' held breath.
 
 **Instruments.**
 - Lead 1: Vibraphone 11, Tine Electric Piano 4, Echo Drops 102, Harp 46.
-- Lead 2: Celesta 8, Marimba 12, Kalimba 108, Harp 46.
-- Rhythm: Glockenspiel 9, Celesta 8, Tinker Bell 112, Synth Chime 11098.
+- Lead 2: Tinkling Bells 11008, Christmas Bells 12010, Kalimba 108, Harp 46 (2026-11-21: Celesta is on Rhythm only, Marimba 12 is out as too wooden, Xylophone was tried and dropped).
+- Rhythm: Glockenspiel 9, Celesta 8, Tinker Bell 112, Synth Chime 11098, Christmas Bells 12010 (added 2026-11-21 to audition beside Lead 2).
 
 **Effects.**
 - Echo on the bells: Lead 1 wet 45, Lead 2 50, Rhythm 48.
@@ -323,6 +343,23 @@ If the bed doesn't work, rethink before phase 2.
 - Is the phasing audible?
 - Do the loops change without wandering?
 - Does the swell make the song move?
+
+### Phase 2 as built (2026-11-20)
+
+Built and checked by script; not yet heard. Uncommitted, on top of phase 1.
+
+- **Files.** New: Generation/Ambient/AmbientZenLoops.swift (the loop, the three bell rules, the sounding check, writeBells). The swell is in AmbientZenPlan (swellCurve, swell(atBar:), index 125). Branches in SongGenerator (generation step 4, the log, regenerateTrack for Lead 1, Lead 2 and Rhythm), AppState (bell pools and pick lists) and PlaybackEngine (pans).
+- **Seeds.** The bells' default seeds are Zen indices 126 (Lead 1), 128 (Lead 2) and 129 (Rhythm); 127 stays the pulse's.
+- **The loop.** One slot per quarter-note beat. A slot keeps its offset, velocity and length from pass to pass. Lead 1 and Lead 2 notes are 8 steps (2 beats) long, the same span as the sounding check; Rhythm's are 2 to 4. The octave-ring roll is made for every slot so a rest or a dropped note never shifts the draws after it. A chord step is an even step within the octave (0, 2, 4, 6, then 7, 9, 11, 13); 1, 3 and 5 are the passing steps.
+- **Lead 2 answer.** Lead 2 drops any note whose onset is a Lead 1 onset.
+- **Exits.** Lead 1 stops at the pads' held breath, Lead 2 4 bars earlier, Rhythm 4 bars before that. Notes are clipped so none rings into the next exit.
+- **The swell on the bed.** Pad breath and pedal velocity times (1 + 0.1 × swell); bass sit-out chance 0.3 × restlessness + 0.25 × max(−swell, 0) (the old plan's numbers). No extra draws, so the bed's notes are unchanged; only velocities and sit-outs move.
+- **Regeneration.** Regenerating any Zen track but Drums rebuilds the bells after it on their own seeds: a bed track rebuilds all three, Lead 1 rebuilds Lead 2 and Rhythm, Lead 2 rebuilds Rhythm. A bell track with an override always plays (a regenerated Lead 2 never comes back Silent), so a reload's replay gives the same song in any order. Checked on 40 songs with four regenerations each.
+- **Instruments.** Appended to the Ambient pools, so base Ambient and Ambient Piano keep their old indices (their pick lists are now capped at the old counts). As the plan lists them, sharing included: AMB-1 plays every bell loop on one voice, so a shared sound is fine (Zack, 2026-11-20: the no-repeat rule was only against unintended duplicates). Lead 1: Vibraphone, Tine EP, Echo Drops, Harp. Lead 2: Tinkling Bells, Christmas Bells, Kalimba, Harp (2026-11-21: Celesta moved to Rhythm only, Marimba out as too wooden, Xylophone tried and dropped; the SF2 has no Music Box). Lead 1 draws Echo Drops in only 10 percent of picks, never two songs running, and the Lead 2 lock skips it, because it sounds like a choir (Zack, 2026-11-21). Texture drops Synth Voice; Choir Aahs and Space Voice are 15 percent of its picks together (Zack, 2026-11-21: a voice on Texture is a wall of sound). Picker names were shortened (Zack, 2026-11-21): Solar Swell, Bass Swell (was Lead Bass Swell), Synth Swell (was Synth Bass 3 Swell), Pulse Swell; Slow Strings Swell is gone from the pads, which keep Strings 3 and Strings 5 Swell. Rhythm: Glockenspiel, Celesta, Tinker Bell, Synth Chime. In 25 percent of songs (a dial, lead2SyncsLead1, drawn last from index 120) Lead 2 plays on Lead 1's instrument through the existing Lead 2 lock, logged "Lead 2 <name> locked to L1" (Zack, 2026-11-20); a song with no Lead 2 skips it. No gain trims yet; by ear.
+- **Effects.** The echo table, sends and Rhythm's 8-bar auto-pan were already in place from phase 1. New: static pans Lead 1 −0.6, Lead 2 +0.35, Rhythm +0.6, and Rhythm's auto-pan swings ±0.35 around +0.6 instead of the full width around the centre.
+- **Log.** The rules in track order (Lead 1, Lead 2, Pads, Rhythm, Texture, Bass); a silent Lead 2 logs AMB-LD2-000 No lead 2 and a silent Rhythm AMB-RTHM-000 No rhythm, and Drums always logs AMB-DRUM-000 No percussion until the phase 3 pulse. The Zen line reads "Breaths: long, Echo: medium, Bells: sparse, Drift: calm, Swell: deep" (Zack, 2026-11-21). Drift is the restlessness dial; Swell is the swell depth (swellCurve's scale). The Style line carries the outro, for example "Ambient Zen – 72 bpm, 9 bar outro".
+- **Evolve (changed 2026-11-21).** Zen now follows the normal Evolve passes (Zack): pass 1 regenerates Lead 1 and Lead 2 with new instruments, pass 2 regenerates Pads and Rhythm with new instruments, each through Zen's own regenerate branches, so the bells are rebuilt clash-free against the new tracks. Zen never adds the absent Bass or Drums in a pass, and the new-rule retry is skipped (one rule per Zen track). A silent Lead 2 or Rhythm in the song plays in its pass.
+- **Checks.** 200 Zen songs: no bell note 1 or 13 semitones from any other track's note, and no major 7th with the bell's tension below; no out-of-scale notes, no unsafe tensions, no tensions on beat 1 or 3, no bell in the held breath. About 42 Lead 1 notes a song, and 23 Lead 2 and 18 Rhythm notes in the songs where they play; Lead 2 silent in 17 percent, Rhythm in 24 percent. Base Ambient and Ambient Piano identical on seeds 1 to 300. InstrumentPoolDriftTests pass; Mac and iOS builds succeed.
 
 ## 9. Phase 3: variety
 
@@ -355,7 +392,7 @@ Each piece below names the existing code it reuses or the small branch it needs 
   - Zen draws its tempo from index 120 and passes it to AmbientMusicalFrameGenerator.generate as tempoOverride, so the bar count is computed at the Zen tempo, as Piano does. A user tempo override of 92 or below is honoured.
   - Then frame.withMode(zenMode).
   - The key comes from the frame's own draw, or keyOverride.
-- **Structure.** Zen builds its own SongStructure: three SongSections (intro, A, outro) with the Zen mode, and chordPlan from the ZenPlan windows. Each ChordWindow is made the way AmbientStructureGenerator.makeWindow does (NotePoolBuilder for chordTones). Zen keeps its own safe-tension set in the ZenPlan (section 5).
+- **Structure.** Zen builds its own SongStructure: two SongSections (A, outro) with the Zen mode, and chordPlan from the ZenPlan windows. Each ChordWindow is made the way AmbientStructureGenerator.makeWindow does (NotePoolBuilder for chordTones). Zen keeps its own safe-tension set in the ZenPlan (section 5).
 - **Tonal map.** TonalGovernanceBuilder.build(frame:structure:) as Ambient already calls it.
 - **Events.** MIDIEvent is step-based (16 steps a bar) with a duration in steps, so breaths, pedal notes and bells are plain events. Seconds convert with steps = seconds × tempo / 15.
 - **Order inside generateAmbientZen:**
@@ -368,8 +405,8 @@ Each piece below names the existing code it reuses or the small branch it needs 
   - Generation/Ambient/AmbientZenPlan.swift (dials, chord table, walk, cadence, pedal sets, swell);
   - AmbientZenTracks.swift (pads, pedal, bass, structure, trim);
   - AmbientZenLoops.swift in phase 2 (loop helper, bell rules, sounding check).
-- **Rule IDs.** All free (checked 2026-11-14): AMB-PADS-011, AMB-TEXT-012, AMB-BASS-007, AMB-BASS-008, AMB-LEAD-011, AMB-LEAD-014, AMB-LEAD-016, AMB-RTHM-007, and in phase 3 AMB-DRUM-005, AMB-PADS-014, AMB-PADS-015, AMB-TEXT-011.
-- **Log.** buildAmbientLog gets a Zen style line ("Ambient Zen – N bpm"), the dials line, one line per chord change, and rule descriptions. forced["Zen"] mirrors forced["Piano"]. Every new rule goes in GenerationLogEntry.testingMarkedRules.
+- **Rule IDs.** All free (checked 2026-11-14): AMB-PADS-011, AMB-TEXT-012, AMB-BASS-007, AMB-BASS-008, AMB-LD1-011, AMB-LD2-014, AMB-LD2-000 (was 016; the three lead rules were AMB-LEAD-011, 014 and 000 until 2026-11-21, renamed LD1 and LD2 because each belongs to one lead, Zack), AMB-RTHM-007, and in phase 3 AMB-DRUM-005, AMB-PADS-014, AMB-PADS-015, AMB-TEXT-011.
+- **Log.** buildAmbientLog gets a Zen style line ("Ambient Zen – N bpm"), the dials line and rule descriptions. No line per chord change. forced["Zen"] mirrors forced["Piano"]. Every new rule goes in GenerationLogEntry.testingMarkedRules.
 - **regenerateTrack** gets a Zen branch that rebuilds the ZenPlan and regenerates one track. Regenerating Pads, Texture or Bass also re-checks the bells, by regenerating the bell tracks with the same seeds, because the sounding check depended on them.
 
 **SongState and AppState**

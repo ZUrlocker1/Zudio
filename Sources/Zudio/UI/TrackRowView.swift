@@ -340,6 +340,15 @@ struct TrackRowView: View {
         let isKosmic  = activeStyle == .kosmic || activeStyle == .ambient
         let isAmbient = activeStyle == .ambient
         let isChill   = activeStyle == .chill
+        // Ambient Zen: the pedal and the bells want echo, the bass a slow tremolo, the bell Rhythm
+        // its auto-pan (docs/Ambient-Zen-plan.md, section 11).
+        if isAmbient && appState.songState?.isAmbientZen == true {
+            switch trackIndex {
+            case kTrackRhythm, kTrackTexture: return [.pan, .delay, .space]
+            case kTrackBass:                  return [.sweep, .tremolo, .reverb]
+            default:                          break
+            }
+        }
         switch trackIndex {
         case kTrackLead1:
             if isChill   { return [.space, .delay, .vibrato] }
@@ -428,7 +437,19 @@ struct TrackRowView: View {
         }
 
         let defaults: [TrackEffect]
-        if activeStyle == .ambient {
+        if activeStyle == .ambient && appState.songState?.isAmbientZen == true {
+            // Ambient Zen. Pads take their light echo with no chip of their own; the bass sweep
+            // stays off. Mirrored in AppState.restoreDefaultEffects — keep the two in step.
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.delay, .space]
+            case kTrackLead2:   [.delay, .space]
+            case kTrackPads:    [.space, .tremolo, .sweep, .delay]
+            case kTrackRhythm:  [.delay, .space, .pan]
+            case kTrackTexture: [.delay, .space]
+            case kTrackBass:    [.reverb, .tremolo]
+            default:            []
+            }
+        } else if activeStyle == .ambient {
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]
             case kTrackLead2:   isInstrumentLocked ? [.delay, .space] : [.space]

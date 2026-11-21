@@ -71,6 +71,9 @@
 		AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000057 /* AmbientRhythmGenerator.swift */; };
 		AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000058 /* AmbientTextureGenerator.swift */; };
 		AA000000000000000000059 /* AmbientHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000059 /* AmbientHelpers.swift */; };
+		AA000000000000000000781 /* AmbientZenPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000781 /* AmbientZenPlan.swift */; };
+		AA000000000000000000782 /* AmbientZenTracks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000782 /* AmbientZenTracks.swift */; };
+		AA000000000000000000783 /* AmbientZenLoops.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000783 /* AmbientZenLoops.swift */; };
 		AA000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */; };
 		AA000000000000000000061 /* ChillStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000061 /* ChillStructureGenerator.swift */; };
 		AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
@@ -170,6 +173,9 @@
 		IS000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000057 /* AmbientRhythmGenerator.swift */; };
 		IS000000000000000000058 /* AmbientTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000058 /* AmbientTextureGenerator.swift */; };
 		IS000000000000000000059 /* AmbientHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000059 /* AmbientHelpers.swift */; };
+		IS000000000000000000781 /* AmbientZenPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000781 /* AmbientZenPlan.swift */; };
+		IS000000000000000000782 /* AmbientZenTracks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000782 /* AmbientZenTracks.swift */; };
+		IS000000000000000000783 /* AmbientZenLoops.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000783 /* AmbientZenLoops.swift */; };
 		IS000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */; };
 		IS000000000000000000061 /* ChillStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000061 /* ChillStructureGenerator.swift */; };
 		IS000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
@@ -316,6 +322,9 @@
 		BB000000000000000000057 /* AmbientRhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientRhythmGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000058 /* AmbientTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientTextureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000059 /* AmbientHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientHelpers.swift; sourceTree = "<group>"; };
+		BB000000000000000000781 /* AmbientZenPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientZenPlan.swift; sourceTree = "<group>"; };
+		BB000000000000000000782 /* AmbientZenTracks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientZenTracks.swift; sourceTree = "<group>"; };
+		BB000000000000000000783 /* AmbientZenLoops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientZenLoops.swift; sourceTree = "<group>"; };
 		BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillMusicalFrameGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000061 /* ChillStructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillStructureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000062 /* ChillDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillDrumGenerator.swift; sourceTree = "<group>"; };
@@ -598,6 +607,9 @@
 				BB000000000000000000057 /* AmbientRhythmGenerator.swift */,
 				BB000000000000000000058 /* AmbientTextureGenerator.swift */,
 				BB000000000000000000059 /* AmbientHelpers.swift */,
+				BB000000000000000000781 /* AmbientZenPlan.swift */,
+				BB000000000000000000782 /* AmbientZenTracks.swift */,
+				BB000000000000000000783 /* AmbientZenLoops.swift */,
 			);
 			path = Ambient;
 			sourceTree = "<group>";
@@ -969,6 +981,9 @@
 				AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */,
 				AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */,
 				AA000000000000000000059 /* AmbientHelpers.swift in Sources */,
+				AA000000000000000000781 /* AmbientZenPlan.swift in Sources */,
+				AA000000000000000000782 /* AmbientZenTracks.swift in Sources */,
+				AA000000000000000000783 /* AmbientZenLoops.swift in Sources */,
 				AA000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */,
 				AA000000000000000000061 /* ChillStructureGenerator.swift in Sources */,
 				AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */,
@@ -1075,6 +1090,9 @@
 				IS000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */,
 				IS000000000000000000058 /* AmbientTextureGenerator.swift in Sources */,
 				IS000000000000000000059 /* AmbientHelpers.swift in Sources */,
+				IS000000000000000000781 /* AmbientZenPlan.swift in Sources */,
+				IS000000000000000000782 /* AmbientZenTracks.swift in Sources */,
+				IS000000000000000000783 /* AmbientZenLoops.swift in Sources */,
 				IS000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */,
 				IS000000000000000000061 /* ChillStructureGenerator.swift in Sources */,
 				IS000000000000000000062 /* ChillDrumGenerator.swift in Sources */,

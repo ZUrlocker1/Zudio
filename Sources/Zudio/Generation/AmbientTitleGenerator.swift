@@ -197,8 +197,8 @@ struct AmbientTitleGenerator {
 
     // JMJ-style French concept words (parody of Oxygene, Equinoxe, etc.)
     private static let jmjConcepts = [
-        "Oxygene", "Equinoxe", "Magnetique", "Kronologie", "Electrique",
-        "Metamorphoses", "Electronique", "Atmosphere", "Crezendo",
+        "Oxydoze", "Nokturn", "Magnevibe", "Kronologie", "Morphique",
+        "Metamorphoze", "Electronoze", "Atmosphyre", "Crezendo",
         "Cozmique", "Solstice", "Anthropique", "Lumineux", "Galactique",
         "Telephonie", "Zenith", "Isotrope", "Maladoxe", "Zut Alors"
     ]

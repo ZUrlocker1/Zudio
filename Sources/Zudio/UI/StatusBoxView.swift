@@ -259,7 +259,7 @@ struct StatusBoxView: View {
         #endif
 
         for (i, entry) in entries.enumerated() {
-            // A testing marker ("* " new, "F " fixed clash; see GenerationLogEntry) moves up beside
+            // The testing marker ("* " new or changed rule; see GenerationLogEntry) moves up beside
             // the rule ID, one space after it and in the same green: "CHL-LD2-004 *  Rhythm trade".
             // The saved file keeps it in the description.
             let marker = entry.isTitle ? nil

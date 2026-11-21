@@ -276,6 +276,7 @@ final class AppState: ObservableObject {
             if let name = substyleName { return name }
             let vals = Set(forcedRules.values)
             if forcedRules.values.contains(where: { $0.hasPrefix("AMB-PNO-") })   { return "Ambient Piano" }
+            if forcedRules["Zen"] == "true"                                       { return "Ambient Zen" }
             if forcedRules.values.contains(where: { $0.hasPrefix("CHL-BLUES-") }) { return "Chill Blues" }
             if !vals.isDisjoint(with: ["MOT-DRUM-005","MOT-DRUM-006","MOT-DRUM-007","MOT-DRUM-008",
                                        "MOT-BASS-016","MOT-BASS-017","MOT-BASS-018","MOT-BASS-019","MOT-BASS-020","MOT-BASS-021"]) {
@@ -387,7 +388,10 @@ final class AppState: ObservableObject {
             forceBluesVariation:  forceBlues,
             forceSohoVariation:   forceSoho,
             forbidSohoVariation:  forbidSoho,
-            forceAmbientPianoRule: forced["Piano"]
+            forceAmbientPianoRule: forced["Piano"],
+            // A Zen song records "Zen" in its forced rules, so it reloads as Zen whatever the
+            // Ambient shares are by then.
+            forceAmbientZen:      forced["Zen"] == "true"
         )
         // Every saved seed is known before the replay, so a track that reads another's seed sees the
         // final one whatever the order: Bass (replayed before Drums) locks to the regenerated drums'
@@ -668,8 +672,8 @@ final class AppState: ObservableObject {
     // If the SAME instrument was used in the previous song, a different one is chosen.
     // All instruments remain equally available — this only prevents back-to-back repeats.
     private static let noRepeatInstruments: [(track: Int, style: MusicStyle, poolIndex: Int)] = [
-        (kTrackLead1,  .ambient, 1),  // Ocarina          patch 79
-        (kTrackLead1,  .ambient, 1),  // Stereo Piano     patch 61001
+        (kTrackLead1,  .ambient, 2),  // Ocarina          patch 79 (was 1, which is Flute; fixed 2026-11-21)
+        (kTrackLead1,  .ambient, 0),  // Stereo Piano     patch 61001 (was 1, so it could play two songs running; fixed 2026-11-21)
         (kTrackLead2,  .kosmic,  2),  // Charang          patch 84
         (kTrackLead2,  .kosmic,  3),  // Vox Solo         patch 85
         (kTrackBass,   .kosmic,  2),  // Lead Bass        patch 87
@@ -680,6 +684,7 @@ final class AppState: ObservableObject {
         (kTrackBass,   .motorik, 2),  // Rock Bass        patch 34
         (kTrackLead2,  .motorik, 1),  // Brightness       patch 100
         (kTrackLead2,  .ambient, 0),  // Harp             patch 46
+        (kTrackLead1,  .ambient, 10), // Echo Drops       patch 102 — Zen only, once and only once (Zack, 2026-11-21)
         (kTrackLead2,  .ambient, 1),  // Acoustic Guitar  patch 24
         (kTrackBass,   .ambient, 2),  // Voice Oohs       patch 54
         (kTrackBass,   .ambient, 3),  // FM Synth         patch 62
@@ -751,14 +756,18 @@ final class AppState: ObservableObject {
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet","Flute","Soprano Sax","Recorder"]
-        case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
+        // + Ambient Zen's bells (2026-11-20): Vibraphone, Tine EP and Echo Drops; Zen also draws Harp.
+        case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi",
+                                                "Vibraphone","Tine EP","Echo Drops"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai",
                                                 "Synth Brass 1","Synth Brass 2","5th Saw Wave","Bright Saw"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         // Blues drops Flute; the generator never chose Xylophone for any form, so it is gone.
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Alto Sax","Tenor Sax","Synth Brass 1"]
-        case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
+        // + Ambient Zen's answering bells (2026-11-20).
+        case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere",
+                                                "Celesta","Marimba","Kalimba","Tinkling Bells","Christmas Bells"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal",
                                                 "Synth Strings 1","Saw Lead","Square Lead 2"]
         case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar","Square Lead","Synth Lead","Saw Lead","5th Saw Wave"]
@@ -783,7 +792,14 @@ final class AppState: ObservableObject {
         // Stereo Strings (p49) is the only pad shared at all, by Blues and Soho; nothing is
         // common to all three.
         case (kTrackPads,    .chill):   return ["Warm Pad","Strings Fast","Sweep Pad","Soundtrack","Cello","Synth Strings 5","Strings Slow","Halo Pad","Bowed Glass"]
-        case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
+        // Ambient pads: base Ambient's four, then Ambient Zen's (2026-11-20), appended so every
+        // saved index still points at the same sound. Zen's Rhodes-like pads (Warm Pad to Halo
+        // Swell) and glass and strings pads (Glass Swell to Strings 5 Swell) are kept together.
+        // The Swell presets are bank 14 copies with a slow attack and release. The picker holds
+        // only what Zen, base Ambient or Ambient Piano use; Zen's choir voices were removed.
+        case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack",
+                                                "Warm Pad","Fantasia","FM Piano","Warm Swell","Halo Swell",
+                                                "Glass Swell","Strings 3 Swell","Strings 5 Swell"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2",
                                                 "Synth Strings 3","Synth Strings 4","Synth Strings 5","Stereo Strings Slow"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
@@ -798,19 +814,27 @@ final class AppState: ObservableObject {
         // tremolo by default — see rhythmUsesTremolo, which keys on the GM guitar family.
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar",
                                                  "Jazz Guitar","Funk Guitar"]
-        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
+        // + Ambient Zen's Synth Chime (2026-11-20) and Christmas Bells (2026-11-21).
+        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba",
+                                                 "Synth Chime","Christmas Bells"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad",
                                                  "Pulse Bass"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
-        case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
+        // + Ambient Zen's pedal: Tonewheel, the choir-like Synth Voice and Space Voice, then Solar Wind
+        // Swell and Polysynth Swell (Choir Aahs is shared with base Ambient). Warm Pad and Bowed Glass
+        // are on Zen's pads, so the pedal has neither.
+        case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly",
+                                                "Tonewheel","Synth Voice","Space Voice","Solar Swell","Sine Swell"]
         case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain","White Noise","Solar Wind 2","Starship","Interference"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
                                                 "Solar Wind","Interference","Guitar Fdbk","Metal Pad","Ice Rain","Mystery Pad"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
-        case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
+        // + Ambient Zen's long-sustain basses (Voice Oohs is shared).
+        case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad",
+                                                "Synth Bass 101","Saw Bass Swell","Brass Swell","Pulse Swell","Bass Swell","Synth Swell","Polysynth Swell"]
         case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad",
                                                 "Fretless Bass","Synth Bass 101","Mean Saw Bass"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 3"]
@@ -837,22 +861,24 @@ final class AppState: ObservableObject {
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71, 73, 64, 74]
-        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77]
+        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77, 11, 4, 102]   // + Zen: Vibraphone, Tine EP, Echo Drops
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111,  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
                                               62, 63, 86, 11100]                     // + Space: Synth Brass 1/2, 5th Saw, Bright Saw
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 65, 66, 62]
-        case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
+        case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99, 8, 12, 108, 11008, 12010]   // + Zen: Celesta, Marimba, Kalimba, Tinkling Bells, Christmas Bells
         case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98, 50, 81, 12080]  // + Space: Synth Strings 1, Saw Lead, Square Lead 2
         case (kTrackLead2, .motorik):  return [90, 100, 39, 30, 80, 87, 81, 86]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
-        case (kTrackPads, .ambient):   return [95, 50, 94, 97]
+        case (kTrackPads, .ambient):   return [95, 50, 94, 97,
+                                              89, 88, 5, 14089, 14094,         // + Zen: Warm Pad, Fantasia, FM Piano, Warm Swell, Halo Swell
+                                              14092, 14050, 14051]             // + Zen glass and strings: Glass, Strings 3, Strings 5 (all Swell copies; Slow Strings removed 2026-11-21)
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088,
                                               8050, 11050, 11051, 49]                // + Space: Synth Strings 3/4/5, Stereo Strings Slow
         case (kTrackPads, .chill):     return [89, 48, 95, 97, 42, 11051, 49, 94, 92]
         case (kTrackPads, _):          return [94, 95, 92, 50]
-        case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
+        case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108, 11098, 12010]   // + Zen: Synth Chime, Christmas Bells
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016, 24, 26, 8028]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096,  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
                                               11039]                                  // + Space: Pulse Bass (Synth Bass 1, 38, is a 25 ms click in the SF2)
@@ -861,12 +887,12 @@ final class AppState: ObservableObject {
         case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84, 11088, 4]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
-        case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
+        case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90, 16, 54, 91, 14088, 14080]   // + Zen: Tonewheel, Synth Voice, Space Voice, Solar Wind Swell, Sine Swell
         case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96, 12122, 12089, 8125, 11127]  // + Rain, + Space: White Noise Wave, Solar Wind 2, Starship, Interference
         case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031, 93, 96, 11096]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
-        case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
+        case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93, 1038, 14038, 14062, 14039, 14087, 14037, 14090]   // + Zen: Synth Bass 101, then swell copies: Saw Bass, Brass, Pulse Bass, Lead Bass, Synth Bass 3, Polysynth
         case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89, 35, 1038, 12038]  // + Space: Fretless Bass, Synth Bass 101, Mean Saw Bass
         case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 8038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
@@ -2496,8 +2522,17 @@ final class AppState: ObservableObject {
     // Stored as a raw MIDI program number so it survives pool-index lookup differences.
     private func applyLead2Mirror(for state: SongState) {
         let mirrorRules: Set<String> = ["AMB-LEAD-001", "AMB-LEAD-002", "AMB-LEAD-007", "AMB-LEAD-008"]
+        // Ambient Zen: Lead 2 takes Lead 1's bell in the songs whose dial says so (25 percent),
+        // when Lead 2 plays at all.
+        // Never when Lead 1 is Echo Drops (102): its choir-like voice stays on one track (Zack, 2026-11-21).
+        let zenLead1Program = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .ambient)
+            .dropFirst(instrumentOverrides[kTrackLead1] ?? 0).first
+        let zenSync = state.isAmbientZen
+            && AmbientZenDials.draw(seed: state.globalSeed).lead2SyncsLead1
+            && state.generationLog.contains { $0.tag == "AMB-LD2-014" }
+            && zenLead1Program != 102
         guard state.style == .ambient,
-              state.generationLog.contains(where: { mirrorRules.contains($0.tag) })
+              zenSync || (!state.isAmbientZen && state.generationLog.contains(where: { mirrorRules.contains($0.tag) }))
         else { return }
         let lead1Idx      = instrumentOverrides[kTrackLead1] ?? 0
         let lead1Names    = Self.instrumentPoolNames(trackIndex: kTrackLead1, style: .ambient)
@@ -2745,6 +2780,62 @@ final class AppState: ObservableObject {
             case kTrackPads:    return isDrift ? [0,1,2,4,5,6]   : Array(0..<min(poolCount, 7))
             case kTrackBass:    return isDrift ? [1,3,4,6,7]     : Array(0..<min(poolCount, 8))
             default: break
+            }
+        }
+        if style == .ambient {
+            // Ambient Zen draws only its own short lists; base Ambient and Ambient Piano keep the
+            // indices they drew before Zen's instruments were appended, so no seed moves.
+            if state?.isAmbientZen == true {
+                switch trackIndex {
+                // Pads by the song's pad colour: [4=Warm Pad, 2=Halo Pad, 5=Fantasia, 6=FM Piano,
+                // 7=Warm Swell, 8=Halo Swell] or glass and strings [9=Glass Swell, 10=Strings 3 Swell,
+                // 11=Strings 5 Swell] (Slow Strings Swell removed, Zack 2026-11-21: two strings are enough). Choir voices are out of the pads and the
+                // picker (Zack, 2026-11-20): choir is on the pedal only, and the picker holds only
+                // instruments that Zen, base Ambient or Ambient Piano use.
+                case kTrackPads:
+                    let colour = state.map { AmbientZenDials.draw(seed: $0.globalSeed).padColour } ?? .rhodes
+                    return (colour == .rhodes ? [4, 2, 5, 6, 7, 8] : [9, 10, 11]).filter { $0 < poolCount }
+                // Texture: Tonewheel [5], Solar Wind Swell [8] and Sine Swell [9], 17 entries each (85
+                // percent), then the voices Choir Aahs [2] (5) and Space Voice [7] (4), 15 percent in
+                // all. Synth Voice [6] is out (Zack, 2026-11-21: a voice on Texture is a wall of sound). Zack, 2026-11-20: choir only on
+                // the pedal, no MIDI patch repeats across Zen tracks (Warm Pad and Bowed Glass are
+                // on Pads, Sine Wave moved here from Bass, Polysynth Swell moved to Bass), synth only.
+                case kTrackTexture:
+                    return (Array(repeating: 5, count: 17) + Array(repeating: 8, count: 17)
+                            + Array(repeating: 9, count: 17) + Array(repeating: 2, count: 5)
+                            + Array(repeating: 7, count: 4)).filter { $0 < poolCount }
+                // Bass, all synth and all long-sustaining: Synth Bass 101 [5] and the swell copies Saw
+                // Bass [6], Brass [7], Pulse Bass [8], Lead Bass [9], Synth Bass 3 [10] and Polysynth [11]. No Voice
+                // Oohs (choir is pedal only), no Cello (base Ambient's), no Sine Wave (now the pedal's
+                // Sine Swell), no Fretless Bass (it dies away too soon). Zack, 2026-11-20.
+                case kTrackBass:    return [5, 6, 7, 8, 9, 10, 11].filter { $0 < poolCount }
+                // The bells (phase 2). AMB-1 plays all its bell loops on one voice, so a sound may
+                // be shared between bell tracks (Zack, 2026-11-20): Harp on both leads. Celesta is
+                // Rhythm's only (Zack, 2026-11-21).
+                // Lead 1: Vibraphone [8], Tine EP [9], Harp [6], 6 entries each, and Echo Drops [10]
+                // at 2 of 20 (10 percent): it sounds like a choir, so it is rare, never two songs
+                // running (noRepeatInstruments) and never copied to Lead 2 by the lock (Zack, 2026-11-21).
+                case kTrackLead1:   return ([8,8,8,8,8,8, 9,9,9,9,9,9, 6,6,6,6,6,6, 10,10] as [Int]).filter { $0 < poolCount }
+                // Lead 2: Tinkling Bells [8], Christmas Bells [9], Kalimba [7], Harp [0]. Celesta [5]
+                // and Marimba [6] (too wooden) are out (Zack, 2026-11-21); they stay in the pool so
+                // later indices don't move. Xylophone was tried briefly and dropped.
+                case kTrackLead2:   return [8, 9, 7, 0].filter { $0 < poolCount }
+                // Rhythm: Glockenspiel [0], Celesta [1], Tinker Bell [4], Synth Chime [8], Christmas
+                // Bells [9] (2026-11-21, to audition beside Lead 2's).
+                case kTrackRhythm:  return [0, 1, 4, 8, 9].filter { $0 < poolCount }
+                default: break
+                }
+            }
+            // Base Ambient and Ambient Piano draw from the pools as they stood before Zen appended
+            // to them, so no seed moves.
+            switch trackIndex {
+            case kTrackPads:    return Array(0..<min(poolCount, 4))
+            case kTrackTexture: return Array(0..<min(poolCount, 5))
+            case kTrackBass:    return Array(0..<min(poolCount, 5))
+            case kTrackLead1:   return Array(0..<min(poolCount, 8))
+            case kTrackLead2:   return Array(0..<min(poolCount, 5))
+            case kTrackRhythm:  return Array(0..<min(poolCount, 8))
+            default:            return Array(0..<poolCount)
             }
         }
         guard style == .chill else { return Array(0..<poolCount) }
@@ -3146,7 +3237,9 @@ final class AppState: ObservableObject {
             // and Blues Pads (CHL-PAD-004) have a single rule, so no attempt could ever pass:
             // every Blues pass ran all four full regenerations and kept the last. A fresh seed
             // is the only change available on a fixed rule, so those skip (a).
-            let ruleIsFixed = anchor.chillBluesVariation && (idx == kTrackLead2 || idx == kTrackPads)
+            // Ambient Zen has one rule per track too (AMB-LD1-011, AMB-PADS-011, ...).
+            let ruleIsFixed = (anchor.chillBluesVariation && (idx == kTrackLead2 || idx == kTrackPads))
+                || anchor.isAmbientZen
             var attempts = 1
             while attempts < 4 {
                 let newRuleIDs = Set(newEntries.map(\.tag).filter(isRuleID))
@@ -3378,9 +3471,15 @@ final class AppState: ObservableObject {
             return
         }
 
-        // If bass or drums are absent from the anchor body, add them to freshTracks so the
-        // evolve pass introduces them. Both passes do this so bass/drums persist through pass 2.
-        freshTracks += absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
+        // Ambient Zen follows the normal passes (Zack, 2026-11-21): Lead 1 and Lead 2, then Pads and
+        // Rhythm, each through Zen's own regenerate branches. It never adds the absent Bass or
+        // Drums: Zen's drums are silent by design, and the generic drum path would bring in base
+        // Ambient percussion.
+        if !anchor.isAmbientZen {
+            // If bass or drums are absent from the anchor body, add them to freshTracks so the
+            // evolve pass introduces them. Both passes do this so bass/drums persist through pass 2.
+            freshTracks += absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
+        }
         // Chill pass 1: the lead instruments are chosen now, so the leads are written for them.
         let leadInstruments = pass == 1 ? evolveLeadInstruments(for: anchor) : nil
         evolvePassInFlight = true
@@ -4607,6 +4706,20 @@ final class AppState: ObservableObject {
         // Apply style defaults
         let defaults: [TrackEffect]
         switch selectedStyle {
+        case .ambient where songState?.isAmbientZen == true:
+            // Ambient Zen (docs/Ambient-Zen-plan.md, section 11). Pads take their light echo with
+            // no chip of its own, as Kosmic Space's Texture takes four effects on three chips.
+            // The bass sweep stays off: it follows the per-note fade, which Zen does not use.
+            // Mirrors TrackRowView.applyDefaultEffects — keep the two in step.
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.delay, .space]
+            case kTrackLead2:   [.delay, .space]
+            case kTrackPads:    [.space, .tremolo, .sweep, .delay]
+            case kTrackRhythm:  [.delay, .space, .pan]
+            case kTrackTexture: [.delay, .space]
+            case kTrackBass:    [.reverb, .tremolo]
+            default:            []
+            }
         case .ambient:
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]

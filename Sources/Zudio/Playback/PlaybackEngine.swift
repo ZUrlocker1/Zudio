@@ -150,6 +150,15 @@ final class PlaybackEngine: ObservableObject {
     // Delay times in beats: Lead1=dotted-quarter(0.75), Lead2=dotted-quarter(0.75),
     //                       Rhythm=dotted-half(1.5), Texture=1-beat, Drums=1-beat
     private let ambientDelayBeats:   [Double] = [0.75, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0, 1.0]
+    // Ambient Zen's echo (docs/Ambient-Zen-plan.md, sections 7 and 8): a long, darkening echo.
+    // Feedback is the song's echo-size dial (74 to 79 percent), set in setAmbientMode. The time is
+    // 2 beats (Lead 2 at 0.75 of Lead 1, Rhythm 1.5 beats), capped at AVAudioUnitDelay's 2 s.
+    // Bells roll off at 2600 Hz, Pads and Texture at 1800 Hz; Bass and Drums take none.
+    private let zenDelayWet:     [Float]  = [45,   50,   15,   48,   10,   -1,  -1,  -1]
+    private let zenDelayLowpass: [Float]  = [2600, 2600, 1800, 2600, 1800, -1,  -1,  -1]
+    private let zenDelayBeats:   [Double] = [2.0,  1.5,  2.0,  1.5,  2.0,  1.0, 1.0, 1.0]
+    /// The Ambient delay wet table in force: Zen's in an Ambient Zen song.
+    private var ambientDelayWetTable: [Float] { cachedIsAmbientZen ? zenDelayWet : ambientDelayWet }
 
     // Per-track base volumes — persisted so applyMuteState restores the right level, not 1.0
     private var trackBaseVolume = Array(repeating: Float(1.0), count: kTrackCount)
@@ -515,8 +524,13 @@ final class PlaybackEngine: ObservableObject {
     /// Track order: Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6, LeadSynth=7.
     nonisolated static func staticPans(kosmic: Bool, motorik: Bool, ambient: Bool,
                                        chillPads: Bool, chillSoho: Bool,
-                                       kosmicSpace: Bool = false, spaceStereoTwin: Bool = false) -> [Float] {
-        if kosmic && kosmicSpace && spaceStereoTwin {
+                                       kosmicSpace: Bool = false, spaceStereoTwin: Bool = false,
+                                       ambientZen: Bool = false) -> [Float] {
+        if ambient && ambientZen {
+            // Ambient Zen's bells (docs/Ambient-Zen-plan.md, section 8): Lead 1 left, Lead 2 right
+            // of centre, Rhythm further right, where its auto-pan swings around (zenRhythmPanCentred).
+            return [-0.60, 0.35, 0.10, 0.60, 0, 0, 0, 0]
+        } else if kosmic && kosmicSpace && spaceStereoTwin {
             // KOS-LD2-001 stereo twin: Rhythm and its twin on Lead 2 wide apart on either side, as
             // Magnetic Fields 1's two sequencers; Rhythm's auto-pan holds still.
             return [-0.10, -0.45, 0, 0.45, -0.22, 0, 0, 0]
@@ -549,7 +563,8 @@ final class PlaybackEngine: ObservableObject {
                                          ambient: ambientMode, chillPads: chillPadsMode,
                                          chillSoho: chillSohoMode,
                                          kosmicSpace: songState?.isKosmicSpace == true,
-                                         spaceStereoTwin: kosmicStyle && songState?.isSpaceStereoTwin == true)
+                                         spaceStereoTwin: kosmicStyle && songState?.isSpaceStereoTwin == true,
+                                         ambientZen: ambientMode && cachedIsAmbientZen)
         cachedSpaceStereoTwin = kosmicStyle && songState?.isSpaceStereoTwin == true
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
@@ -996,7 +1011,9 @@ final class PlaybackEngine: ObservableObject {
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
             // The chosen duration is stored per-track and reused for the matching note-off.
-            if hasEvents, self.ambientMode {
+            // Ambient Zen skips it on both: its pad voices and bass joins overlap, and one ramp per
+            // track would duck the notes still sounding at every note-off.
+            if hasEvents, self.ambientMode, !self.cachedIsAmbientZen {
                 for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackBass || trackIndex == kTrackPads {
                         let noteSecs  = Double(ev.durationSteps) * sps
@@ -1231,6 +1248,9 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedLead1Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedLead2Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedIsAmbientPiano:   Bool  = false
+    /// The loaded song is Ambient Zen. Set only in setAmbientMode, and not cleared with the
+    /// program cache: the per-note fade reads it on every step.
+    nonisolated(unsafe) private var cachedIsAmbientZen:     Bool  = false
     nonisolated(unsafe) private var cachedIsKosmicDrift:    Bool  = false
     nonisolated(unsafe) private var cachedIsKosmicSpace:    Bool  = false
     // The song's current drum rule is KOS-DRUM-005 Electric Buddha Pulse (set with songState).
@@ -1354,8 +1374,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.78   // Mean Saw Bass runs hot on Motorik Arcade bass — pull back
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {
                 vol = 0.22   // Lead Bass runs hot on Motorik bass — pull back (0.30 until 2026-11-10, then about 2.7 dB lower)
-            } else if trackIndex == kTrackBass && program == 87 {
-                vol = 0.56   // Lead Bass runs hot
+            } else if trackIndex == kTrackBass && (program == 87 || program == 14087) {
+                vol = 0.56   // Lead Bass (and its Ambient Zen Swell copy) runs hot
             } else if trackIndex == kTrackLead2 && program == 86 {
                 vol = 1.35   // 5th Saw Wave runs soft on Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && motorikStyle && program == 87 {
@@ -1399,12 +1419,22 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.8    // Starship runs hot at the default Texture gain — measured at about 1.7x White Noise Wave
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 102 {
                 vol = 0.50   // FX Echoes — pull back from general 1.4 Texture boost
+            } else if trackIndex == kTrackBass && ambientMode && program == 14090 {
+                vol = 0.5    // Polysynth Swell (Ambient Zen bass, moved from the pedal 2026-11-20) runs loud; pulled back; by ear
+            } else if trackIndex == kTrackTexture && ambientMode && program == 14080 {
+                vol = 0.7    // Sine Swell (Ambient Zen pedal): a pure tone carries far at the Texture boost; by ear
+            } else if trackIndex == kTrackTexture && ambientMode && program == 14088 {
+                vol = 0.8    // Solar Wind Swell (Ambient Zen pedal): Solar Wind runs loud, as on Kosmic Texture; by ear
+            } else if trackIndex == kTrackTexture && ambientMode && program == 16 {
+                vol = 0.8    // Tonewheel (Ambient Zen pedal) is loud next to the soft textures the 2.0 below lifts; by ear
             } else if trackIndex == kTrackTexture && ambientMode {
                 vol = 2.0    // Ambient Texture instruments run soft — boost
             } else if trackIndex == kTrackTexture {
                 vol = 1.4    // Texture pads are quiet
             } else if trackIndex == kTrackDrums && ambientMode {
                 vol = 2.2    // Drums sit under heavy Ambient reverb — boost so they're audible
+            } else if trackIndex == kTrackBass && ambientMode && program == 14062 {
+                vol = 0.25   // Brass Swell (Ambient Zen bass) still sat forward at 0.40, so about 4 dB lower (Zack, 2026-11-20); by ear
             } else if trackIndex == kTrackBass && ambientMode && program == 62 {
                 vol = 0.40   // FM Synth (Synth Brass 1) runs loud on Ambient bass — pull back
             } else if trackIndex == kTrackRhythm && ambientMode && program == 8 {
@@ -1635,8 +1665,8 @@ final class PlaybackEngine: ObservableObject {
             // non-Ambient sweep uses standard 300–3100 Hz range at 0.07 Hz.
             // Ambient bass sweep is amplitude-coupled in live playback but approximated as
             // a standard LFO in export (the per-note fade coupling cannot be reproduced offline).
-            let sFloor:     Float  = ambientMode ? ambientSweepFloor[i]    : 300
-            let sHalfRange: Float  = ambientMode ? ambientSweepHalfRange[i]: 1600
+            let sFloor:     Float  = ambientMode ? ambientSweepFloorFor(i)    : 300
+            let sHalfRange: Float  = ambientMode ? ambientSweepHalfRangeFor(i): 1600
             let sInc:       Double = ambientMode ? ambientSweepPhaseInc[i] : 0.02199
             let sweepHz:    Float  = Float(sInc * 20.0 / (2.0 * .pi))   // phaseInc is per 20fps tick
 
@@ -1792,6 +1822,7 @@ final class PlaybackEngine: ObservableObject {
     func setAmbientMode(_ enabled: Bool) {
         ambientMode = enabled
         cachedIsAmbientPiano = enabled && songState?.isAmbientPiano == true
+        cachedIsAmbientZen   = enabled && songState?.isAmbientZen == true
         if !enabled {
             for i in 0..<lowEQs.count { lowEQs[i].bands[1].bypass = true }
             applyStaticPans()
@@ -1838,8 +1869,11 @@ final class PlaybackEngine: ObservableObject {
             delays[kTrackLead1].feedback      = 0
             delays[kTrackLead1].lowPassCutoff = 2800
         }
-        // Enable HPF (250 Hz) on Lead and Texture to prevent reverb low-end muddiness.
-        let hpfTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackTexture]
+        if cachedIsAmbientZen { applyAmbientZenAudio() }
+        // Enable HPF (250 Hz) on Lead and Texture to prevent reverb low-end muddiness. Ambient
+        // Zen leaves it off Texture: the pedal's fundamental is 131 to 370 Hz.
+        let hpfTracks: Set<Int> = cachedIsAmbientZen ? [kTrackLead1, kTrackLead2]
+                                                     : [kTrackLead1, kTrackLead2, kTrackTexture]
         for i in 0..<lowEQs.count {
             lowEQs[i].bands[1].bypass = !hpfTracks.contains(i)
         }
@@ -1848,6 +1882,37 @@ final class PlaybackEngine: ObservableObject {
         if songState?.isAmbientPiano == true {
             trackStaticPan[kTrackLead1] = 0.0
             boosts[kTrackLead1].pan     = 0.0
+        }
+    }
+
+    /// Ambient Zen's space (docs/Ambient-Zen-plan.md, section 7): a long hall on the large bus for
+    /// everything but the bass and drums, a near-dry centred bass on the small bus, and a long,
+    /// darkening echo. Existing settings with new values only.
+    private func applyAmbientZenAudio() {
+        setBusPresets(large: .largeHall2, small: .mediumHall)
+        connectSend(kTrackPads,      to: .large, wetDryMix: 75)
+        connectSend(kTrackLead1,     to: .large, wetDryMix: 68)
+        connectSend(kTrackLead2,     to: .large, wetDryMix: 68)
+        connectSend(kTrackRhythm,    to: .large, wetDryMix: 70)
+        connectSend(kTrackTexture,   to: .large, wetDryMix: 55)
+        connectSend(kTrackBass,      to: .small, wetDryMix: 10)
+        connectSend(kTrackDrums,     to: .small, wetDryMix: 35)
+        connectSend(kTrackLeadSynth, to: .small, wetDryMix: 0)
+        perTrackReverbPresets[kTrackLead1]     = .largeHall2
+        perTrackReverbPresets[kTrackLead2]     = .largeHall2
+        perTrackReverbPresets[kTrackPads]      = .largeHall2
+        perTrackReverbPresets[kTrackRhythm]    = .largeHall2
+        perTrackReverbPresets[kTrackTexture]   = .largeHall2
+        perTrackReverbPresets[kTrackBass]      = .mediumHall
+        perTrackReverbPresets[kTrackDrums]     = .mediumHall
+        perTrackReverbPresets[kTrackLeadSynth] = .mediumHall
+        let tempo    = songState?.frame.tempo ?? 72
+        let beatSecs = 60.0 / Double(tempo)
+        let feedback = songState.map { AmbientZenDials.draw(seed: $0.globalSeed).echoFeedbackPercent } ?? 76
+        for i in 0..<Swift.min(delays.count, zenDelayWet.count) where zenDelayWet[i] >= 0 {
+            delays[i].delayTime     = Swift.min(2.0, beatSecs * zenDelayBeats[i])
+            delays[i].feedback      = feedback
+            delays[i].lowPassCutoff = zenDelayLowpass[i]
         }
     }
 
@@ -2015,10 +2080,10 @@ final class PlaybackEngine: ObservableObject {
                 let beatSecs = 60.0 / Double(songState?.frame.tempo ?? 120)
                 delays[trackIndex].delayTime = Swift.min(2.0, beatSecs * 0.75)
             }
-            if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
+            if ambientMode, trackIndex < ambientDelayWetTable.count, ambientDelayWetTable[trackIndex] >= 0 {
                 let wet: Float = (trackIndex == kTrackLead1 && songState?.isAmbientPiano == true)
                     ? 14   // piano needs a touch of thickening, not an audible repeating echo
-                    : ambientDelayWet[trackIndex]
+                    : ambientDelayWetTable[trackIndex]
                 delays[trackIndex].wetDryMix = enabled ? wet : 0
             } else if chillPadsMode && trackIndex == kTrackLead1 {
                 delays[trackIndex].wetDryMix = enabled ? 30 : 0  // St. Germain echo: subtle shadow
@@ -2035,7 +2100,10 @@ final class PlaybackEngine: ObservableObject {
         case .pan:
             if enabled {
                 let hz: Double
-                if (ambientMode || kosmicStyle) && trackIndex == kTrackTexture {
+                if ambientMode && cachedIsAmbientZen && trackIndex == kTrackRhythm {
+                    // Ambient Zen's bell Rhythm: one slow sweep every 8 bars.
+                    hz = Double(songState?.frame.tempo ?? 72) / (240.0 * 8.0)
+                } else if (ambientMode || kosmicStyle) && trackIndex == kTrackTexture {
                     // 1 full sweep per 4 bars (Space: 2, 4 or 8) — tempo-aware, slow and meditative.
                     // Ambient: ~12.8s at 75 BPM. Kosmic Drift: ~10.6s at 90 BPM.
                     let bpm = Double(songState?.frame.tempo ?? 75)
@@ -2202,15 +2270,16 @@ final class PlaybackEngine: ObservableObject {
         // Sweep — ~20fps, all active tracks (skipped for tracks overridden by global sweep)
         for i in 0..<kTrackCount where sweepEnabled[i] && globalSweepTicksRemaining == 0 {
             let cutoff: Float
-            if ambientMode && i == kTrackBass {
+            if ambientMode && i == kTrackBass && !cachedIsAmbientZen {
                 // Amplitude-coupled: cutoff tracks the boost node volume (300 Hz closed → 3500 Hz open).
+                // Not in Ambient Zen, which has no per-note fade: its bass sweep is an ordinary LFO.
                 cutoff = 300 + 3200 * boosts[kTrackBass].outputVolume
             } else {
                 let inc:   Double
                 let floor: Float
                 let half:  Float
                 if ambientMode {
-                    (inc, floor, half) = (ambientSweepPhaseInc[i], ambientSweepFloor[i], ambientSweepHalfRange[i])
+                    (inc, floor, half) = (ambientSweepPhaseInc[i], ambientSweepFloorFor(i), ambientSweepHalfRangeFor(i))
                 } else {
                     (inc, floor, half) = (0.02199, 300, 1600)
                 }
@@ -2249,7 +2318,9 @@ final class PlaybackEngine: ObservableObject {
             panPhase[i] += panPhaseInc[i]
             // A Space stereo twin's Rhythm holds its side: the pair is the stereo image.
             if i == kTrackRhythm && cachedSpaceStereoTwin { boosts[i].pan = trackStaticPan[i]; continue }
-            boosts[i].pan = Float(sin(panPhase[i])) * panDepth[i]
+            // Ambient Zen's Rhythm swings around its home at +0.6 rather than the centre.
+            let centre: Float = i == kTrackRhythm && ambientMode && cachedIsAmbientZen ? trackStaticPan[i] : 0
+            boosts[i].pan = centre + Float(sin(panPhase[i])) * panDepth[i]
         }
 
     }
@@ -2296,7 +2367,18 @@ final class PlaybackEngine: ObservableObject {
 
 
     private func startTremolo(forTrack i: Int) {
-        if (ambientMode || chillPadsMode) && i == kTrackPads {
+        if ambientMode && cachedIsAmbientZen && i == kTrackPads {
+            // Ambient Zen pads: a slow 0.06 Hz swell (a 17 s cycle) at depth 0.30.
+            tremPhaseInc[i]   = 0.018850   // 2π × 0.06 Hz / 20 fps
+            tremDepth[i]      = 0.30
+            tremBaseVolume[i] = 1.0
+        } else if ambientMode && cachedIsAmbientZen && i == kTrackBass {
+            // Ambient Zen bass: a slow, shallow 0.08 Hz movement under the bed, never above the
+            // track's calibrated volume. A sine bass wants some motion (by ear, 2026-11-20).
+            tremPhaseInc[i]   = 0.025133   // 2π × 0.08 Hz / 20 fps
+            tremDepth[i]      = 0.15
+            tremBaseVolume[i] = trackBaseVolume[i]
+        } else if (ambientMode || chillPadsMode) && i == kTrackPads {
             tremPhaseInc[i]   = 0.047124   // 2π × 0.15 Hz / 20 fps — one swell per ~6.5 seconds (runs at 20fps via lfoTick guard)
             tremDepth[i]      = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
             tremBaseVolume[i] = 1.0
@@ -2373,6 +2455,13 @@ final class PlaybackEngine: ObservableObject {
     private let ambientSweepFloor:     [Float]  = [300,    300,    1500,   300,    1500,   300,    300, 300]
     private let ambientSweepHalfRange: [Float]  = [1600,   1600,   2750,   1600,   2750,   1600,   1600, 1600]
     private let ambientSweepPhaseInc:  [Double] = [0.02199,0.02199,0.011,  0.02199,0.011,  0.02199,0.02199, 0.02199]
+    /// Ambient Zen's Pads sweep runs 1000 to 3000 Hz; every other track keeps the Ambient table.
+    private func ambientSweepFloorFor(_ i: Int) -> Float {
+        cachedIsAmbientZen && i == kTrackPads ? 1000 : ambientSweepFloor[i]
+    }
+    private func ambientSweepHalfRangeFor(_ i: Int) -> Float {
+        cachedIsAmbientZen && i == kTrackPads ? 1000 : ambientSweepHalfRange[i]
+    }
 
     private func startSweep(forTrack i: Int) {
         sweepEnabled[i] = true
@@ -2420,7 +2509,8 @@ final class PlaybackEngine: ObservableObject {
         panEnabled[i]  = true
         panPhase[i]    = 0.0
         panPhaseInc[i] = 2.0 * Double.pi * hz / 20.0  // increment per 20fps tick
-        panDepth[i]    = (kosmicStyle && i == kTrackRhythm && songState?.isKosmicSpace == true) ? 0.4 : 1.0
+        panDepth[i]    = (kosmicStyle && i == kTrackRhythm && songState?.isKosmicSpace == true) ? 0.4
+                       : (ambientMode && cachedIsAmbientZen && i == kTrackRhythm) ? 0.35 : 1.0
         anyLFOActive   = true
         startSharedLFO()
     }
