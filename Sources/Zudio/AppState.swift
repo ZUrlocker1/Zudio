@@ -956,6 +956,9 @@ final class AppState: ObservableObject {
             // Synth Chime cuts through Kosmic's sustained texture more than the other rhythm
             // patches, which are pads and organs sitting further back.
             case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
+            // Warm Swell sat forward of the rest of the Ambient pad pool (Zack, 2026-11-22). 75 is
+            // about 2.5 dB down from the untouched 100; Zen, base Ambient and Piano all draw it.
+            case (kTrackPads,    .ambient, "Warm Swell"):   return 75
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
             // Chill audition guitar (Zack, 2026-10-15): Jazz sat under the rest of the rhythm
             // pool. 127 is the CC7 ceiling; the rest of its lift is PlaybackEngine's rhythm boost.
@@ -2862,9 +2865,11 @@ final class AppState: ObservableObject {
                     // Sweep Pad, Synth Strings, Soundtrack 15 each; the three swells 55 in all.
                     return weighted([(0, 15), (1, 15), (3, 15), (12, 19), (13, 18), (8, 18)])
                 case kTrackBass:
-                    // Cello, French Horn, FM Synth, Metallic Pad about 11 each; the two swells 55,
+                    // Cello, French Horn, Synth Bass 101 [5], Metallic Pad about 11 each; the three swells 55,
                     // Metal Swell 20, Cello Swell 15, Organ Swell 20 (FM Swell is Zen's; Zack, 2026-11-22).
-                    return weighted([(0, 11), (1, 11), (3, 11), (4, 12), (12, 20), (13, 15), (14, 20)])
+                    // Synth Bass 101 replaced FM Synth [3] in base Ambient on 2026-11-22: FM was too buzzy.
+                    // FM Synth stays in the pool and in Ambient Piano's picks.
+                    return weighted([(0, 11), (1, 11), (5, 11), (4, 12), (12, 20), (13, 15), (14, 20)])
                 default: break
                 }
             }
