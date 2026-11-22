@@ -1,7 +1,7 @@
 # Ambient Zen — substyle plan
 Copyright (c) 2026 Zack Urlocker
 
-*Status, 2026-11-21: phases 1 (the bed) and 2 (the bells and the swell) are built and committed (6cc1cbe). Zack has listened and likes it, and the first round of tuning by ear is done. Phase 3 waits until he says the bells are settled. This document describes Zen as it is now. The 2026-11-09 plan, with the AMB-1 code reading, the Eno research and every number, is kept in [Ambient-Zen-plan-old-2026-11-09.md](Ambient-Zen-plan-old-2026-11-09.md) as reference only; where the two disagree, this one wins.*
+*Status, 2026-11-21: This document describes Zen as it is now. The 2026-11-09 plan, with the AMB-1 code reading, the Eno research and every number, is kept in [Ambient-Zen-plan-old-2026-11-09.md](Ambient-Zen-plan-old-2026-11-09.md) as reference only; where the two disagree, this one wins.*
 
 **Contents**
 
@@ -89,7 +89,7 @@ Zudio normally rolls each track's rule on its own. Zen works only if every track
 13. **Bass low:** AMB-1's bass octave at -1, in 12 percent of songs (Zack, 2026-11-21). Never higher.
 14. **Bells low:** AMB-1's bell octave at -1, all three bell loops an octave down, 12 percent of songs (Zack, 2026-11-21). Never higher.
 15. **Echo character:** usual 75 percent; deep 15 (feedback 79 to 80 percent, bells 15 points wetter, after AMB-1's Shoreline); dry 10 (feedback 66 to 70, bells 15 points drier). One dial, so a song is never extreme both ways. The echo time doesn't change.
-16. **Big Ship cycle:** breathing pads 15 percent, block chords 15 percent while testing (likely 20 in all at release); otherwise the journey (section 5).
+16. **Big Ship cycle:** breathing pads 15 percent, block chords 15 percent; otherwise the journey (section 5).
 17. **Texture rule:** Low Tide 40 percent, Pearl Pedal 60.
 18. **Shell Voices:** drawn in 47 percent of songs and ignored under Big Ship block chords, so about 40 percent of all Zen songs (section 7).
 19. **Slow Glide:** 35 percent of songs play AMB-BASS-009 (section 7).
@@ -187,7 +187,7 @@ Zen computes its own safe set. The shared NotePoolBuilder's scaleTensions includ
 - **Block chords:** AMB-PADS-015 Big Ship Block Chords. All four voices strike together on each chord and hold it, on the same voicings; a note the next chord keeps holds on.
 - Layers come in by addition at half-cycles: Lead 1 at bar 16, Lead 2 at 32, Rhythm at 48 (or the latest half-cycle that leaves it 12 bars).
 - Texture, bass and bells follow the windows as in a journey, under the same clash rules.
-- The Chords line names the variant and the cycle's shape, no numerals: "G Lydian Big Ship chords: eight-chord cycle, tonic shuttle with a turnaround" (block chords) or "G Lydian Big Ship drift: slow cycle, tonic shuttle, soft turnaround" (breathing pads).
+- The Chords line names the variant and the cycle's shape, no numerals: "G Lydian Big Ship chords: 8-chord cycle" (block chords) or "G Lydian Big Ship drift: slow cycle" (breathing pads).
 - On 200 songs: 60 cycle songs, no rubs on any pair of pitched tracks, the log matched the variant in every song.
 
 - The windows go into structure.chordPlan, and each SongSection takes the Zen mode, so TonalGovernanceBuilder, the log and the chord display follow.

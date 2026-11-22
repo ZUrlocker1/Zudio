@@ -1961,8 +1961,8 @@ struct SongGenerator {
                 "\(frame.key) \(frame.mode.rawValue) 7th chord drift\(plan.padColourWords)"))
         case .breathing, .block:
             let shape = plan.dials.cycle == .block
-                ? "chords: eight-chord cycle, tonic shuttle with a turnaround"
-                : "drift: slow cycle, tonic shuttle, soft turnaround"
+                ? "chords: 8-chord cycle"
+                : "drift: slow cycle"
             log.append(GenerationLogEntry(tag: "Chords", description:
                 "\(frame.key) \(frame.mode.rawValue) Big Ship \(shape)"))
         }
