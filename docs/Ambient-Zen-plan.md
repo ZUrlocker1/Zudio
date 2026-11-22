@@ -48,10 +48,7 @@ What sets it apart from base Ambient, in order of how much you hear it:
 3. By ear: the staggered endings, stop and seek tails with the 4.5 s swell release, and the iPhone speaker.
 4. Moving from a base Ambient song with an audio texture to a Zen song should stop the audio player. Not yet checked in the app.
 5. The variety features (section 13) are built but not all heard yet; the Drums level is by ear.
-6. Before release, the testing values to set back:
-   - Ambient shares: Piano 10 / base 30 / Zen 60 back to Piano 35 / Zen about 30 / base about 35 (section 3, SongGenerator).
-   - Big Ship cycle: 30 percent (15 breathing, 15 block) back to about 20, or drop the variant Zack doesn't keep (AmbientZenDials.draw).
-   - Then rerun tools/zen_fpcheck.sh, and clean up the SF2.
+6. Before the App Store build: rerun tools/zen_fpcheck.sh and clean up the SF2. The Big Ship share stays at 30 percent (Zack, 2026-11-22).
 
 ## 3. Ground rules
 
@@ -60,13 +57,12 @@ What sets it apart from base Ambient, in order of how much you hear it:
 - **No new playback features.** Everything is ordinary MIDI notes and existing effect paths (reverb, echo, tremolo, filter sweep, auto-pan). New tables for existing settings are fine.
 - **No clashes.** Every Zen note is in the song's mode, and section 6's rules are enforced where each note is written, not in a post-pass.
 - **Determinism.** No Dictionary or Set order feeds an RNG draw. Zen draws come from its own seed block (section 4), and new dial draws go at the end of AmbientZenDials.draw so no existing song's dials move.
-- **iPhone parity.** Every chip default set in TrackRowView is mirrored in AppState.restoreDefaultEffects.
+- **iPhone parity.** The Ambient chip defaults live in one table, AmbientEffectDefaults (AmbientHelpers.swift), read by both TrackRowView.applyDefaultEffects and AppState.restoreDefaultEffects.
 - **Long sustain.** Every pad, Texture and bass instrument holds for a long time without dying away.
 
 **Shares.** Zen reuses pianoRuleRoll, which only Piano songs read, so no new draw enters the shared prefix. Piano if pianoRoll < Piano share; Zen if not Piano and pianoRuleRoll < zenShare; otherwise base Ambient.
-- **Testing (now, temporary):** Piano 10, base Ambient 30, Zen 60 (0.10 and zenShare 0.667), marked temporary in SongGenerator.
-- **Release:** Piano 35, Zen about 30 (zenShare about 0.46), base about 35.
-- A Zen song records "Zen" in its forced rules and reloads as Zen whatever the shares are then. A base Ambient seed that falls in the Zen share becomes Zen; that is accepted.
+- **Release values (Zack, 2026-11-22):** Piano 20, base Ambient 25, Zen 55 (ambientPianoShare 0.20, ambientZenShare 0.6875).
+- Every Ambient song records its substyle in its forced rules: "Zen", "Piano" with its rule, or "Base". It reloads as the same substyle whatever the shares are then. Songs saved before this record nothing and reload by the current shares.
 
 ## 4. The ZenPlan: one picture of the song
 
@@ -82,7 +78,7 @@ Zudio normally rolls each track's rule on its own. Zen works only if every track
 2. **Tempo:** 62 to 88 bpm, triangular, peak 72. A user tempo override of 92 or below is honoured.
 3. **Chord pace:** a mean window of 25 to 60 s.
 4. **Breath length:** AMB-1's Swell knob, 45 to 70 (section 7).
-5. **Pad colour:** Rhodes-like 0.55, or glass and strings 0.45.
+5. **Pad colour:** retired. The draw is still taken so no later dial moves, but the pads now come from one weighted pool (section 9).
 6. **Restlessness ("Drift" in the log):** 0.25 to 0.45. How much the bell loops change from pass to pass, and how often the bass sits out. It's kept low because the Eno records repeat literally.
 7. **Bell density:** sparse 30, medium 45 or full 60.
 8. **Echo size:** 0.75 to 0.90, which sets the echo feedback.
@@ -276,7 +272,7 @@ The target is zero glaring clashes in the MIDI. Each rule is enforced in the gen
 
 **AMB-RTHM-007 Lux Glass** on Rhythm, 80 percent of songs. One to three short high chord tones (2 to 4 steps) per 23-beat loop, velocity 35 to 60. Otherwise Rhythm rests, logged AMB-RTHM-000 No rhythm.
 
-**AMB-DRUM-005 Garden Pulse** on Drums, 10 percent of songs (the pulse dial; AMB-DRUM-000 No percussion otherwise). AMB-1's pulse on the Brush Kit, very quiet: kick, closed hat and open hat on Euclidean patterns of 16, 12 and 7 steps with 2, 2 and 1 hits, rotated 0, 2 and 3, each on its own cycle. Each bar, with r = restlessness: a rest with probability 0.02 × r, half of them 2 to 4 bars and half a long passage of 8 to 16, and with probability 0.25 × r one pattern turns a step or gains or loses a hit (within one of its home count, at least 1). Velocity is AMB-1's: (0.95 on the pattern's first step, else 0.6, plus random 0 to 0.25) × clamp(1 + 1.3 × swell, 0.3, 1.15) × 50, about 9 to 69. The swell thins it: no open hat below 0, no closed hat below −0.4. It plays from bar 4 to the pads' held breath. Its own generator (AmbientZenTracks.gardenPulse), seed index 127. About 5 hits a bar.
+**AMB-DRUM-005 Garden Pulse** on Drums, 10 percent of songs (the pulse dial; AMB-DRUM-000 No percussion otherwise). AMB-1's pulse on the Brush Kit, very quiet: kick, closed hat and open hat on Euclidean patterns of 16, 12 and 7 steps with 2, 2 and 1 hits, rotated 0, 2 and 3, each on its own cycle. Each bar, with r = restlessness: a rest with probability 0.02 × r, half of them 2 to 4 bars and half a long passage of 8 to 16, and with probability 0.25 × r one pattern turns a step or gains or loses a hit (within one of its home count, at least 1). Velocity is (0.95 on the pattern's first step, else 0.6, plus random 0 to 0.25) × clamp(1 + 1.3 × swell, 0.3, 1.15) × 30, about 5 to 41 (AMB-1's scale was 50). The swell thins it: no open hat below 0, no closed hat below −0.4. It plays from bar 4 to the pads' held breath. Its own generator (AmbientZenTracks.gardenPulse), seed index 127. About 5 hits a bar.
 
 **Entries and exits.**
 - Lead 1 enters at a random bar from 2 to 4, Lead 2 at bar 6 to 8, Rhythm at bar 9.
@@ -291,28 +287,27 @@ The target is zero glaring clashes in the MIDI. Each rule is enforced in the gen
 
 Zen's sounds are appended to the Ambient pools, so base Ambient and Ambient Piano keep their old indices (their pick lists are capped at the old counts). Zen draws only from its own short lists. Bells may share a sound across tracks, because AMB-1 plays every bell loop on one voice; the rule is only against unintended duplicates. Voices are kept rare: a voice on a track that holds all song is a wall of sound (Zack, 2026-11-21).
 
-- **Pads, Rhodes-like:** Warm Pad, Halo Pad, Fantasia, FM Piano, Warm Swell, Halo Swell.
-- **Pads, glass and strings:** Glass Swell, Strings 3 Swell, Strings 5 Swell.
+- **Pads**, in percent: Warm Swell 20, Glass Swell 18, Strings 3 Swell 13, Strings 5 Swell 13 (the swells, 64 in all), Warm Pad 13, Fantasia 13, FM Piano 10. Halo Pad and Halo Swell are not Zen's; they belong to Ambient Piano and base Ambient.
 - **Texture:** Tonewheel, Synth Voice, Space Voice, Solar Swell and Sine Swell, equal weights (the two voices don't sound too much like voices). No Choir Aahs in Zen picks or the ⚡ shuffle; the picker still offers the whole Ambient pool, as every style does.
 - **Bass:** Synth Bass 101, Saw Bass Swell, FM Swell, Pulse Swell, Bass Swell, Synth Swell, Polysynth Swell. All synth, all long-sustaining.
 - **Lead 1:** Vibraphone, Tine EP and Harp, 20 percent each; the bells Church Bells and Bell Tower, 15 percent each; Echo Drops 10 percent. Echo Drops sounds like a choir, so it never plays two songs running (noRepeatInstruments) and the Lead 2 lock never copies it.
-- **Lead 2:** Tinkling Bells, Christmas Bells, Kalimba, Harp.
-- **Rhythm:** Glockenspiel, Celesta, Tinker Bell, Synth Chime, Christmas Bells.
+- **Lead 2:** Tinkling Bells, Kalimba, Harp 30 percent each; Christmas Bells 10, never two songs running.
+- **Rhythm:** Glockenspiel, Celesta, Tinker Bell, Synth Chime about 23 percent each; Christmas Bells about 8, never two songs running.
 - **Lead 2 lock.** In 25 percent of songs (the dial), when Lead 2 plays and Lead 1 isn't Echo Drops, Lead 2 takes Lead 1's instrument, logged "Lead 2 <name> locked to L1".
 
-**Gain trims** in setProgram, by ear: Tonewheel 0.8, Solar Swell 0.8, Sine Swell 0.7 (all against the Ambient Texture boost of 2.0); Bass Swell 0.56, Polysynth Swell 0.5, FM Swell 0.25; Church Bells and Bell Tower 1.4 on Lead 1 (measured about 6 dB under Vibraphone). Not yet set: the Saw Bass, Pulse and Synth Swell basses, and the other bells.
+**Gain trims** in setProgram, by ear: Tonewheel 0.8, Solar Swell 0.8, Sine Swell 0.7 (all against the Ambient Texture boost of 2.0); Bass Swell 0.56, Polysynth Swell 0.75, Glass Swell 0.7 (pads), Synth Voice 1.4 (Texture), FM Swell 0.25, Pulse Swell 1.5; Church Bells and Bell Tower 1.4 on Lead 1 (measured about 6 dB under Vibraphone). Not yet set: the Saw Bass and Synth Swell basses, and the other bells.
 
 ## 10. The space: reverb, echo, pans and chips
 
 All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAudio).
-- **Reverb.** The large bus switches to .largeHall2: Pads 75, Lead 1 68, Lead 2 68, Rhythm 70, Texture 55. Bass 10 and Drums 35 go to the small .mediumHall bus, so the bass stays almost dry and centred, as in AMB-1. perTrackReverbPresets matches, for export.
+- **Reverb.** The large bus switches to .cathedral, with a 300 Hz low cut on what feeds it (live playback only): Pads 75, Lead 1 68, Lead 2 68, Rhythm 70, Texture 55. Bass 10 and Drums 35 go to the small .mediumHall bus, so the bass stays almost dry and centred, as in AMB-1. perTrackReverbPresets matches, for export.
 - **Echo.** Feedback 0.5 + 0.32 × echo size (74 to 79 percent), or 79 to 80 for a deep echo and 66 to 70 for a dry one. Lead 1 echoes every 2 beats and Lead 2 every 1.5 (AMB-1's two tape heads), Rhythm every 1.5, Texture every 2; capped at 2.0 s. Wet: Lead 1 45, Lead 2 50, Rhythm 48 (each 15 more in a deep echo, 15 less in a dry one), Pads 15, Texture 10, Bass none. The low-pass is 2600 Hz on the bells and 1800 Hz on Pads, so each repeat comes back darker.
 - **High-pass.** Base Ambient's 250 Hz high-pass stays on the leads but is off Texture, whose fundamental is 131 to 370 Hz.
-- **Pads.** Tremolo 0.06 Hz (a 17 s cycle) at depth 0.30; a filter sweep from 1000 to 3000 Hz.
-- **Bass.** Tremolo 0.08 Hz at depth 0.15. The sweep, if switched on, is an ordinary LFO.
+- **Pads.** Tremolo 0.06 Hz (a 17 s cycle) at depth 0.30. The filter follows the song's swell curve: about 1 kHz at a swell of -0.5, 4.5 kHz at 0.9 (zenPadCutoff, held to 800 to 5000 Hz). A hidden auto-pan drifts them ±0.6 across the room, one sweep about every 30 s.
+- **Bass.** Tremolo 0.08 Hz at depth 0.15, and a hidden low shelf of +3 dB at 80 Hz for floor under the bed. The sweep, if switched on, is an ordinary LFO.
 - **No per-note fade** on Pads or Bass: it is one volume ramp per track, so with overlapping notes each note-off would duck the notes still sounding. The breath comes from the note timing and the swell presets.
-- **Pans.** Lead 1 −0.6, Lead 2 +0.35, Pads 0.10. Rhythm swings ±0.35 around +0.6 on a slow auto-pan, one sweep per 8 bars.
-- **Chips.** Defaults: Pads Hall, Trem, Sweep and a hidden Delay (the 15 percent echo); Texture Delay, Reverb; Bass Reverb, Trem; leads Delay, Hall; Rhythm Delay, Hall, Pan; Drums none. TrackRowView and AppState.restoreDefaultEffects carry the same table.
+- **Pans.** Lead 1 −0.6, Lead 2 +0.35, Pads drift around the centre (above). Rhythm swings ±0.35 around +0.6 on a slow auto-pan, one sweep per 8 bars.
+- **Chips.** Defaults: Pads Hall, Trem, Sweep and a hidden Delay (the 15 percent echo) and Pan; Texture Delay, Reverb; Bass Reverb, Trem and a hidden Low shelf; Lead 1 Air (a gentle 3.5 dB shelf from 10 kHz, the chip in place of Sweep in every Ambient form), Delay, Hall; Lead 2 Delay, Hall; Rhythm Delay, Hall, Pan; Drums none. AmbientEffectDefaults holds the table.
 
 ## 11. The log
 
@@ -326,7 +321,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 
 ## 12. Regeneration and Evolve
 
-**Regeneration.** Regenerating a Zen track rebuilds the ZenPlan from the seed and regenerates that track, then rebuilds the bells after it on their own seeds, because the sounding check depends on what came before: a bed track rebuilds all three bells, Lead 1 rebuilds Lead 2 and Rhythm, Lead 2 rebuilds Rhythm. A bell track's seed is its override in trackOverrides, or else its Zen index. A bell track with an override always plays, so a regenerated Lead 2 never comes back silent, and a reload's replay gives the same song in any order. Drums regenerate only in a Garden Pulse song; otherwise they stay silent. A regenerated Lead 1 or Lead 2 goes to the opposite of the song's bell density (sparse becomes full, full becomes sparse, medium goes either way on its own seed; always taken from the song's dial so a reload replays it) and logs it as Bells:word; Rhythm keeps the song's density.
+**Regeneration.** A regenerated track with more than one rule draws its rule afresh from its own seed, at a new song's weights: Bass Slow Glide 35 percent, Airports Root 39, Plateaux Octave Root 26 (playback reads the same roll, AmbientZenTracks.bassGlides); Pads Shell Voices 47 percent against Airports Breath (a Big Ship block song keeps its block pads); Texture Low Tide 40 percent against Pearl Pedal. Regenerating a Zen track rebuilds the ZenPlan from the seed and regenerates that track, then rebuilds the bells after it on their own seeds, because the sounding check depends on what came before: a bed track rebuilds all three bells, Lead 1 rebuilds Lead 2 and Rhythm, Lead 2 rebuilds Rhythm. A bell track's seed is its override in trackOverrides, or else its Zen index. A bell track with an override always plays, so a regenerated Lead 2 never comes back silent, and a reload's replay gives the same song in any order. Drums regenerate only in a Garden Pulse song; otherwise they stay silent. A regenerated Lead 1 or Lead 2 goes to the opposite of the song's bell density (sparse becomes full, full becomes sparse, medium goes either way on its own seed; always taken from the song's dial so a reload replays it) and logs it as Bells:word; Rhythm keeps the song's density.
 
 **Evolve** follows the normal passes (Zack, 2026-11-21):
 - Pass 1 regenerates Lead 1 and Lead 2 and gives them new instruments.
@@ -369,7 +364,7 @@ These come back only if a listen says Zen is missing them. Details are in the ol
 - **SongState:** isAmbientZen, passed in the initialiser and every withXxx() copy method; displayStyleName "Ambient Zen"; the testing stars.
 - **AppState:** reload (forced "Zen"), the Ambient pools (instrumentPoolNames and instrumentPoolPrograms), Zen's pick lists in instrumentPickPoolStatic, noRepeatInstruments (Echo Drops), the Lead 2 lock in applyLead2Mirror, restoreDefaultEffects, and Evolve.
 - **PlaybackEngine:** applyAmbientZenAudio (halls, sends, the zenDelayWet, zenDelayBeats and zenDelayLowpass tables), staticPans and startPan, the per-note fade skip, and gain trims in setProgram.
-- **TrackRowView:** Zen chip defaults, mirrored in restoreDefaultEffects (and any onChange logic mirrored in PhonePlayerView).
+- **TrackRowView:** the chip rows; the defaults come from AmbientEffectDefaults, shared with restoreDefaultEffects (any onChange logic is still mirrored in PhonePlayerView).
 - **assets/Zudio.sf2:** the bank 14 swell presets.
 
 **Tools**

@@ -192,8 +192,7 @@ enum AmbientZenLoops {
             for ev in sounding {
                 if ev.stepIndex >= e { break }
                 if ev.stepIndex + ev.durationSteps <= s { continue }
-                let d = abs(Int(ev.note) - pitch)
-                if d == 1 || d == 13 { return true }
+                if AmbientZenPlan.rubs(Int(ev.note), pitch) { return true }
             }
             return false
         }
@@ -313,7 +312,7 @@ enum AmbientZenLoops {
         let scale  = plan.mode.intervals
         let n      = scale.count
         let tonic  = base - ((base - plan.tonicPC) % 12 + 12) % 12
-        let degree = (Int(w.degree.drop { $0 == "b" || $0 == "#" }) ?? 1) - 1
+        let degree = w.degreeNumber - 1
         let idx    = degree + k
         let octave = idx >= 0 ? idx / n : (idx - n + 1) / n
         let within = ((idx % n) + n) % n

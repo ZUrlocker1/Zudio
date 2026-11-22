@@ -51,3 +51,39 @@ func pickSoloWindows(
     }
     return windows
 }
+
+/// The three Ambient forms' default effects per track, in one place. TrackRowView.applyDefaultEffects
+/// (Mac and iPad) and AppState.restoreDefaultEffects (iPhone) both read it, so the two can't drift.
+enum AmbientEffectDefaults {
+    enum Form { case zen, piano, base }
+
+    /// `lead2Locked`: Lead 2 doubles Lead 1 (a mirrored lead), so it takes Lead 1's delay too.
+    /// `audioTexture`: an audio texture file is playing, where pan and sweep do nothing.
+    static func defaults(track: Int, form: Form, lead2Locked: Bool, audioTexture: Bool) -> [TrackEffect] {
+        if form == .zen {
+            // Ambient Zen. Pads take their light echo and slow pan across the room with no chip of
+            // their own, Lead 1 has Air, and the bass has a hidden low shelf (Zack, 2026-11-22).
+            switch track {
+            case kTrackLead1:   return [.delay, .space, .air]
+            case kTrackLead2:   return [.delay, .space]
+            case kTrackPads:    return [.space, .tremolo, .sweep, .delay, .pan]
+            case kTrackRhythm:  return [.delay, .space, .pan]
+            case kTrackTexture: return [.delay, .space]
+            case kTrackBass:    return [.reverb, .tremolo, .lowShelf]
+            default:            return []
+            }
+        }
+        // Base Ambient and Ambient Piano: a gentle Air on Lead 1 (not Piano's) and Pads, and the
+        // Pads' dark echo with no chip of its own (Zack, 2026-11-22).
+        switch track {
+        case kTrackLead1:   return form == .piano ? [.delay, .space] : [.delay, .space, .air]
+        case kTrackLead2:   return lead2Locked ? [.delay, .space] : [.space]
+        case kTrackPads:    return [.space, .sweep, .delay, .air]
+        case kTrackRhythm:  return [.reverb]
+        case kTrackTexture: return audioTexture ? [.space] : [.space, .pan, .sweep]
+        case kTrackBass:    return [.reverb, .sweep]
+        case kTrackDrums:   return [.delay]
+        default:            return []
+        }
+    }
+}

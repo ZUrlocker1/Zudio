@@ -41,9 +41,10 @@ struct ZenBassGlide: Sendable {
     static let tau = 0.45
     static let bendRange = 12.0
 
-    /// The glide for a Slow Glide song (AmbientZenDials.slowGlide), or nil for any other song.
+    /// The glide for a song whose bass is AMB-BASS-009 Slow Glide (the dial for a new song, the
+    /// regeneration's roll for a regenerated bass), or nil for any other song.
     static func make(for state: SongState) -> ZenBassGlide? {
-        guard state.isAmbientZen, AmbientZenDials.draw(seed: state.globalSeed).slowGlide else { return nil }
+        guard state.isAmbientZen, AmbientZenTracks.bassGlides(in: state) else { return nil }
         let notes = state.trackEvents[kTrackBass].sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
         guard !notes.isEmpty else { return nil }
 

@@ -12,11 +12,6 @@
 
 import Foundation
 
-/// The pad colour dial: Rhodes-like pads or glass and strings (no choir voices, Zack 2026-11-20).
-enum ZenPadColour: Sendable, Equatable {
-    case rhodes, glassStrings
-}
-
 /// The echo dial's character: the usual echo, or an occasional deep or dry one (Zack, 2026-11-21).
 enum ZenEchoCharacter: Sendable, Equatable {
     case usual, deep, dry
@@ -37,7 +32,6 @@ struct AmbientZenDials: Sendable, Equatable {
     let chordPaceSeconds: Double
     /// AMB-1's Swell knob, 45 to 70: sets the pad breath cycle.
     let breathLength: Double
-    let padColour: ZenPadColour
     /// 0.25 to 0.45. Phase 1 uses it only for the bass sit-outs.
     let restlessness: Double
     /// The bell loops' density: 30, 45 or 60 (sparse, medium, full).
@@ -92,7 +86,7 @@ struct AmbientZenDials: Sendable, Equatable {
         let tempo   = Int(rng.triangular(min: 62, peak: 72, max: 88).rounded())
         let pace    = 25 + 35 * rng.nextDouble()
         let breath  = 45 + 25 * rng.nextDouble()
-        let colour: ZenPadColour = rng.nextDouble() < 0.55 ? .rhodes : .glassStrings
+        _ = rng.nextDouble()   // was the pad colour roll; the pads now draw from one weighted pool. Kept so no later dial moves
         let restless = 0.25 + 0.20 * rng.nextDouble()
         let density  = [30, 45, 60][rng.nextInt(upperBound: 3)]
         let echo     = 0.75 + 0.15 * rng.nextDouble()
@@ -128,7 +122,7 @@ struct AmbientZenDials: Sendable, Equatable {
         let homeSixNine   = rng.nextDouble() < 0.25
         let padColourSeed = rng.next()
         return AmbientZenDials(mode: mode, tempo: tempo, chordPaceSeconds: pace, breathLength: breath,
-                               padColour: colour, restlessness: restless, bellDensity: density,
+                               restlessness: restless, bellDensity: density,
                                echoSize: echo, pulse: pulse, outroBars: outro, endOffsets: offsets,
                                lead2SyncsLead1: lead2Sync, bassLow: bassLow, bellsLow: bellsLow,
                                echoCharacter: echoCharacter, echoAmount: echoAmount, cycle: cycle, lowTide: lowTide,
@@ -203,6 +197,11 @@ enum ZenPadVoicing: Sendable, Equatable {
     case sixNine
 }
 
+extension ChordType {
+    /// The chord's own fifth above the root: 7, or 6 for a half-diminished chord.
+    var fifthInterval: Int { intervals.count > 2 ? intervals[2] : 7 }
+}
+
 /// One entry of the chord table: a diatonic seventh chord on a degree, with AMB-1's walk weight.
 struct ZenChord: Sendable, Equatable {
     let degree: String
@@ -231,8 +230,9 @@ struct ZenWindow: Sendable, Equatable {
     var voiceTones: [Int] { padTones.isEmpty ? chordTones : padTones }
     var endBar: Int { startBar + lengthBars }
     var rootPC: Int { chordTones[0] }
-    /// The chord's own fifth above the root: 7, or 6 for a half-diminished chord.
-    var fifthInterval: Int { type.intervals.count > 2 ? type.intervals[2] : 7 }
+    var fifthInterval: Int { type.fifthInterval }
+    /// The degree's number, 1 to 7 ("b3" is 3, "#4" is 4).
+    var degreeNumber: Int { AmbientZenPlan.degreeNumber(degree) }
 }
 
 struct AmbientZenPlan: Sendable {
@@ -295,7 +295,7 @@ struct AmbientZenPlan: Sendable {
     static func numeral(degree: String, type: ChordType) -> String {
         let romans = ["I", "II", "III", "IV", "V", "VI", "VII"]
         let accidental = degree.hasPrefix("b") ? "b" : degree.hasPrefix("#") ? "#" : ""
-        let n = Int(degree.drop { $0 == "b" || $0 == "#" }) ?? 1
+        let n = degreeNumber(degree)
         let quality: String
         switch type {
         case .min7:   quality = "m7"
@@ -305,6 +305,23 @@ struct AmbientZenPlan: Sendable {
         default:      quality = ""
         }
         return accidental + romans[Swift.max(0, Swift.min(6, n - 1))] + quality
+    }
+
+    /// A degree string's number, 1 to 7: "b3" is 3, "#4" is 4.
+    static func degreeNumber(_ degree: String) -> Int {
+        Int(degree.drop { $0 == "b" || $0 == "#" }) ?? 1
+    }
+
+    /// Two MIDI notes a semitone or a minor 9th apart: the clash every Zen track avoids.
+    static func rubs(_ a: Int, _ b: Int) -> Bool {
+        let d = abs(a - b)
+        return d == 1 || d == 13
+    }
+
+    /// Two pitch classes a semitone apart, either way round.
+    static func pcNear(_ a: Int, _ b: Int) -> Bool {
+        let d = (a - b + 12) % 12
+        return d == 1 || d == 11
     }
 
     /// The chord the song comes home from (the last body window), or nil when it is the tonic.
@@ -424,7 +441,7 @@ struct AmbientZenPlan: Sendable {
             var plan = AmbientZenPlan(dials: dials, key: key, tempo: tempo, totalBars: totalBars,
                                       windows: cycleWindows(rng: &rng, dials: dials, key: key,
                                                             bodyEnd: bodyEnd, totalBars: totalBars))
-            plan.swell = swellCurve(seed: seed, tempo: tempo, totalBars: totalBars, outroStartBar: plan.outroStartBar)
+            plan.finish(seed: seed)   // colourPads returns at once under Big Ship
             return plan
         }
 
@@ -486,9 +503,14 @@ struct AmbientZenPlan: Sendable {
         windows.append(makeWindow(start: start, length: Swift.max(1, totalBars - start),
                                   degree: tonic.degree, type: tonic.type, key: key, mode: dials.mode))
         var plan = AmbientZenPlan(dials: dials, key: key, tempo: tempo, totalBars: totalBars, windows: windows)
-        plan.swell = swellCurve(seed: seed, tempo: tempo, totalBars: totalBars, outroStartBar: plan.outroStartBar)
-        plan.colourPads()
+        plan.finish(seed: seed)
         return plan
+    }
+
+    /// The last steps of every plan, new or rebuilt: the swell curve, then the pad colours.
+    mutating func finish(seed: UInt64) {
+        swell = Self.swellCurve(seed: seed, tempo: tempo, totalBars: totalBars, outroStartBar: outroStartBar)
+        colourPads()
     }
 
     // MARK: - Pad colours (Zack, 2026-11-21)
@@ -508,7 +530,7 @@ struct AmbientZenPlan: Sendable {
         guard dials.cycle == .none, !dials.shellVoices else { return }
         var rng = SeededRNG(seed: dials.padColourSeed)
         let scale = mode.intervals.map { (tonicPC + $0) % 12 }
-        func near(_ a: Int, _ b: Int) -> Bool { let d = (a - b + 12) % 12; return d == 1 || d == 11 }
+        let near = Self.pcNear
         for i in windows.indices {
             let roll = rng.nextDouble()
             let w = windows[i]
@@ -595,16 +617,23 @@ struct AmbientZenPlan: Sendable {
 
     // MARK: - The swell (plan section 8)
 
+    /// The swell's stream, and its first draw: the per-song scale, 0.5 to 0.9. swellCurve and
+    /// swellDepthWords both read it here, so the log's depth word always matches the curve.
+    private static func swellRNG(seed: UInt64) -> SeededRNG {
+        SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: swellIndex))
+    }
+    private static func swellScale(_ rng: inout SeededRNG) -> Double { 0.5 + 0.4 * rng.nextDouble() }
+
     /// AMB-1's arc, per bar. Every 50 to 150 s a new target is drawn (random -1 to 1 times 0.6 to
     /// 1.0, pushed 0.25 further from the middle, clamped); the value eases toward it with a 35 s
     /// time constant and is scaled by 0.5 to 0.9 per song. Held at -0.5 or below for the first 8
     /// bars and in the outro. A pure function of the seed, tempo and length, so a regenerated
     /// track reads the same curve.
     static func swellCurve(seed: UInt64, tempo: Int, totalBars: Int, outroStartBar: Int) -> [Double] {
-        var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: swellIndex))
+        var rng = swellRNG(seed: seed)
         let barSeconds = 240.0 / Double(Swift.max(1, tempo))
         let ease  = 1 - exp(-barSeconds / 35.0)
-        let scale = 0.5 + 0.4 * rng.nextDouble()
+        let scale = swellScale(&rng)
         func newTarget() -> Double {
             let raw = (2 * rng.nextDouble() - 1) * (0.6 + 0.4 * rng.nextDouble())
             let pushed = raw + (raw < 0 ? -0.25 : 0.25)
@@ -631,14 +660,20 @@ struct AmbientZenPlan: Sendable {
     /// The swell's depth in plain words, for the Zen log line: the first draw of swellCurve's
     /// stream (its `scale`, 0.5 to 0.9), read on a fresh copy, so nothing moves.
     static func swellDepthWords(seed: UInt64) -> String {
-        var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: swellIndex))
-        let scale = 0.5 + 0.4 * rng.nextDouble()
+        var rng = swellRNG(seed: seed)
+        let scale = swellScale(&rng)
         return scale < 0.633 ? "gentle" : scale < 0.767 ? "medium" : "deep"
     }
 
     /// The swell at a bar (-0.5 past either end).
     func swell(atBar bar: Int) -> Double {
         bar >= 0 && bar < swell.count ? swell[bar] : -0.5
+    }
+
+    /// A song's swell curve without rebuilding its windows: what rebuild(from:) would give.
+    static func swell(for song: SongState, dials: AmbientZenDials) -> [Double] {
+        swellCurve(seed: song.globalSeed, tempo: zenTempo(dials: dials, tempoOverride: song.tempoOverride),
+                   totalBars: song.frame.totalBars, outroStartBar: song.frame.totalBars - dials.outroBars)
     }
 
     /// The plan of an existing song, for a track regeneration: the dials from the seed and the
@@ -652,9 +687,7 @@ struct AmbientZenPlan: Sendable {
         }
         var plan = AmbientZenPlan(dials: dials, key: song.frame.key, tempo: tempo,
                                   totalBars: song.frame.totalBars, windows: windows)
-        plan.swell = swellCurve(seed: song.globalSeed, tempo: tempo, totalBars: song.frame.totalBars,
-                                outroStartBar: plan.outroStartBar)
-        plan.colourPads()
+        plan.finish(seed: song.globalSeed)
         return plan
     }
 
@@ -671,14 +704,13 @@ struct AmbientZenPlan: Sendable {
         }
         // A pedal note that is not a chord tone drops when it sits a semitone from one.
         func keeps(_ pc: Int) -> Bool {
-            toneSet.contains(pc) || !tones.contains { let d = (pc - $0 + 12) % 12; return d == 1 || d == 11 }
+            toneSet.contains(pc) || !tones.contains { pcNear(pc, $0) }
         }
         var keepsTonic = keeps(keyPC), keepsFifth = keeps((keyPC + 7) % 12)
         // A pedal note a semitone or a minor 9th from a bass note drops too. Only Aeolian's bVI
         // in C to Eb does this: the pedal fifth sits a semitone under AMB-BASS-008's upper root.
-        let fifthInterval = type.intervals.count > 2 ? type.intervals[2] : 7
-        let bass = bassNotes(rootPC: rootPC, fifthInterval: fifthInterval, leadingTonePC: (keyPC + 11) % 12)
-        func clearOfBass(_ note: Int) -> Bool { !bass.contains { [1, 13].contains(abs($0 - note)) } }
+        let bass = bassNotes(rootPC: rootPC, fifthInterval: type.fifthInterval, leadingTonePC: (keyPC + 11) % 12)
+        func clearOfBass(_ note: Int) -> Bool { !bass.contains { rubs($0, note) } }
         let tonicClear = clearOfBass(48 + keyPC), fifthClear = clearOfBass(55 + keyPC)
         if (keepsTonic && tonicClear) || (keepsFifth && fifthClear) {
             keepsTonic = keepsTonic && tonicClear

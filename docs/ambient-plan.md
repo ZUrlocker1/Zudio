@@ -797,6 +797,14 @@ A clean implementation: when `PlaybackEngine.ambientStyle` is true, configure de
 
 **2. Reverb — deep wet, cathedral for all atmospheric tracks**
 
+As built for base Ambient (`applyBaseAmbientSpace` in PlaybackEngine.swift; Ambient Piano and Zen keep their own spaces):
+- Large bus Cathedral: Pads 80, Lead 1 72, Lead 2 68, Rhythm 55, Texture 55. Bass and Drums stay on the Medium Hall bus.
+- A 300 Hz low cut on what feeds the large bus reverb, so the hall stays clear at these levels (live playback only; export builds its own per-track reverbs).
+- Pads pan 0.35, Rhythm -0.40, opposite sides; leads stay at -0.20 and 0.20.
+- Pads take a quiet 2-beat echo (wet 15, feedback 50, rolled off at 2 kHz), on by default with no chip.
+- Lead 1 and Pads take a gentle Air by default (no 4 kHz peak, 3.5 dB shelf from 10 kHz). Lead 1 shows it as a chip in place of Sweep, in every Ambient form (on by default in base Ambient and Zen, off in Ambient Piano); Pads have no chip.
+- Drums: velocities about 25 percent lower; cymbals a crash at 40 percent and a ride at 60 percent of their drawn level.
+
 Current behaviour: atmospheric tracks (Lead 1, Lead 2, Pads, Texture) load Cathedral preset; rhythmic tracks (Rhythm, Bass, Drums) load Large Chamber. Space effect = cathedral at 70% wet. Regular reverb = large chamber at 50% wet.
 
 For Ambient, every track benefits from more reverb depth:
@@ -1283,9 +1291,9 @@ Base Ambient only; Ambient Piano and Zen don't share these:
 - **AMB-PADS-014 Airports 2/1** in 25 percent of songs, in place of the pad loop: four voices (the opening chord's root, 3rd, 5th and its 9th or 13th), each on its own loop of 17 to 31 seconds, sounding 45 to 60 percent of it, so the chord is whichever notes overlap.
 - The 7ths and Airports draws come from their own stream (trackSeed index 140), so no other draw moves.
 - **Swell instruments** (Zack, for a smoother, more relaxed sound), 55 percent of base picks on both tracks (`instrumentPickPoolStatic` in AppState.swift):
-  - Pads: Sweep Pad, Synth Strings and Soundtrack 15 percent each; Sweep Pad Swell 19, Synth Strings Swell 18 and Halo Swell 18.
-  - Bass: Cello, French Horn and FM Synth 11 percent each, Metallic Pad 12; Metallic Pad Swell 28 and FM Swell 27. FM Swell is the swell copy of the FM Synth bass (Synth Brass 1). Every bass rule holds for bars, so swells play under all of them.
-  - Sweep Pad Swell, Synth Strings Swell and Metallic Pad Swell are base's own (bank 14 copies, tools/sf2_clone_presets.py set "base-ambient"); Halo Swell and FM Swell are shared with Zen.
+  - Pads: Sweep Pad, Synth Strings and Soundtrack 15 percent each; Sweep Pad Swell 19, Strings Swell 18 and Halo Swell 18.
+  - Bass: Cello, French Horn and FM Synth 11 percent each, Metallic Pad 12; Metal Swell (the Metal Pad swell) 20, Cello Swell 15, Organ Swell 20. FM Swell is Zen's only. Every bass rule holds for bars, so swells play under all of them.
+  - Sweep Pad Swell, Strings Swell, Metal Swell (the Metal Pad swell, set "base-ambient") and Cello Swell (14042, a copy of Cello 0:42, set "cello") and Organ Swell (14016, Tonewheel Organ 0:16, set "organ") are base's own bank 14 copies, made by tools/sf2_clone_presets.py; Halo Swell is shared with Zen.
   - Out of base's picks but still in the pool for Zen or Ambient Piano: Halo Pad, Warm Swell, Glass Swell, Voice Oohs and Saw Bass Swell. Ambient Piano's picks are unchanged.
 - **Lead 1 down an octave** in about a third of songs: once or twice, two or three whole passes of the Lead 1 loop (at most 32 bars) inside the body play an octave lower, then return; never the first pass, never below E3 (a stretch that would go lower stays up). Applied after the HarmonicFilter, whose register pass would lift it back, and on Lead 1 regeneration at the same places. Drawn from the song seed (trackSeed index 142); the log marks "Down an octave for N bars" and "Back up". Section solos are left alone.
 - **Major Pentatonic** songs have a major tonic in base (`ambientPentatonicTonic`); the shared chord-plan builder gives a minor one, which Ambient Piano keeps.

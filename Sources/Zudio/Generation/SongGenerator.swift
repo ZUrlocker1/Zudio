@@ -73,7 +73,10 @@ struct SongGenerator {
         forceSohoVariation:   Bool    = false,
         forbidSohoVariation:  Bool    = false,
         forceAmbientPianoRule: String? = nil,
-        forceAmbientZen:      Bool    = false
+        forceAmbientZen:      Bool    = false,
+        forceAmbientBase:     Bool    = false,
+        forceSubstyle:        String? = nil,
+        forceMotorikSync:     String? = nil
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -82,14 +85,17 @@ struct SongGenerator {
                                   forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
                                   forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                                   forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
-                                  forceBridge: forceBridge)
+                                  forceBridge: forceBridge,
+                                  forceSubstyle: forceSubstyle)
         case .motorik:
             return generateMotorik(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                    moodOverride: moodOverride,
                                    forceBassRuleID:   forceBassRuleID,
                                    forceDrumRuleID:   forceDrumRuleID,
                                    forceRhythmRuleID: forceArpRuleID,
-                                   forceLeadRuleID:   forceLeadRuleID)
+                                   forceLeadRuleID:   forceLeadRuleID,
+                                   forceSubstyle:     forceSubstyle,
+                                   forceSync:         forceMotorikSync)
         case .ambient:
             return generateAmbient(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                    moodOverride: moodOverride,
@@ -99,7 +105,8 @@ struct SongGenerator {
                                    forceBridge: forceBridge,
                                    useBrushKit: useBrushKit,
                                    forceAmbientPianoRule: forceAmbientPianoRule,
-                                   forceAmbientZen: forceAmbientZen)
+                                   forceAmbientZen: forceAmbientZen,
+                                   forceAmbientBase: forceAmbientBase)
         case .chill:
             return ChillBassSlides.annotated(generateChill(
                                  seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
@@ -126,14 +133,18 @@ struct SongGenerator {
         forceBassRuleID:   String? = nil,
         forceDrumRuleID:   String? = nil,
         forceRhythmRuleID: String? = nil,
-        forceLeadRuleID:   String? = nil
+        forceLeadRuleID:   String? = nil,
+        forceSubstyle:     String? = nil,
+        forceSync:         String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
-        // Motorik substyle: Noir/Arcade/base. Production split: 21/19/60.
+        // Motorik substyle: Noir/Arcade/base. Production split: 21/19/60. The song records the
+        // result (forced["Substyle"], forced["Sync"]), so a later share change can't move it. The
+        // roll is still drawn when a substyle is forced, so every later draw stays in place.
         let substyleRoll = rng.nextDouble()
-        let isNoir    = substyleRoll < 0.20
-        let isArcade  = !isNoir && substyleRoll < 0.39
+        let isNoir    = forceSubstyle.map { $0 == "Noir" } ?? (substyleRoll < 0.20)
+        let isArcade  = forceSubstyle.map { $0 == "Arcade" } ?? (!isNoir && substyleRoll < 0.39)
         // Bass distortion: 20% of regular (non-Noir, non-Arcade) Motorik songs get Dist. on bass by default.
         let motorikBassDistortion = !isNoir && !isArcade && rng.nextDouble() < 0.20
         // Noir distortion: 75% chance independently for Bass and Rhythm.
@@ -156,6 +167,7 @@ struct SongGenerator {
         let syncRoll = syncRNG.nextDouble()
         let motorikSync: MotorikSync = {
             guard !isNoir && !isArcade else { return .none }
+            if let f = forceSync, let sync = MotorikSync(rawValue: f) { return sync }
             // 32.8% of base Motorik, which is 20% of all Motorik once Noir and Arcade are
             // excluded. The three groups keep their original 8:7:5 proportions to each other.
             if syncRoll < 0.672 { return .none }
@@ -449,6 +461,8 @@ struct SongGenerator {
         if let r = forceDrumRuleID   { forced["Drums"]  = r }
         if let r = forceRhythmRuleID { forced["Rhythm"] = r }
         if let r = forceLeadRuleID   { forced["Lead"]   = r }
+        forced["Substyle"] = isNoir ? "Noir" : isArcade ? "Arcade" : "Base"
+        if !isNoir && !isArcade { forced["Sync"] = motorikSync.rawValue }
 
         return SongState(
             frame: frame,
@@ -491,7 +505,8 @@ struct SongGenerator {
         forceLeadRuleID:      String? = nil,
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
-        forceBridge:          Bool    = false
+        forceBridge:          Bool    = false,
+        forceSubstyle:        String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -502,7 +517,8 @@ struct SongGenerator {
                 seed: seed,
                 keyOverride: keyOverride,
                 tempoOverride: tempoOverride,
-                moodOverride: moodOverride
+                moodOverride: moodOverride,
+                forceSubstyle: forceSubstyle
             )
 
         // Space keeps to its own drum pool: a forced base style (the curated first Kosmic song
@@ -919,6 +935,8 @@ struct SongGenerator {
         if let r = forcePadsRuleID  { forced["Pads"]   = r }
         if let r = forceLeadRuleID  { forced["Lead"]   = r }
         if let r = forceTexRuleID   { forced["Tex"]    = r }
+        // The substyle the shares picked, so a later share change can't move a saved song.
+        forced["Substyle"] = isKosmicDrift ? "Drift" : isKosmicSpace ? "Space" : "Base"
         // forceBridge/forcePercussionStyle (curated first-song path) gate a
         // forceBridge || rng.nextDouble() short-circuit in CosmicStructureGenerator — if not
         // captured here and replayed on load, reloading re-rolls the form from scratch and can
@@ -952,12 +970,17 @@ struct SongGenerator {
 
     // MARK: - Ambient generation path
 
-    // Ambient substyle shares. TEMPORARY testing shares while base Ambient and Zen are tuned (Zack,
-    // 2026-11-21): Piano 10, base Ambient 30, Zen 60, so Piano is pianoRoll < 0.10 and Zen takes
-    // 0.667 of the rest. RELEASE values: ambientPianoShare = 0.35 and ambientZenShare = 0.46
-    // (Piano 35, Zen about 30, base about 35). Put these back before the App Store.
-    static let ambientPianoShare = 0.10
-    static let ambientZenShare   = 0.667
+    // Ambient substyle shares (Zack, 2026-11-22): Piano 20, base Ambient 25, Zen 55. Piano is
+    // pianoRoll < 0.20, and Zen takes 55/80 = 0.6875 of the rest.
+    static let ambientPianoShare = 0.20
+    static let ambientZenShare   = 0.6875
+
+    /// The Ambient Piano lead rule for a roll: 35 percent Floating Buds, 30 Satin Melody, 35 Koln
+    /// Winter Arc. A new song draws it from the seed; a regenerated Lead 1 draws it afresh from its
+    /// own seed, so every regeneration can land on any of the three.
+    static func ambientPianoRule(roll: Double) -> String {
+        roll < 0.35 ? "AMB-PNO-001" : (roll < 0.65 ? "AMB-PNO-002" : "AMB-PNO-003")
+    }
     /// Base Ambient's colour stream (7th chords, Airports 2/1); no other style uses index 140.
     static let ambientColourIndex = 140
 
@@ -1149,7 +1172,8 @@ struct SongGenerator {
         forceBridge:           Bool    = false,
         useBrushKit:           Bool    = false,
         forceAmbientPianoRule: String? = nil,
-        forceAmbientZen:      Bool    = false
+        forceAmbientZen:      Bool    = false,
+        forceAmbientBase:     Bool    = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -1160,15 +1184,17 @@ struct SongGenerator {
         // Ambient Zen reuses pianoRuleRoll, which only Piano songs read, so no new draw enters the
         // shared prefix and base Ambient and Ambient Piano songs keep their seeds. A saved Zen song
         // forces Zen on reload, so it stays Zen whatever the shares are then.
-        let isAmbientPiano = !forceAmbientZen
+        // Every Ambient song records its substyle (Zen, Piano with its rule, or base), so a saved
+        // song reloads as the same substyle whatever the shares are by then (Zack, 2026-11-22).
+        let isAmbientPiano = !forceAmbientZen && !forceAmbientBase
             && (forceAmbientPianoRule != nil || pianoRoll < Self.ambientPianoShare)
-        if forceAmbientZen || (!isAmbientPiano && pianoRuleRoll < Self.ambientZenShare) {
+        if forceAmbientZen || (!isAmbientPiano && !forceAmbientBase && pianoRuleRoll < Self.ambientZenShare) {
             return generateAmbientZen(seed: seed, rng: &rng, keyOverride: keyOverride,
                                       tempoOverride: tempoOverride, moodOverride: moodOverride)
         }
         let pianoRule: String = {
             if let f = forceAmbientPianoRule { return f }
-            return pianoRuleRoll < 0.35 ? "AMB-PNO-001" : (pianoRuleRoll < 0.65 ? "AMB-PNO-002" : "AMB-PNO-003")
+            return ambientPianoRule(roll: pianoRuleRoll)
         }()
 
         // For Ambient Piano, derive a rule-appropriate tempo before frame generation so that
@@ -1301,7 +1327,7 @@ struct SongGenerator {
                 ann(denouementBar, "Denouement")
             }
             var forced: [String: String] = [:]
-            if let r = forceAmbientPianoRule { forced["Piano"] = r }
+            forced["Piano"] = pianoRule   // Piano records its rule, so it reloads as Piano (2026-11-22)
             if let p = forcePercussionStyle  { forced["PercStyle"] = p.rawValue }
             if useBrushKit                   { forced["BrushKit"] = "true" }   // see below
             return SongState(
@@ -1773,7 +1799,7 @@ struct SongGenerator {
             return s ..< s + 64     // 4 bars × 16 steps
         }
 
-        var forced: [String: String] = [:]
+        var forced: [String: String] = ["Base": "true"]   // base Ambient records its substyle (2026-11-22)
         if let r = forceBassRuleID  { forced["Bass"]   = r }
         if let r = forceArpRuleID   { forced["Rhythm"] = r }
         if let r = forcePadsRuleID  { forced["Pads"]   = r }
@@ -1972,8 +1998,33 @@ struct SongGenerator {
 
     /// Regenerates a single track without touching any other track or the global seed.
     /// Appends regen log entries so the status box reflects the new rules used.
+    /// Regenerates one track. A regeneration never leaves its track empty (Zack, 2026-11-22): when a
+    /// rule comes back silent, the track is drawn again on the next seed in a fixed sequence, up to
+    /// 12 times. The seed that finally plays is the one recorded in trackOverrides, so a reload
+    /// replays it on the first try. Exempt: a track that is audio by design, Ambient's audio texture
+    /// and base Chill and Blues Texture. A track that can't regenerate (it returns the song
+    /// unchanged) is left as it is.
     static func regenerateTrack(_ trackIndex: Int, songState: SongState, overrideSeed: UInt64? = nil, passBodyBars: Int? = nil) -> SongState {
-        let newTrackSeed = overrideSeed ?? UInt64.random(in: .min ... .max)
+        var seed = overrideSeed ?? UInt64.random(in: .min ... .max)
+        var result = regenerateTrackOnce(trackIndex, songState: songState, overrideSeed: seed, passBodyBars: passBodyBars)
+        func emptyIsRight(_ s: SongState) -> Bool {
+            guard trackIndex == kTrackTexture else { return false }
+            return (s.style == .ambient && s.ambientAudioTexture != nil)
+                || (s.style == .chill && !s.chillSohoVariation)
+        }
+        var tries = 0
+        while tries < 12,
+              result.generationLog.count > songState.generationLog.count,   // a real regeneration, not an early return
+              result.trackEvents[trackIndex].isEmpty, !emptyIsRight(result) {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            result = regenerateTrackOnce(trackIndex, songState: songState, overrideSeed: seed, passBodyBars: passBodyBars)
+            tries += 1
+        }
+        return result
+    }
+
+    private static func regenerateTrackOnce(_ trackIndex: Int, songState: SongState, overrideSeed: UInt64, passBodyBars: Int? = nil) -> SongState {
+        let newTrackSeed = overrideSeed
         var rng = SeededRNG(seed: newTrackSeed)
         var usedRules: Set<String> = []
         let isSpace = songState.style == .kosmic && songState.isKosmicSpace
@@ -1981,6 +2032,13 @@ struct SongGenerator {
             ? KosmicSpaceArrangement.make(structure: songState.structure,
                                           totalBars: songState.frame.totalBars, seed: songState.globalSeed)
             : nil
+
+        // Chill bass and drums pick their rule from the beat style, so a regeneration that kept the
+        // song's style always came back with the same rule. It draws a fresh style from the form's
+        // own pool, as generation does (Zack, 2026-11-22); the groove may drift from the other
+        // tracks. Soho keeps its own latin or soul pool, which couples bass, drums and rhythm.
+        let chillRegenBeatStyle = songState.chillSohoVariation ? songState.chillBeatStyle
+            : ChillMusicalFrameGenerator.regenBeatStyle(blues: songState.chillBluesVariation, seed: newTrackSeed)
 
         var events: [MIDIEvent]
         var kosmicGapAnswers: [MIDIEvent] = []   // base Kosmic Lead 2 gap answers, joined after the regen filter
@@ -2073,7 +2131,7 @@ struct SongGenerator {
                     : nil
                 events = ChillDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    beatStyle: songState.chillBeatStyle,
+                    beatStyle: chillRegenBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoPlan: regenSohoPlan,
@@ -2089,7 +2147,8 @@ struct SongGenerator {
             if isAmbPiano {
                 return songState
             } else if let plan = zenPlan {
-                events = AmbientZenTracks.bass(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
+                events = AmbientZenTracks.bass(plan: plan, rng: &rng, usedRuleIDs: &usedRules,
+                                               ruleID: AmbientZenTracks.regenBassRule(seed: newTrackSeed))
             } else if isAmbient {
                 events = AmbientBassGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
@@ -2115,7 +2174,7 @@ struct SongGenerator {
                 events = ChillBassGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     chillProgFamily: songState.chillProgFamily,
-                    beatStyle: songState.chillBeatStyle,
+                    beatStyle: chillRegenBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules,
@@ -2142,7 +2201,8 @@ struct SongGenerator {
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     totalBars: songState.frame.totalBars, rng: &rng, usedRuleIDs: &usedRules)
             } else if let plan = zenPlan {
-                events = AmbientZenTracks.pads(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
+                events = AmbientZenTracks.pads(plan: plan, rng: &rng, usedRuleIDs: &usedRules,
+                                               shell: AmbientZenTracks.regenShell(seed: newTrackSeed))
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.pads ?? 8
                 let loop = AmbientPadsGenerator.generate(
@@ -2150,6 +2210,15 @@ struct SongGenerator {
                     loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
                 events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
                                            chords: songState.structure.chordPlan, track: kTrackPads)
+                // AMB-PADS-014 Airports 2/1 is reachable here as in a new song (25 percent), rolled
+                // on a stream of its own so the pad loop's draws don't move. Without this a regenerated
+                // base pad track could never bring it back (found 2026-11-22).
+                var airportsRNG = SeededRNG(seed: newTrackSeed ^ 0xA127_0275_2F01_0014)
+                if airportsRNG.nextDouble() < 0.25, !loop.isEmpty {
+                    usedRules = ["AMB-PADS-014"]
+                    events = AmbientPadsGenerator.airportsVoices(frame: songState.frame,
+                                                                 chords: songState.structure.chordPlan, rng: &airportsRNG)
+                }
                 if let block = songState.ambientXFilesBlockRange {
                     let whistle = songState.trackEvents[kTrackLead1].filter { block.contains($0.stepIndex) }
                     events = clearAgainstWhistle(events, whistle: whistle)
@@ -2177,8 +2246,11 @@ struct SongGenerator {
                                                density: AmbientZenLoops.regenBellDensity(seed: newTrackSeed, base: plan.dials.bellDensity),
                                                rng: &rng, usedRuleIDs: &usedRules)
             } else if isAmbPiano {
+                // A fresh roll on a stream of its own, so the notes' draws don't move: any of the
+                // three rules (Zack, 2026-11-22). The song's pads and tempo keep the original rule.
+                var ruleRNG = SeededRNG(seed: newTrackSeed ^ 0x9150_7E40_AB1E_0001)
                 events = AmbientLeadGenerator.generateAmbientPianoLead(
-                    pianoRule: songState.ambientPianoRule,
+                    pianoRule: ambientPianoRule(roll: ruleRNG.nextDouble()),
                     frame: songState.frame, totalBars: songState.frame.totalBars,
                     rng: &rng, usedRuleIDs: &usedRules,
                     introEndBar: songState.structure.introSection?.endBar ?? 0)
@@ -2387,7 +2459,8 @@ struct SongGenerator {
                 return songState
             } else if let plan = zenPlan {
                 // Zen's texture is always the MIDI pedal: never an audio texture.
-                events = AmbientZenTracks.texture(plan: plan, rng: &rng, usedRuleIDs: &usedRules)
+                events = AmbientZenTracks.texture(plan: plan, rng: &rng, usedRuleIDs: &usedRules,
+                                                  lowTide: AmbientZenTracks.regenLowTide(seed: newTrackSeed))
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.texture ?? 7
                 let ambientFiles = Self.ambientAudioFilePool
@@ -4134,12 +4207,12 @@ struct SongGenerator {
     private static func ambientRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         // Ambient Piano — Lead
-        case "AMB-PNO-001":    return "Floating Tones"
-        case "AMB-PNO-001-BT": return "Floating Tones — Sparse"
-        case "AMB-PNO-001-CW": return "Floating Tones — Chord Wash"
-        case "AMB-PNO-001-PD": return "Floating Tones — Pendulum"
-        case "AMB-PNO-002":  return "Pensive Melody"
-        case "AMB-PNO-003":  return "Dramatic Arc"
+        case "AMB-PNO-001":    return "Floating Buds"
+        case "AMB-PNO-001-BT": return "Floating Buds — Sparse"
+        case "AMB-PNO-001-CW": return "Floating Buds — Chord Wash"
+        case "AMB-PNO-001-PD": return "Floating Buds — Pendulum"
+        case "AMB-PNO-002":  return "Satin Melody"
+        case "AMB-PNO-003":  return "Koln Winter Arc"
         // Ambient Piano — Pads
         case "AMB-PADS-007": return "Sparse drone"
         case "AMB-PADS-008": return "Staggered strings"
@@ -4832,7 +4905,9 @@ struct SongGenerator {
         // Skipped for Chill Blues — the bass variation bars are now tracked explicitly (see
         // chillBassVariationAnnotations at the call site), which would otherwise double up with
         // this generic fingerprint-based detector at the same bar.
-        if kTrackBass < trackEvents.count && !bluesVariation {
+        // Skipped for Ambient and its substyles: the bass never evolves there, and the detector
+        // only fired on the bass's first entrance (Zack, 2026-11-22).
+        if kTrackBass < trackEvents.count && !bluesVariation && !isAmbient {
             var lastEvolvedBar: Int = -8
 
             if !bassEvolutionBars.isEmpty {

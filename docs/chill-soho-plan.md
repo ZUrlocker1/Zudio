@@ -374,33 +374,32 @@ same nor all different. The pedal holds one note in one octave (40–52); a peda
 the line note beside it is dropped, and the line itself is never moved. `sohoTurnaroundPalette`
 and `sohoTurnaroundStyle` are pure functions, so the generator and the log agree.
 
-**Slides** (`ChillBassSlides`, prototype 2026-10-15) — Best Melodic Bass (`CHL-BASS-014`) songs only, any
-bass instrument. Every bass bend in the corpus is a slide up into a note, a whole step (most) or a
-half step, over one to two sixteenths: a slide along one string. Holding Back the Years' fretless
-slides about once per 8 bars, always on the same note of its figure. The slides are pitch bend over
-notes already in the track, so the notes, the MIDI lane and the fingerprints do not change; playback
-(`PlaybackEngine.startBassSlide`) and export (`OfflineExport.slideEvents`) read the same pure
-function.
+**Slides** (`ChillBassSlides`) — Best Melodic Bass (`CHL-BASS-014`) songs only, any bass instrument.
+Every bass bend in the corpus is a slide into a note, a whole step (most) or a half step, over one to
+two sixteenths: one finger moving along one string. Holding Back the Years' fretless slides about once
+per 8 bars, always on the same note of its figure.
+- A slide is played as one finger would: the note before is plucked and held, and the target is never
+  plucked. Playback and export play the two written notes as one held note (the first note's key, to
+  the target's end) and bend it to the target's pitch, arriving exactly on the target's start, so the
+  target is in tune on its beat. The notes in the song, the MIDI lane, MIDI export and the fingerprints
+  are unchanged; playback (`PlaybackEngine.startChillSlide`) and export (`OfflineExport.slideEvents`)
+  read the same pure function
+- The glide eases off the first note, moves fastest mid-way and settles into the target (a half-cosine).
+  Soho glides over at most two sixteenths, Blues a sixteenth and a half, and never more than half the
+  span from the first note to the target, so the first note is heard at pitch
+- Only from the note just before, a half step to a minor third away, with at most an eighth's gap
+  between them; after a wider leap, into a repeated note or across a rest it would read as a scoop,
+  a bend or a filled silence
+- The bass channel's bend range is ±12 for a song with slides (as Ambient Zen's Slow Glide), and the
+  bend returns to centre just before the next bass note. The Vibrato effect rides on the slide
 - The root after each turnaround slides in half the time
 - Otherwise a note held a quarter or longer slides in 5% of the time
-- Slides stay at least four bars apart, landings placed first; bars 29 and 30 both sliding read as a
-  habit, not a gesture
-- From below after a lower note and from above after a higher one; from the previous note itself
-  when it is a half or whole step away, otherwise a whole step (65%) or a half step. Two and a half sixteenths, at most half the note: the starting pitch holds for the first
-  quarter of the glide, then moves steadily. Only after a move of a half step to a fourth — after a
-  wider leap or into a repeated note it is heard as a bend. The first version (a sixteenth and a
-  half, leaving at once, always from below, up to three quarters of the note) sounded like bends
+- Slides stay at least four bars apart, landings placed first
 - **Scope is settled** (Zack, 2026-10-15): slides stay on these two rules only — Soho `CHL-BASS-014` and
-  Blues `CHL-BASS-009` — as a rare touch. They took more tuning than expected, so they are not being spread
-  to other bass rules, and bass vibrato is not being pursued
-- **Chill Blues**, on the B.B. King pickup riff (`CHL-BASS-009`) only: a half-step slide over a sixteenth
-  and a half into the root at the top of every form, where the turnaround ends on the b7 below it.
-  Every form, so it belongs to the riff — one that came and went sounded arbitrary in a form this
-  repetitive, and a whole step over most of a beat sounded artificial. Zack slides into the IV and
-  V playing *The Thrill Is Gone*, but this riff reaches those roots from above: forced upward they
-  were bends, following the line they were pull-offs
-- Off while the bass has the Vibrato effect on, which drives the same pitch wheel
-- Over 51 songs: median 9 slides a song (3–16), 0.7 per 8 bars (before the leap rule)
+  Blues `CHL-BASS-009` — as a rare touch, and bass vibrato is not being pursued
+- **Chill Blues**, on the B.B. King pickup riff (`CHL-BASS-009`) only: up into the root at the top of
+  every form, from the riff's last note below it (usually the b7, a whole step). Every form, so it
+  belongs to the riff. The riff reaches the IV and V roots from above, where a slide reads as a pull-off
 
 ### Rhythm — comping
 

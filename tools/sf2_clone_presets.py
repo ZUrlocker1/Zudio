@@ -60,7 +60,11 @@ CLONES_SINE_BASS = [(8, 80, "Sine Swell"), (0, 87, "Lead Bass Swell"), (8, 38, "
 # Sixth set (2026-11-22): base Ambient's own swells, a Metal Pad bass and two pads. Base Ambient's
 # "FM Synth" bass is Synth Brass 1 (0:62), whose swell copy is the existing Brass Swell.
 CLONES_BASE_AMBIENT = [(0, 93, "Metal Pad Swell"), (0, 95, "Sweep Pad Swell"), (0, 50, "Synth Strings Swell")]
-SETS = {"base-ambient": CLONES_BASE_AMBIENT, "sine-bass": CLONES_SINE_BASS,"pads": CLONES, "glass-strings-bass": CLONES_GLASS_STRINGS_BASS, "pedal": CLONES_PEDAL, "synth": CLONES_SYNTH}
+# Seventh set (2026-11-22): base Ambient's Cello bass as a swell, so base has its own beside Metal Pad Swell
+CLONES_CELLO = [(0, 42, "Cello Swell")]
+# Eighth set (2026-11-22): base Ambient's drawbar-organ bass swell
+CLONES_ORGAN = [(0, 16, "Organ Swell")]
+SETS = {"organ": CLONES_ORGAN, "cello": CLONES_CELLO, "base-ambient": CLONES_BASE_AMBIENT, "sine-bass": CLONES_SINE_BASS,"pads": CLONES, "glass-strings-bass": CLONES_GLASS_STRINGS_BASS, "pedal": CLONES_PEDAL, "synth": CLONES_SYNTH}
 BACKUP = "/private/tmp/claude-502/-Users-urlocker-Downloads-Zudio/e54396ca-747a-4e83-bd56-b2891d1bef81/scratchpad/Zudio.sf2.orig"
 
 
@@ -71,9 +75,17 @@ def gens_of(recs_g, lo, hi):
     return [struct.unpack("<Hh", recs_g[g]) for g in range(lo, hi)]
 
 
+GEN_KEYRANGE = 43
+
+
 def inst_env(sf, ik):
     """Effective (attack, release) of each sample zone of instrument ik: zone value, else the
     instrument's global zone, else the spec default."""
+    return [(a, r) for a, r, _, _ in inst_env_keys(sf, ik)]
+
+
+def inst_env_keys(sf, ik):
+    """As inst_env, with each sample zone's key range: (attack, release, key_lo, key_hi)."""
     R = sf["recs"]
     I, IB, IG = R["inst"], R["ibag"], R["igen"]
     zones = []
@@ -84,7 +96,9 @@ def inst_env(sf, ik):
     out = []
     for d, is_sample in zones:
         if is_sample:
-            out.append(tuple(d.get(g, glob.get(g, DEFAULT_ENV)) for g in (GEN_ATTACK, GEN_RELEASE)))
+            kr = d.get(GEN_KEYRANGE, glob.get(GEN_KEYRANGE, 127 << 8))
+            out.append(tuple(d.get(g, glob.get(g, DEFAULT_ENV)) for g in (GEN_ATTACK, GEN_RELEASE))
+                       + (kr & 255, kr >> 8))
     return out
 
 
@@ -113,7 +127,10 @@ def effective_totals(sf, pk):
         pa = d.get(GEN_ATTACK, glob.get(GEN_ATTACK, 0))
         pr = d.get(GEN_RELEASE, glob.get(GEN_RELEASE, 0))
         ik = d[GEN_INSTRUMENT]
-        res.append((ik, [(a + pa, r + pr) for a, r in inst_env(sf, ik)]))
+        kr = d.get(GEN_KEYRANGE, 127 << 8)
+        lo, hi = kr & 255, kr >> 8
+        res.append((ik, [(a + pa, r + pr) for a, r, klo, khi in inst_env_keys(sf, ik)
+                         if klo <= hi and khi >= lo]))
     return res
 
 
@@ -150,6 +167,30 @@ def clone(sf, clones):
                 off_r = TARGET_RELEASE - median_low([r for _, r in env])
                 gs2 = [(o, a) for o, a in gs if o not in (GEN_ATTACK, GEN_RELEASE, GEN_INSTRUMENT)]
                 gs2 += [(GEN_ATTACK, off_a), (GEN_RELEASE, off_r), (GEN_INSTRUMENT, ik)]
+                # Sample zones whose own envelopes differ by more than the check allows (the Cello's
+                # one sample at keys 57 to 60) can't share one offset. Split this preset zone by key
+                # range, each range with the offset its samples need; no samples or PCM are touched.
+                if any(abs(a + off_a - TARGET_ATTACK) > 1200 or abs(r + off_r - TARGET_RELEASE) > 1200
+                       for a, r in env) and not any(o == GEN_KEYRANGE for o, _ in gs):
+                    segs = []                                  # (lo, hi, off_a, off_r)
+                    for a, r, klo, khi in sorted(inst_env_keys(sf, ik), key=lambda t: t[2]):
+                        seg = (klo, khi, TARGET_ATTACK - a, TARGET_RELEASE - r)
+                        if segs and segs[-1][1] + 1 == klo and segs[-1][2:] == seg[2:]:
+                            segs[-1] = (segs[-1][0], khi) + seg[2:]
+                        else:
+                            segs.append(seg)
+                    base = [(o, a) for o, a in gs2 if o not in (GEN_ATTACK, GEN_RELEASE)]
+                    for n, (klo, khi, sa, sr) in enumerate(segs):
+                        if n:
+                            bag = bytearray(4)
+                            struct.pack_into("<HH", bag, 0, len(DR["pgen"]), len(DR["pmod"]))
+                            DR["pbag"].append(bag)
+                        zg = [(GEN_KEYRANGE, klo | (khi << 8))] + base[:-1] + [(GEN_ATTACK, sa), (GEN_RELEASE, sr), base[-1]]
+                        for o, a in zg:
+                            DR["pgen"].append(bytearray(struct.pack("<Hh", o, a)))
+                        for m in range(m0, m1):
+                            DR["pmod"].append(bytearray(PM[m]))
+                    continue
             for o, a in gs2:
                 DR["pgen"].append(bytearray(struct.pack("<Hh", o, a)))
             for m in range(m0, m1):
@@ -206,10 +247,19 @@ def verify(old, chk, clones):
         if ck is None:
             bad(f"clone {prog} missing"); continue
         if C["phdr"][ck][:20].split(b"\0")[0].decode() != name: bad(f"clone {prog} name")
-        if resolve(old, sk) != resolve(chk, ck): bad(f"clone {prog} samples differ")
-        if pcm_hash(old, resolve(old, sk)) != pcm_hash(chk, resolve(chk, ck)): bad(f"clone {prog} PCM differs")
+        # A split clone (key-range zones) repeats a preset zone's samples once per segment, so it
+        # is compared by the set of samples it plays; every other clone by the exact list.
+        zc0 = preset_zones(chk, ck)
+        split = any(o == GEN_KEYRANGE for _, g, _ in zc0 for o, _ in g)
+        norm = (lambda l: sorted(set(l))) if split else (lambda l: l)
+        if norm(resolve(old, sk)) != norm(resolve(chk, ck)): bad(f"clone {prog} samples differ")
+        if pcm_hash(old, norm(resolve(old, sk))) != pcm_hash(chk, norm(resolve(chk, ck))): bad(f"clone {prog} PCM differs")
         zo, zc = preset_zones(old, sk), preset_zones(chk, ck)
-        if len(zo) != len(zc): bad(f"clone {prog} zone count"); continue
+        if len(zo) != len(zc):
+            # A split clone (key-range zones, see clone()) has more zones; its samples, PCM and
+            # envelope totals are still checked below and above.
+            if any(o == GEN_KEYRANGE for _, g, _ in zc for o, _ in g): continue
+            bad(f"clone {prog} zone count"); continue
         for (go, a, ma), (gc, b, mc) in zip(zo, zc):
             strip = lambda g: [(o, v) for o, v in g if o not in (GEN_ATTACK, GEN_RELEASE)]
             if go != gc or strip(a) != strip(b) or ma[1] - ma[0] != mc[1] - mc[0]:

@@ -568,7 +568,7 @@ struct AmbientLeadGenerator {
         }
     }
 
-    // MARK: AMB-PNO-001 — Floating Tones (Harold Budd)
+    // MARK: AMB-PNO-001 — Floating Buds (Harold Budd)
 
     private static func floatingTonesFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
@@ -1375,7 +1375,7 @@ struct AmbientLeadGenerator {
         return trimDissonances(events, totalSteps: totalSteps)
     }
 
-    // MARK: AMB-PNO-002 — Pensive Melody (Satie / Arnalds)
+    // MARK: AMB-PNO-002 — Satin Melody (Satie / Arnalds)
 
     private static func pensiveMelodyFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
@@ -1784,7 +1784,7 @@ struct AmbientLeadGenerator {
         return events
     }
 
-    // MARK: AMB-PNO-003 — Dramatic Arc (Winston / Jarrett)
+    // MARK: AMB-PNO-003 — Koln Winter Arc (Winston / Jarrett)
 
     private static func dramaticArcFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false

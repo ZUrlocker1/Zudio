@@ -167,7 +167,9 @@ struct TrackRowView: View {
                             .help("Solo")
 
                         Button {
-                            instrumentIndex = Int.random(in: 0..<instruments.count)
+                            instrumentIndex = appState.shuffledInstrumentIndex(
+                                forTrack: trackIndex, style: appState.songState?.style ?? activeStyle,
+                                poolCount: instruments.count, current: instrumentIndex)
                             appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
                             appState.instrumentOverrides[trackIndex] = instrumentIndex
                             applyDefaultEffects()
@@ -352,7 +354,8 @@ struct TrackRowView: View {
         switch trackIndex {
         case kTrackLead1:
             if isChill   { return [.space, .delay, .vibrato] }
-            if isAmbient { return [.sweep, .delay, .space] }
+            // Every Ambient form shows its gentle Air where Sweep was (Zack, 2026-11-22).
+            if isAmbient { return [.air, .delay, .space] }
             return isKosmic ? [.vibrato, .delay, .space] : [.air, .delay, .tremolo]
         case kTrackLead2:
             if isChill   { return [.space, .delay, .vibrato] }
@@ -437,29 +440,14 @@ struct TrackRowView: View {
         }
 
         let defaults: [TrackEffect]
-        if activeStyle == .ambient && appState.songState?.isAmbientZen == true {
-            // Ambient Zen. Pads take their light echo with no chip of their own; the bass sweep
-            // stays off. Mirrored in AppState.restoreDefaultEffects — keep the two in step.
-            defaults = switch trackIndex {
-            case kTrackLead1:   [.delay, .space]
-            case kTrackLead2:   [.delay, .space]
-            case kTrackPads:    [.space, .tremolo, .sweep, .delay]
-            case kTrackRhythm:  [.delay, .space, .pan]
-            case kTrackTexture: [.delay, .space]
-            case kTrackBass:    [.reverb, .tremolo]
-            default:            []
-            }
-        } else if activeStyle == .ambient {
-            defaults = switch trackIndex {
-            case kTrackLead1:   [.delay, .space]
-            case kTrackLead2:   isInstrumentLocked ? [.delay, .space] : [.space]
-            case kTrackPads:    [.space, .sweep]
-            case kTrackRhythm:  [.reverb]
-            case kTrackTexture: appState.songState?.ambientAudioTexture != nil ? [.space] : [.space, .pan, .sweep]
-            case kTrackBass:    [.reverb, .sweep]
-            case kTrackDrums:   [.delay]
-            default:            []
-            }
+        if activeStyle == .ambient {
+            // One table for all three forms, shared with AppState.restoreDefaultEffects.
+            let song = appState.songState
+            defaults = AmbientEffectDefaults.defaults(
+                track: trackIndex,
+                form: song?.isAmbientZen == true ? .zen : song?.isAmbientPiano == true ? .piano : .base,
+                lead2Locked: isInstrumentLocked,
+                audioTexture: song?.ambientAudioTexture != nil)
         } else if activeStyle == .chill {
             let isBlues    = appState.songState?.chillBluesVariation == true
             let baseLeadFX: [TrackEffect] = isBlues ? [.space] : [.space, .delay]

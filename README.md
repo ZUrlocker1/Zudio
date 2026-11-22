@@ -20,7 +20,7 @@ This repository contains the macOS app source, implementation notes, and support
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v3.1/Zudio-3.1.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
 **Zudio 3.0 is a major release, with many improvements across all four styles.** Build 138 was the release candidate for V3 and was submitted to the App Store on 2026-11-15. Highlights: Chill has new jazz leads, second-soloist answers and chords that move; Kosmic gains the Jean-Michel Jarre-style Space substyle; Motorik Noir and Europe get new leads transcribed from real tracks; Chill Soho brings back the St Germain beat; playback is smoother with a lighter visualizer; and iPhone audio recovers better from a stuck output. The sections below list the details.
-**v3.1 (build 139, 2026-11-20) is a minor release with minor adjustments, and the Mac download is this build.** Chill leads and bass repeat fewer notes, easing an overcorrection in 3.0's clash fixes. On the Mac, the Generation Log area in Track View is now resizable. Details in the [change log](docs/change-log.md).
+**v3.1 (build 139, 2026-11-22) is a minor release, work in progress with minor tuning, and the Mac download is this build.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords, and base Ambient moves through short chord cycles with swell pads and basses and a grander reverb. Chill leads and bass repeat fewer notes, and the Mac Track View Generation Log is now resizable. Smaller touches include smoother bass slides in Chill Soho and Blues and more reverb on Ambient Piano's pads. Details in the [change log](docs/change-log.md).
 
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
@@ -66,6 +66,7 @@ Earlier releases are covered in the [change log](docs/change-log.md).
 - [kosmic-space-plan.md](docs/kosmic-space-plan.md) — Kosmic Space: the Jean-Michel Jarre substyle, its corpus measurements, harmony families, rules by track, and the ideas closed or on hold.
 - [Solo-improvement-plan.md](docs/Solo-improvement-plan.md) — Hook-based Lead 1 and gap-answer Lead 2 rules for base Motorik and Kosmic: what is built, what is next, and the source cells.
 - [ambient-plan.md](docs/ambient-plan.md) — Ambient style: genre research, artist-by-artist analysis, universal rules, generator design, and MIDI analysis.
+- [Ambient-Zen-plan.md](docs/Ambient-Zen-plan.md) — Ambient Zen: the Music for Airports homage, its song plan, instruments, audio and log, and what is on the shelf.
 - [chill-plan.md](docs/chill-plan.md) — Chill style: genre research, artist-by-artist analysis (St Germain, Moby, Air, DJ Cam Quartet, Electric Buddha Band), universal rules, generator design, and MIDI analysis.
 - [chill-jazz-leads-plan.md](docs/chill-jazz-leads-plan.md) — Chill's jazz lick Lead 1 rules: the tunes and solos they come from, the three-theme form, shares, and open items.
 

@@ -40,16 +40,7 @@ struct GenerationLogEntry: Sendable {
 
     /// TESTING ONLY. Rules fixed in the current round, marked with "F " ("AMB-LEAD-003 F  ...").
     /// Same lifetime as testingMarkedRules.
-    static let fixMarkedRules: Set<String> = [
-        // Base Ambient (2026-11-21): every pitched loop now follows the chord in force, so it no
-        // longer rubs against a later chord (AmbientChordFollow).
-        "AMB-PADS-001", "AMB-PADS-002",
-        "AMB-LEAD-001", "AMB-LEAD-002", "AMB-LEAD-003", "AMB-LEAD-004", "AMB-LEAD-005",
-        "AMB-LEAD-006", "AMB-LEAD-007", "AMB-LEAD-008", "AMB-LEAD-009", "AMB-LEAD-010",
-        "AMB-RTHM-001", "AMB-RTHM-002", "AMB-RTHM-003", "AMB-RTHM-005", "AMB-RTHM-006",
-        "AMB-TEXT-001", "AMB-TEXT-002",
-        "AMB-BASS-006",
-    ]
+    static let fixMarkedRules: Set<String> = []   // empty since 2026-11-22: the "F " marks are off
 
     /// The testing markers a description can start with: "* " new or radically changed, "F "
     /// fixed. A marker counts only on a rule in one of the two sets (isMarkable), so a Chords line

@@ -65,7 +65,7 @@ struct AmbientDrumGenerator {
             if rng.nextDouble() < 0.30 {
                 for step in stride(from: 0, to: 16, by: 4) {
                     if rng.nextDouble() < 0.50 {
-                        let vel = UInt8(28 + rng.nextInt(upperBound: 20))  // 28–47
+                        let vel = UInt8(((28 + rng.nextInt(upperBound: 20)) * 3) / 4)  // 21–35
                         events.append(MIDIEvent(stepIndex: bar * 16 + step,
                                                 note: shaker, velocity: vel, durationSteps: 1))
                     }
@@ -80,7 +80,7 @@ struct AmbientDrumGenerator {
                     positions.swapAt(i, rng.nextInt(upperBound: i + 1))
                 }
                 for h in 0..<min(numHits, positions.count) {
-                    let vel = UInt8(36 + rng.nextInt(upperBound: 16))  // 36–51
+                    let vel = UInt8(((36 + rng.nextInt(upperBound: 16)) * 3) / 4)  // 27–38
                     let note: UInt8 = [hiConga, midConga, lowConga][rng.nextInt(upperBound: 3)]
                     events.append(MIDIEvent(stepIndex: bar * 16 + positions[h],
                                             note: note, velocity: vel, durationSteps: 1))
@@ -90,7 +90,7 @@ struct AmbientDrumGenerator {
             // Bongos: accent hit ~20% of bars, on beat 1 or beat 3
             if rng.nextDouble() < 0.20 {
                 let beat = (rng.nextDouble() < 0.5) ? 0 : 8
-                let vel  = UInt8(32 + rng.nextInt(upperBound: 18))  // 32–49
+                let vel  = UInt8(((32 + rng.nextInt(upperBound: 18)) * 3) / 4)  // 24–36
                 let note: UInt8 = rng.nextDouble() < 0.6 ? hiBongo : lowBongo
                 events.append(MIDIEvent(stepIndex: bar * 16 + beat,
                                         note: note, velocity: vel, durationSteps: 1))
@@ -99,14 +99,14 @@ struct AmbientDrumGenerator {
             // Maracas: light accent ~15% of bars on offbeat step 6 or 10
             if rng.nextDouble() < 0.15 {
                 let step = (rng.nextDouble() < 0.5) ? 6 : 10
-                let vel  = UInt8(32 + rng.nextInt(upperBound: 16))  // 32–47
+                let vel  = UInt8(((32 + rng.nextInt(upperBound: 16)) * 3) / 4)  // 24–35
                 events.append(MIDIEvent(stepIndex: bar * 16 + step,
                                         note: maracas, velocity: vel, durationSteps: 1))
             }
 
             // Claves: sparse click ~15% of bars on beat 2 (step 4)
             if rng.nextDouble() < 0.15 {
-                let vel = UInt8(44 + rng.nextInt(upperBound: 20))  // 44–63
+                let vel = UInt8(((44 + rng.nextInt(upperBound: 20)) * 3) / 4)  // 33–47
                 events.append(MIDIEvent(stepIndex: bar * 16 + 4,
                                         note: claves, velocity: vel, durationSteps: 1))
             }
@@ -128,7 +128,7 @@ struct AmbientDrumGenerator {
             // Regular brush/ride sparse hits
             if rng.nextDouble() < 0.30 {
                 let beat = rng.nextInt(upperBound: 4) * 4
-                let vel  = UInt8(35 + rng.nextInt(upperBound: 25))  // 35–59
+                let vel  = UInt8(((35 + rng.nextInt(upperBound: 25)) * 3) / 4)  // 26–44
                 let drum = colors[rng.nextInt(upperBound: colors.count)]
                 events.append(MIDIEvent(stepIndex: bar * 16 + beat,
                                         note: drum.rawValue, velocity: vel, durationSteps: 1))
@@ -141,10 +141,12 @@ struct AmbientDrumGenerator {
 
             if isFirstBodyBar || barsSinceCymbal >= cymbalThreshold {
                 if isFirstBodyBar || rng.nextDouble() < 0.55 {
-                    let vel  = UInt8(50 + rng.nextInt(upperBound: 28))  // 50–77
+                    let raw  = 50 + rng.nextInt(upperBound: 28)  // 50–77 raw, drawn before the cymbal is chosen
                     // Alternate crash1, crash2, ride for variety
                     let cyms: [GMDrum] = [.crash1, .ride, .crash2, .ride]
                     let drum = cyms[rng.nextInt(upperBound: cyms.count)]
+                    // Cymbals sit well under the rest (Zack, 2026-11-22): a crash at 40 percent, a ride at 60.
+                    let vel  = UInt8(drum == .ride ? raw * 6 / 10 : raw * 4 / 10)
                     events.append(MIDIEvent(stepIndex: bar * 16,
                                             note: drum.rawValue, velocity: vel, durationSteps: 2))
                     lastCymbalBar = bar

@@ -58,14 +58,16 @@ struct KosmicMusicalFrameGenerator {
         seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil
+        moodOverride: Mood? = nil,
+        forceSubstyle: String? = nil
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily,
           isKosmicDrift: Bool, isDriftDreamscape: Bool, driftVelocityBase: Int, isKosmicSpace: Bool) {
 
         // Kosmic Drift and Kosmic Space share one draw — the slot Drift has always used
         let substyleRoll  = rng.nextDouble()
-        let isKosmicDrift = substyleRoll < driftShare
-        let isKosmicSpace = !isKosmicDrift && substyleRoll < driftShare + spaceShare
+        // A recorded substyle replaces the comparison; the roll is still drawn.
+        let isKosmicDrift = forceSubstyle.map { $0 == "Drift" } ?? (substyleRoll < driftShare)
+        let isKosmicSpace = forceSubstyle.map { $0 == "Space" } ?? (!isKosmicDrift && substyleRoll < driftShare + spaceShare)
         var spaceRNG = KosmicSpaceStream.frame.rng(seed: seed)
         // Space harmony family, drawn first because it sets the song mode
         let spaceFamily: KosmicProgressionFamily? = isKosmicSpace ? pickSpaceFamily(rng: &spaceRNG) : nil

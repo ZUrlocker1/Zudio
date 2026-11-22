@@ -211,6 +211,13 @@ struct ChillMusicalFrameGenerator {
         return insts[rng.nextInt(upperBound: insts.count)]
     }
 
+    /// A beat style drawn afresh for a regenerated bass or drums, from the form's own pool at
+    /// generation's weights, on a stream of its own.
+    static func regenBeatStyle(blues: Bool, seed: UInt64) -> ChillBeatStyle {
+        var rng = SeededRNG(seed: seed ^ 0xC411_BEA7_5717_E000)
+        return blues ? pickBeatStyleBlues(rng: &rng) : pickBeatStyle(rng: &rng)
+    }
+
     private static func pickBeatStyle(rng: inout SeededRNG) -> ChillBeatStyle {
         // No mood bias. St Germain 13% of base Chill (about 6% of all Chill songs, Zack's target
         // 5-7%, 2026-11-12); the other four share the rest evenly at 21.75% each.

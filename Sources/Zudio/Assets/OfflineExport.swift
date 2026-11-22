@@ -143,10 +143,9 @@ enum OfflineExport {
         }
 
         let sps = 60.0 / Double(state.frame.tempo) / 4.0
-        // Bass slides, as playback plays them (PlaybackEngine.startBassSlide) and suppressed in
-        // the same case: the bass has the Vibrato effect on.
-        let bassVibrato = kTrackBass < snapshots.count && snapshots[kTrackBass].vibratoEnabled
-        let bassSlides  = bassVibrato ? [:] : ChillBassSlides.slides(for: state)
+        // Bass slides, as playback plays them (PlaybackEngine.startChillSlide): each slide's two
+        // notes as one held note, bent to the second pitch.
+        let bassSlides  = ChillBassSlides.slides(for: state)
         // Behind-the-beat feel (BeatFixup), as PlaybackEngine.beatDelay plays it: the bass and the
         // drum backbeat notes sit late on a Chill Soho Soul song. Playback delays at fire time;
         // here the same offset is added to the event position, so the export matches.
@@ -156,11 +155,14 @@ enum OfflineExport {
         let chillPads = state.style == .chill
         let beat = (beatFixupEnabled && state.style == .chill)
             ? BeatFixup.offsets(for: state) : (bassMs: 0, backbeatMs: 0)
+        let bassPlayed = ChillBassSlides.played(state.trackEvents[kTrackBass], slides: bassSlides)
         let eventLists: [[SampleEvent]] = samplers.map { item in
-            buildEvents(state.trackEvents[item.trackIdx], track: item.trackIdx, beat: beat,
+            buildEvents(item.trackIdx == kTrackBass ? bassPlayed : state.trackEvents[item.trackIdx],
+                        track: item.trackIdx, beat: beat,
                         padsFade: chillPads, sampleRate: sampleRate, sps: sps)
                 + (item.trackIdx == kTrackBass
-                    ? slideEvents(bassSlides, delaySamples: Int64(Double(beat.bassMs) / 1000 * sampleRate),
+                    ? slideEvents(bassSlides, played: bassPlayed,
+                                  delaySamples: Int64(Double(beat.bassMs) / 1000 * sampleRate),
                                   sampleRate: sampleRate, sps: sps) : [])
         }.map { $0.sorted { $0.pos < $1.pos } }
         var evtIdxs = [Int](repeating: 0, count: samplers.count)
@@ -316,22 +318,24 @@ enum OfflineExport {
             let eq = AVAudioUnitEQ(numberOfBands: 2)
             eq.bands[0].filterType = .lowShelf
             eq.bands[0].frequency  = 80
-            eq.bands[0].gain       = 5.0
+            eq.bands[0].gain       = PlaybackEngine.lowShelfGain(zenBass: state.isAmbientZen && trackIdx == kTrackBass)
             eq.bands[0].bypass     = false
             eq.bands[1].filterType = .highPass
             eq.bands[1].frequency  = 250
             eq.bands[1].bypass     = !snap.hpfEnabled
             eq.auAudioUnit.shouldBypassEffect = snap.lowShelfBypassed
 
+            // Ambient's Air is a soft sheen (PlaybackEngine setEffect .air).
+            let gentleAir = state.style == .ambient
             let airEQ = AVAudioUnitEQ(numberOfBands: 2)
             airEQ.bands[0].filterType = .parametric
             airEQ.bands[0].frequency  = 4000
             airEQ.bands[0].gain       = 5.0
             airEQ.bands[0].bandwidth  = 1.5
-            airEQ.bands[0].bypass     = false
+            airEQ.bands[0].bypass     = gentleAir
             airEQ.bands[1].filterType = .highShelf
-            airEQ.bands[1].frequency  = 8000
-            airEQ.bands[1].gain       = 7.5
+            airEQ.bands[1].frequency  = gentleAir ? 10000 : 8000
+            airEQ.bands[1].gain       = gentleAir ? 3.5 : 7.5
             airEQ.bands[1].bypass     = false
             airEQ.auAudioUnit.shouldBypassEffect = !snap.airEnabled
 
@@ -616,7 +620,7 @@ enum OfflineExport {
                 let eq = AVAudioUnitEQ(numberOfBands: 2)
                 eq.bands[0].filterType = .lowShelf
                 eq.bands[0].frequency  = 80
-                eq.bands[0].gain       = 5.0
+                eq.bands[0].gain       = PlaybackEngine.lowShelfGain(zenBass: state.isAmbientZen && trackIdx == kTrackBass)
                 eq.bands[0].bypass     = false
                 eq.bands[1].filterType = .highPass
                 eq.bands[1].frequency  = 250
@@ -627,15 +631,17 @@ enum OfflineExport {
                 // airEQ. Build 128 tuned live + Phase 2 up to this two-band shape but left
                 // this copy on the original single 12 kHz shelf, so Air-enabled stems
                 // exported far duller than the mix.
+                // Ambient's Air is a soft sheen (PlaybackEngine setEffect .air).
+                let gentleAir = state.style == .ambient
                 let airEQ = AVAudioUnitEQ(numberOfBands: 2)
                 airEQ.bands[0].filterType = .parametric  // presence peak: upper-mid bite
                 airEQ.bands[0].frequency  = 4000
                 airEQ.bands[0].gain       = 5.0
                 airEQ.bands[0].bandwidth  = 1.5          // broad, natural-sounding peak
-                airEQ.bands[0].bypass     = false
+                airEQ.bands[0].bypass     = gentleAir
                 airEQ.bands[1].filterType = .highShelf   // air shelf: opens up top end
-                airEQ.bands[1].frequency  = 8000
-                airEQ.bands[1].gain       = 7.5
+                airEQ.bands[1].frequency  = gentleAir ? 10000 : 8000
+                airEQ.bands[1].gain       = gentleAir ? 3.5 : 7.5
                 airEQ.bands[1].bypass     = false
                 airEQ.auAudioUnit.shouldBypassEffect = !snap.airEnabled
 
@@ -928,24 +934,33 @@ enum OfflineExport {
         return evts.sorted { $0.pos < $1.pos }
     }
 
-    /// Pitch-bend events for each bass slide: off pitch one sample before the note starts, then a
-    /// glide to centre in 4 ms steps on ChillBassSlides.remaining, as PlaybackEngine plays it.
-    /// SampleEvent's `note` and `vel` carry the bend's low and high seven bits.
-    private static func slideEvents(_ slides: [Int: BassSlide], delaySamples: Int64,
+    /// Bend events for the bass slides, as PlaybackEngine plays them: the wide bend range at the
+    /// start, then for each slide a glide in 4 ms steps on ChillBassSlides.progress, ending on the
+    /// target's start, and the bend home one sample before the next bass note. SampleEvent's
+    /// `note` and `vel` carry a bend's low and high seven bits, or a controller and its value.
+    private static func slideEvents(_ slides: [Int: BassSlide], played: [MIDIEvent], delaySamples: Int64,
                                     sampleRate: Double, sps: Double) -> [SampleEvent] {
+        guard !slides.isEmpty else { return [] }
         var evts = [SampleEvent]()
         func bend(_ pos: Int64, _ semis: Double) {
             let v = ChillBassSlides.bendValue(semitones: semis)
             evts.append(SampleEvent(pos: max(0, pos), status: 0xE0, note: UInt8(v & 0x7F), vel: UInt8(v >> 7)))
         }
-        for (step, slide) in slides {
-            let on    = Int64(Double(step) * sampleRate * sps) + delaySamples
-            let from  = Double(slide.fromSemitones)
+        // RPN 0, the pitch-bend range, then the null RPN.
+        for (cc, value) in [(101, 0), (100, 0), (6, Int(ChillBassSlides.bendRange)), (38, 0), (101, 127), (100, 127)] {
+            evts.append(SampleEvent(pos: 0, status: 0xB0, note: UInt8(cc), vel: UInt8(value)))
+        }
+        let starts = played.map(\.stepIndex).sorted()
+        for slide in slides.values {
+            let start = Int64(slide.glideStart * sps * sampleRate) + delaySamples
             let ticks = max(4, Int(slide.glideSteps * sps / 0.004))
-            bend(on - 1, from)
-            for k in 1...ticks {
+            for k in 0...ticks {
                 let t = Double(k) / Double(ticks)
-                bend(on + Int64(slide.glideSteps * sps * sampleRate * t), from * ChillBassSlides.remaining(t))
+                bend(start + Int64(slide.glideSteps * sps * sampleRate * t),
+                     Double(slide.semitones) * ChillBassSlides.progress(t))
+            }
+            if let next = starts.first(where: { $0 > slide.fromStep }) {
+                bend(Int64(Double(next) * sps * sampleRate) + delaySamples - 1, 0)
             }
         }
         return evts

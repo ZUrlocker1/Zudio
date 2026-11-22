@@ -14,6 +14,30 @@ import Foundation
 
 enum AmbientZenTracks {
 
+    // MARK: - Rules drawn again by a regeneration
+
+    /// Where a track has more than one rule, a regenerated track draws its rule afresh from its own
+    /// seed (Zack, 2026-11-22), on a stream apart from the notes', at the weights a new song has:
+    /// bass 35 percent Slow Glide, 39 Airports Root, 26 Plateaux Octave Root; pads 47 percent Shell
+    /// Voices; Texture 40 percent Low Tide. A new song still takes its dials.
+    private static func regenRoll(seed: UInt64) -> Double {
+        var r = SeededRNG(seed: seed ^ 0x2E17_5EED_0DD5_B1A5)
+        return r.nextDouble()
+    }
+    static func regenBassRule(seed: UInt64) -> String {
+        let roll = regenRoll(seed: seed)
+        return roll < 0.35 ? "AMB-BASS-009" : roll < 0.74 ? "AMB-BASS-007" : "AMB-BASS-008"
+    }
+    static func regenShell(seed: UInt64) -> Bool { regenRoll(seed: seed &+ 1) < 0.47 }
+    static func regenLowTide(seed: UInt64) -> Bool { regenRoll(seed: seed &+ 2) < 0.40 }
+
+    /// Whether the song's bass is AMB-BASS-009 Slow Glide: a regenerated bass by its seed's roll,
+    /// any other by the song's dial. Playback (ZenBassGlide) asks this, so the glide and the notes agree.
+    static func bassGlides(in state: SongState) -> Bool {
+        if let seed = state.trackOverrides[kTrackBass] { return regenBassRule(seed: seed) == "AMB-BASS-009" }
+        return AmbientZenDials.draw(seed: state.globalSeed).slowGlide
+    }
+
     // MARK: - Pads: AMB-PADS-011 Airports Breath
 
     /// Four voices, each breathing on its own cycle (AMB-1's numbers). A voice whose note is not
@@ -22,9 +46,11 @@ enum AmbientZenTracks {
     /// held breath (4 to 6 bars, by the outro's length): all four voices on the tonic chord. The pads,
     /// pedal and bass stop 1 to 2 bars apart, in an order drawn per song (dials.endOffsets).
     static func pads(plan: AmbientZenPlan, rng: inout SeededRNG,
-                     usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+                     usedRuleIDs: inout Set<String>, shell shellOverride: Bool? = nil) -> [MIDIEvent] {
         if plan.dials.cycle == .block { return blockPads(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs) }
-        usedRuleIDs.insert(plan.dials.shellVoices ? "AMB-PADS-016" : "AMB-PADS-011")
+        // A new song takes its shell dial; a regeneration passes its own roll (regenShell).
+        let shell = shellOverride ?? plan.dials.shellVoices
+        usedRuleIDs.insert(shell ? "AMB-PADS-016" : "AMB-PADS-011")
         let voicings  = padVoicings(plan: plan)
         let sps       = plan.stepsPerSecond
         let holdStart = plan.heldBreathStartBar * 16
@@ -36,11 +62,7 @@ enum AmbientZenTracks {
         let boundaries = plan.windows.dropFirst().map { $0.startBar * 16 }
 
         func cycleSeconds(_ v: Int) -> Double { base * factors[v] * (0.85 + 0.30 * rng.nextDouble()) }
-        /// Breath velocity, nudged up to 10 percent by the swell at the breath's bar.
-        func velocity(_ step: Int) -> UInt8 {
-            let v = Double(50 + Int((40 * (0.6 + 0.4 * rng.nextDouble())).rounded()))
-            return UInt8(Swift.max(1, Swift.min(127, Int((v * (1 + 0.1 * plan.swell(atBar: step / 16))).rounded()))))
-        }
+        func velocity(_ step: Int) -> UInt8 { padVelocity(step, plan: plan, rng: &rng) }
 
         /// A sounding voice carries across a change only if its note is a chord tone of the new
         /// chord and sits clear of the new voicing and the pedal.
@@ -48,9 +70,9 @@ enum AmbientZenTracks {
             let win = plan.windows[w]
             guard win.voiceTones.contains(pitch % 12) else { return false }
             for (u, other) in voicings[w].enumerated() where u != voice {
-                if [0, 1, 13].contains(abs(pitch - other)) { return false }
+                if pitch == other || AmbientZenPlan.rubs(pitch, other) { return false }
             }
-            for p in plan.pedalNotes(win) + plan.bassNotes(win) where [1, 13].contains(abs(pitch - p)) {
+            for p in plan.pedalNotes(win) + plan.bassNotes(win) where AmbientZenPlan.rubs(pitch, p) {
                 return false
             }
             return true
@@ -105,7 +127,7 @@ enum AmbientZenTracks {
         // AMB-PADS-016 Shell Voices: the same breaths, keeping only the voices on the chord's 3rd
         // and 7th, so the chord is see-through and the bass and Texture supply the root and fifth.
         // A filter after every draw, so the draws match AMB-PADS-011 and it adds no new note.
-        if plan.dials.shellVoices {
+        if shell {
             let lastWindow = plan.windows[plan.windows.count - 1]
             events = events.filter { e in
                 let held = e.stepIndex + e.durationSteps >= endStep
@@ -131,10 +153,7 @@ enum AmbientZenTracks {
         let voicings  = padVoicings(plan: plan)
         let holdStart = plan.heldBreathStartBar * 16
         let endStep   = plan.padsEndBar * 16
-        func velocity(_ step: Int) -> UInt8 {
-            let v = Double(50 + Int((40 * (0.6 + 0.4 * rng.nextDouble())).rounded()))
-            return UInt8(Swift.max(1, Swift.min(127, Int((v * (1 + 0.1 * plan.swell(atBar: step / 16))).rounded()))))
-        }
+        func velocity(_ step: Int) -> UInt8 { padVelocity(step, plan: plan, rng: &rng) }
         var events: [MIDIEvent] = []
         var current: [Int?] = [nil, nil, nil, nil]   // each voice's sounding event, by index
         // Each chord, then the held breath's voicing from holdStart to the end of the pads.
@@ -160,6 +179,13 @@ enum AmbientZenTracks {
             }
         }
         return abutSamePitch(events)
+    }
+
+    /// A pad breath's velocity (50 to 90), nudged up to 10 percent by the swell at the step's bar.
+    /// One draw, shared by the breathing and block pads.
+    private static func padVelocity(_ step: Int, plan: AmbientZenPlan, rng: inout SeededRNG) -> UInt8 {
+        let v = Double(50 + Int((40 * (0.6 + 0.4 * rng.nextDouble())).rounded()))
+        return UInt8(Swift.max(1, Swift.min(127, Int((v * (1 + 0.1 * plan.swell(atBar: step / 16))).rounded()))))
     }
 
     /// One four-voice voicing per window, plus the held breath's tonic voicing last: AMB-1's
@@ -215,9 +241,9 @@ enum AmbientZenTracks {
                     for i in 0..<pick.count {
                         for j in (i + 1)..<pick.count {
                             let d = abs(pick[i] - pick[j])
-                            if d == 0 || d == 1 || d == 13 { cost += 40 }
+                            if d == 0 || AmbientZenPlan.rubs(pick[i], pick[j]) { cost += 40 }
                         }
-                        for p in pedal where [1, 13].contains(abs(pick[i] - p)) { cost += 40 }
+                        for p in pedal where AmbientZenPlan.rubs(pick[i], p) { cost += 40 }
                         if w.keepsTonic && pick[i] % 12 == plan.leadingTonePC && pick[i] < plan.pedalTonicNote {
                             cost += 40
                         }
@@ -237,8 +263,8 @@ enum AmbientZenTracks {
     /// The song's Texture rule, from its dial (so a regeneration keeps it): Low Tide in 40 percent
     /// of songs, Pearl Pedal in 60.
     static func texture(plan: AmbientZenPlan, rng: inout SeededRNG,
-                        usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
-        plan.dials.lowTide ? lowTide(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs)
+                        usedRuleIDs: inout Set<String>, lowTide lowTideOverride: Bool? = nil) -> [MIDIEvent] {
+        (lowTideOverride ?? plan.dials.lowTide) ? lowTide(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs)
                            : pedal(plan: plan, rng: &rng, usedRuleIDs: &usedRuleIDs)
     }
 
@@ -329,15 +355,12 @@ enum AmbientZenTracks {
     /// 007 plays the root alone; 008 doubles it at the octave for 2 bars, then the upper note
     /// carries on alone. A window change ends the old root exactly where the new one starts.
     static func bass(plan: AmbientZenPlan, rng: inout SeededRNG, usedRuleIDs: inout Set<String>,
-                     forceRuleID: String? = nil) -> [MIDIEvent] {
-        let drawn: String = {
-            if let f = forceRuleID, f == "AMB-BASS-007" || f == "AMB-BASS-008" { return f }
-            return rng.nextDouble() < 0.60 ? "AMB-BASS-007" : "AMB-BASS-008"
-        }()
+                     ruleID forcedRuleID: String? = nil) -> [MIDIEvent] {
+        let drawn = rng.nextDouble() < 0.60 ? "AMB-BASS-007" : "AMB-BASS-008"
         // AMB-BASS-009 Slow Glide writes AMB-BASS-007's notes; playback holds one note and bends
         // it to each new pitch (Playback/ZenBassGlide.swift). The draw above is still made, so no
         // later draw moves.
-        let ruleID = plan.dials.slowGlide && forceRuleID == nil ? "AMB-BASS-009" : drawn
+        let ruleID = forcedRuleID ?? (plan.dials.slowGlide ? "AMB-BASS-009" : drawn)
         usedRuleIDs.insert(ruleID)
         let octave  = ruleID == "AMB-BASS-008"
         let endStep = plan.bassEndBar * 16
@@ -421,7 +444,7 @@ enum AmbientZenTracks {
     /// on Euclidean patterns of 16, 12 and 7 steps, 2, 2 and 1 hits (AMB-1's Garden), rotated 0, 2
     /// and 3, each running on its own cycle so the three drift against each other. Each bar, AMB-1's
     /// evolve: now and then a rest of 2 to 4 bars or a long one of 8 to 16, and now and then one pattern turns a step or
-    /// gains or loses a hit (within one of its home count). Velocity is AMB-1's, about 9 to 58.
+    /// gains or loses a hit (within one of its home count). Velocity is AMB-1's scaled down to 60 percent (Zack, 2026-11-22), about 5 to 41.
     /// The swell thins it: the open hat drops below a swell of 0 and the closed hat below -0.4,
     /// so a sparse stretch is the kick alone. It plays from bar 4 to the pads' held breath.
     static func gardenPulse(plan: AmbientZenPlan, rng: inout SeededRNG,
@@ -472,7 +495,7 @@ enum AmbientZenTracks {
                     if resting { continue }
                     if p == 2 && swell < 0 { continue }
                     if p == 1 && swell < -0.4 { continue }
-                    let vel = Swift.max(1, Int((level * arc * 50).rounded()))
+                    let vel = Swift.max(1, Int((level * arc * 30).rounded()))
                     events.append(MIDIEvent(stepIndex: step, note: notes[p], velocity: UInt8(vel), durationSteps: 2))
                 }
             }

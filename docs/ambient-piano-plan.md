@@ -7,9 +7,9 @@ Ambient Piano is a sub-style of Ambient, appearing 40% of the time. Where base A
 
 Each Ambient Piano song is shaped by one of three **lead rules** for Lead 1, chosen probabilistically at generation time. The rules have genuinely different generative logic — not just different parameters — because the three reference aesthetics have fundamentally different structural approaches:
 
-- **AMB-PNO-001 — Floating Tones:** individual notes floating in space, no phrase direction, stochastic placement *(Harold Budd reference)*
-- **AMB-PNO-002 — Pensive Melody:** true melodic phrases with stepwise oscillation and varied returns *(Satie / Arnalds reference)*
-- **AMB-PNO-003 — Dramatic Arc:** fuller phrases shaped by a global dynamic arc across the song *(Keith Jarrett / George Winston reference)*
+- **AMB-PNO-001 — Floating Buds:** individual notes floating in space, no phrase direction, stochastic placement *(Harold Budd reference)*
+- **AMB-PNO-002 — Satin Melody:** true melodic phrases with stepwise oscillation and varied returns *(Satie / Arnalds reference)*
+- **AMB-PNO-003 — Koln Winter Arc:** fuller phrases shaped by a global dynamic arc across the song *(Keith Jarrett / George Winston reference)*
 
 **The governing idea:** every other Ambient track generates texture, density, and layering. This one generates *events in a field of near-silence*.
 
@@ -82,7 +82,7 @@ Phrase window positions below are stated in both bars and steps (at 16 steps/bar
 
 - **Lead 1** — piano, sole melodic voice — active (one of AMB-PNO-001 / 002 / 003)
 - **Lead 2** — silent
-- **Pads** — present conditionally (90% / 75% / 50% for Floating Tones / Pensive Melody / Dramatic Arc); when active uses AMB-PADS-007 / 008 / 009 matched to the piano rule
+- **Pads** — present conditionally (90% / 75% / 50% for Floating Buds / Satin Melody / Koln Winter Arc); when active uses AMB-PADS-007 / 008 / 009 matched to the piano rule
 - **Rhythm** — silent
 - **Bass** — silent
 - **Texture** — silent
@@ -120,7 +120,7 @@ Silent — no effects needed.
 
 ---
 
-## Lead rule 1 — AMB-PNO-001: Floating Tones
+## Lead rule 1 — AMB-PNO-001: Floating Buds
 
 **Probability within Ambient Piano: 30%**  
 *Style reference: Harold Budd / Brian Eno*
@@ -273,7 +273,7 @@ Introduce a new cluster pair C and D, different pitch classes from A/B, for 8 ba
 
 ---
 
-## Lead rule 2 — AMB-PNO-002: Pensive Melody
+## Lead rule 2 — AMB-PNO-002: Satin Melody
 
 **Probability within Ambient Piano: 45%**  
 *Style reference: Erik Satie (Gnossiennes, Gymnopedies), Ólafur Arnalds (Saman, Near Light)*
@@ -397,7 +397,7 @@ These devices are drawn directly from the Gnossienne and Gymnopedie MIDI analysi
 
 ---
 
-## Lead rule 3 — AMB-PNO-003: Dramatic Arc
+## Lead rule 3 — AMB-PNO-003: Koln Winter Arc
 
 **Probability within Ambient Piano: 25%**  
 *Style reference: George Winston (December, Midnight, Snow), Keith Jarrett (Köln Concert Part 1)*
@@ -521,7 +521,7 @@ Above that drone, each style layers strings differently.
 
 ### AMB-PADS-007: Sparse Drone
 
-*Paired with AMB-PNO-001 (Floating Tones). Style reference: Harold Budd.*
+*Paired with AMB-PNO-001 (Floating Buds). Style reference: Harold Budd.*
 
 **Pad present: 90% of AMB-PNO-001 songs.** The Eno ambient wash is structural to the Budd aesthetic; without it the floating notes have no field to float in. The 10% no-pad case produces pure silence beneath each note — valid but extreme.
 
@@ -535,7 +535,7 @@ No active string voices. The drone is the entire pad layer.
 
 ### AMB-PADS-008: Staggered Strings
 
-*Paired with AMB-PNO-002 (Pensive Melody). Style reference: Ólafur Arnalds — Near Light and Raein.*
+*Paired with AMB-PNO-002 (Satin Melody). Style reference: Ólafur Arnalds — Near Light and Raein.*
 
 **Pad present: 75% of AMB-PNO-002 songs.** The bare Gnossienne recordings have no accompaniment; the 25% no-pad case gives the most austere, just-piano Satie feel. When pads are present, **60% of those** activate the full string voices (`ambientPianoStrings = true`); the other 40% use drone only with Sweep/Halo Pad.
 
@@ -570,7 +570,7 @@ When strings are active, four voices layer over the drone:
 
 ### AMB-PADS-009: Warm Sustain
 
-*Paired with AMB-PNO-003 (Dramatic Arc). Style reference: George Winston, Keith Jarrett.*
+*Paired with AMB-PNO-003 (Koln Winter Arc). Style reference: George Winston, Keith Jarrett.*
 
 **Pad present: 50% of AMB-PNO-003 songs.** Winston's and Jarrett's source pieces are all solo piano with no accompaniment; omitting the pad for half these songs is the more faithful interpretation. When absent, the bass punctuation notes in AMB-PNO-003 already anchor the harmony.
 

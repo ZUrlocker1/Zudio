@@ -693,11 +693,11 @@ struct AmbientZenTitleGenerator {
         "Before & After Tea",   // Before and After Science
         "On Hold",              // On Land
         "Taking Tiger Naps",    // Taking Tiger Mountain
-        "Here Come the Naps",   // Here Come the Warm Jets
+        "Here Come the Snooze", // Here Come the Warm Jets
         "Plateaux of Mild",     // The Plateaux of Mirror
-        "Lux Lite",             // Lux
+        "Luxolite",             // Lux
         "Apollo Snooze",        // Apollo
-        "Oat Milk Sea",         // Small Craft on a Milk Sea
+        "Oat Milk Soup",        // Small Craft on a Milk Sea
         "Ascent (Escalator)",   // An Ending (Ascent)
         "Dunwich Beach Towel",  // Dunwich Beach, Autumn, 1960
         "Ambient 1½",           // Ambient 1

@@ -102,6 +102,9 @@ final class PlaybackEngine: ObservableObject {
     private let reverbBusLarge      = AVAudioUnitReverb()   // Cathedral / LargeRoom
     private let reverbBusSmall      = AVAudioUnitReverb()   // MediumHall / MediumRoom
     private let reverbBusMixerLarge = AVAudioMixerNode()
+    /// A low cut on what feeds the large bus reverb, so a big hall doesn't fill up with bass mud.
+    /// Bypassed except in base Ambient (setAmbientMode).
+    private let reverbLargeLowCut   = AVAudioUnitEQ(numberOfBands: 1)
     private let reverbBusMixerSmall = AVAudioMixerNode()
     private var reverbSendMixers    = [AVAudioMixerNode]()  // one per track; volume = the wet leg's gain
     private var fanMixers           = [AVAudioMixerNode]()  // V3-native fan-out source between lowEQ and dry/send split
@@ -144,12 +147,14 @@ final class PlaybackEngine: ObservableObject {
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
-    private let ambientDelayWet:      [Float] = [40,  55, -1, 48, 18, -1, 28, -1]   // -1 = no delay
-    private let ambientDelayFeedback: [Float] = [55,  50, -1, 55, 35, -1, 18,  0]  // Lead2: 65→50
-    private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, 2500, -1, 3000, -1]
+    private let ambientDelayWet:      [Float] = [40,  55, 15, 48, 18, -1, 28, -1]   // -1 = no delay
+    private let ambientDelayFeedback: [Float] = [55,  50, 50, 55, 35, -1, 18,  0]  // Lead2: 65→50
+    private let ambientDelayLowpass:  [Float] = [4000, 4500, 2000, 3500, 2500, -1, 3000, -1]
     // Delay times in beats: Lead1=dotted-quarter(0.75), Lead2=dotted-quarter(0.75),
     //                       Rhythm=dotted-half(1.5), Texture=1-beat, Drums=1-beat
-    private let ambientDelayBeats:   [Double] = [0.75, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0, 1.0]
+    // Base Ambient Pads: a quiet, dark 2-beat echo so the bed blooms (Zack, 2026-11-22); Ambient
+    // Piano's pads take none (ambientDelayWetTable).
+    private let ambientDelayBeats:   [Double] = [0.75, 0.75, 2.0, 1.5, 1.0, 1.0, 1.0, 1.0]
     // Ambient Zen's echo (docs/Ambient-Zen-plan.md, sections 7 and 8): a long, darkening echo.
     // Feedback is the song's echo-size dial (74 to 79 percent), set in setAmbientMode. The time is
     // 2 beats (Lead 2 at 0.75 of Lead 1, Rhythm 1.5 beats), capped at AVAudioUnitDelay's 2 s.
@@ -160,8 +165,10 @@ final class PlaybackEngine: ObservableObject {
     /// The Ambient delay wet table in force: Zen's in an Ambient Zen song.
     /// A deep or dry echo moves the bells' wet mix (Lead 1, Lead 2, Rhythm) 15 points either way.
     private var ambientDelayWetTable: [Float] {
-        guard cachedIsAmbientZen else { return ambientDelayWet }
-        let shift = songState.map { AmbientZenDials.draw(seed: $0.globalSeed).bellEchoWetShift } ?? 0
+        guard cachedIsAmbientZen else {
+            return ambientDelayWet
+        }
+        let shift = zenDials?.bellEchoWetShift ?? 0
         guard shift != 0 else { return zenDelayWet }
         var table = zenDelayWet
         for t in [kTrackLead1, kTrackLead2, kTrackRhythm] where t < table.count && table[t] >= 0 { table[t] += shift }
@@ -306,12 +313,13 @@ final class PlaybackEngine: ObservableObject {
     // Built alongside stepEventMap; fired directly in onStep — eliminates asyncAfter allocs.
     nonisolated(unsafe) private var noteOffMap: [Int: [(Int, UInt8)]] = [:]
 
-    // Bass slides (ChillBassSlides): keyed by the step of the note slid into, built alongside
-    // stepEventMap with the seconds-per-step the glide is timed in. Suppressed while the bass has
-    // the Vibrato effect on, which drives the same pitch-bend wheel every frame.
+    // Bass slides (ChillBassSlides): keyed by the whole step in which each glide starts, built
+    // alongside stepEventMap (which holds the slide's two notes as one) with the seconds-per-step
+    // the glide is timed in. The glide sets glideSemis on the wide bend range, so the Vibrato
+    // effect rides on it as on Slow Glide; chillSlideBent sends the bend home before the next bass note.
     nonisolated(unsafe) private var bassSlideMap: [Int: BassSlide] = [:]
     nonisolated(unsafe) private var bassSlideSecondsPerStep: Double = 0.1
-    nonisolated(unsafe) private var bassSlidesSuppressed = false
+    nonisolated(unsafe) private var chillSlideBent = false
 
     // Ambient Zen Slow Glide (ZenBassGlide, AMB-BASS-009): the bass plays one held key per run and
     // bends to each new pitch. Built with stepEventMap and read on stepTimerQueue. glideSemis is the
@@ -542,7 +550,7 @@ final class PlaybackEngine: ObservableObject {
     nonisolated static func staticPans(kosmic: Bool, motorik: Bool, ambient: Bool,
                                        chillPads: Bool, chillSoho: Bool,
                                        kosmicSpace: Bool = false, spaceStereoTwin: Bool = false,
-                                       ambientZen: Bool = false) -> [Float] {
+                                       ambientZen: Bool = false, ambientPiano: Bool = false) -> [Float] {
         if ambient && ambientZen {
             // Ambient Zen's bells (docs/Ambient-Zen-plan.md, section 8): Lead 1 left, Lead 2 right
             // of centre, Rhythm further right, where its auto-pan swings around (zenRhythmPanCentred).
@@ -562,8 +570,10 @@ final class PlaybackEngine: ObservableObject {
             // Pads and Rhythm panned for separation; Texture rarely used so stays centre
             return [-0.07, 0.07, -0.20, 0.20, 0, 0, 0, 0]
         } else if ambient {
-            // Texture stays 0 — auto-pan LFO controls it dynamically
-            return [-0.20, 0.20, 0.10, -0.15, 0, 0, 0, 0]
+            // Texture stays 0 — auto-pan LFO controls it dynamically. Base Ambient spreads Pads
+            // and Rhythm wide on opposite sides (Zack, 2026-11-22); Ambient Piano keeps its old pans.
+            return ambientPiano ? [-0.20, 0.20, 0.10, -0.15, 0, 0, 0, 0]
+                                : [-0.20, 0.20, 0.35, -0.40, 0, 0, 0, 0]
         } else if chillPads && chillSoho {
             // As base Chill, but the horn stabs sit right of centre — a horn section off to one
             // side of the stage, out of the way of Lead 2 and the rhythm part.
@@ -581,7 +591,8 @@ final class PlaybackEngine: ObservableObject {
                                          chillSoho: chillSohoMode,
                                          kosmicSpace: songState?.isKosmicSpace == true,
                                          spaceStereoTwin: kosmicStyle && songState?.isSpaceStereoTwin == true,
-                                         ambientZen: ambientMode && cachedIsAmbientZen)
+                                         ambientZen: ambientMode && cachedIsAmbientZen,
+                                         ambientPiano: ambientMode && cachedIsAmbientPiano)
         cachedSpaceStereoTwin = kosmicStyle && songState?.isSpaceStereoTwin == true
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
@@ -593,8 +604,12 @@ final class PlaybackEngine: ObservableObject {
         var offMap: [Int: [(Int, UInt8)]]    = [:]
         // A Slow Glide song plays the glide's held keys on the bass in place of the written notes.
         let glide = ZenBassGlide.make(for: state)
+        // A Chill slide plays its two notes as one held note, bent from the first pitch to the second.
+        let slides = glide == nil ? ChillBassSlides.slides(for: state) : [:]
         for trackIndex in 0..<kTrackCount {
-            let events = trackIndex == kTrackBass && glide != nil ? glide!.played : state.events(forTrack: trackIndex)
+            let events = trackIndex == kTrackBass && glide != nil ? glide!.played
+                : trackIndex == kTrackBass ? ChillBassSlides.played(state.events(forTrack: trackIndex), slides: slides)
+                : state.events(forTrack: trackIndex)
             for ev in events {
                 map[ev.stepIndex, default: []].append((trackIndex, ev))
                 offMap[ev.stepIndex + ev.durationSteps, default: []].append((trackIndex, ev.note))
@@ -603,11 +618,12 @@ final class PlaybackEngine: ObservableObject {
         // Sync to stepTimerQueue so the assignment can't race with an in-flight onStep read.
         // The timer fires on stepTimerQueue (serial), so this sync waits for any running
         // tick to finish before writing, and blocks the timer until both writes are done.
-        let slides = ChillBassSlides.slides(for: state)
+        let slideStarts = Dictionary(slides.values.map { (Int($0.glideStart.rounded(.down)), $0) },
+                                     uniquingKeysWith: { a, _ in a })
         stepTimerQueue.sync {
             stepEventMap = map
             noteOffMap   = offMap
-            bassSlideMap = slides
+            bassSlideMap = slideStarts
             bassSlideSecondsPerStep = state.frame.secondsPerStep
             // When the held keys change (a new song, or a bass regeneration mid-song), the old key's
             // note-off may not be in the new map, so the bass is released now and the next step
@@ -620,9 +636,18 @@ final class PlaybackEngine: ObservableObject {
                 glidePrimedScheduler = -1
             }
             zenGlide = glide
-            // Any other song: the bass's bend goes back to the GM range of 2, centred, so Chill's
-            // slides and the Vibrato effect keep their depth.
-            if glide == nil && bassBendRangeWide {
+            // A Chill song with slides: the wide range, so a slide of up to a fourth fits, centred.
+            if glide == nil && !slides.isEmpty {
+                glideToken += 1             // any slide still ramping stops
+                setBassBendRange(UInt8(ChillBassSlides.bendRange))
+                sendBassBend(0)
+                bassBendRangeWide = true
+                glideSemis = 0
+                chillSlideBent = false
+            }
+            // Any other song: the bass's bend goes back to the GM range of 2, centred, so the
+            // Vibrato effect keeps its depth.
+            else if glide == nil && bassBendRangeWide {
                 setBassBendRange(2)
                 sendBassBend(0)
                 bassBendRangeWide = false
@@ -920,6 +945,12 @@ final class PlaybackEngine: ObservableObject {
             let bassStrikes = noteOns.contains { $0.0 == kTrackBass }
             stepGlide(glide, step: step, bassStrikes: bassStrikes, schedulerID: schedulerID)
         }
+        // Chill bass slide: the glide starts inside this step and lands on the target's start,
+        // late by the bass's behind-the-beat delay as its notes are.
+        if let slide = bassSlideMap[step] {
+            let offset = (slide.glideStart - Double(step)) * bassSlideSecondsPerStep + beatDelay(track: kTrackBass, note: 0)
+            startChillSlide(slide, after: offset, schedulerID: schedulerID)
+        }
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
         for (trackIndex, ev) in noteOns {
             let channel = gmChannel(trackIndex)
@@ -996,8 +1027,12 @@ final class PlaybackEngine: ObservableObject {
             }
             func fire() {
                 if trackLoading[trackIndex] { return }   // patch loading on this track; see loadPatch
-                if trackIndex == kTrackBass, !bassSlidesSuppressed, let slide = bassSlideMap[step] {
-                    startBassSlide(slide, channel: channel, schedulerID: schedulerID)
+                // After a slide the bend goes home just before the next bass note is struck.
+                if trackIndex == kTrackBass && chillSlideBent {
+                    glideToken += 1
+                    chillSlideBent = false
+                    glideSemis = 0
+                    sendBassBend(0)
                 }
                 samplers[trackIndex].startNote(fireNote, withVelocity: fireVelocity, onChannel: channel)
             }
@@ -1295,6 +1330,12 @@ final class PlaybackEngine: ObservableObject {
     /// The loaded song is Ambient Zen. Set only in setAmbientMode, and not cleared with the
     /// program cache: the per-note fade reads it on every step.
     nonisolated(unsafe) private var cachedIsAmbientZen:     Bool  = false
+    /// The Ambient Zen song's swell curve, one value a bar (AmbientZenPlan.swellCurve); its pads'
+    /// sweep follows it.
+    nonisolated(unsafe) private var zenSwell: [Double] = []
+    /// The Ambient Zen song's dials, drawn once in setAmbientMode (nil in any other song), so the
+    /// echo table and feedback don't re-run the draw on every effect change.
+    nonisolated(unsafe) private var zenDials: AmbientZenDials? = nil
     nonisolated(unsafe) private var cachedIsKosmicDrift:    Bool  = false
     nonisolated(unsafe) private var cachedIsKosmicSpace:    Bool  = false
     // The song's current drum rule is KOS-DRUM-005 Electric Buddha Pulse (set with songState).
@@ -1466,7 +1507,11 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 102 {
                 vol = 0.50   // FX Echoes — pull back from general 1.4 Texture boost
             } else if trackIndex == kTrackBass && ambientMode && program == 14090 {
-                vol = 0.5    // Polysynth Swell (Ambient Zen bass, moved from the pedal 2026-11-20) runs loud; pulled back; by ear
+                vol = 0.75   // Polysynth Swell (Ambient Zen bass, moved from the pedal 2026-11-20) was pulled back to 0.5, then raised again (Zack, 2026-11-22); by ear
+            } else if trackIndex == kTrackPads && ambientMode && program == 14092 {
+                vol = 0.7    // Glass Swell (Ambient Zen pads) sat too far forward (Zack, 2026-11-22); by ear
+            } else if trackIndex == kTrackTexture && ambientMode && program == 54 {
+                vol = 1.4    // Synth Voice (Ambient Zen pedal) runs forward at the Texture boost of 2.0 (Zack, 2026-11-22); by ear
             } else if trackIndex == kTrackTexture && ambientMode && program == 14080 {
                 vol = 0.7    // Sine Swell (Ambient Zen pedal): a pure tone carries far at the Texture boost; by ear
             } else if trackIndex == kTrackTexture && ambientMode && program == 14088 {
@@ -1479,6 +1524,10 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.4    // Texture pads are quiet
             } else if trackIndex == kTrackDrums && ambientMode {
                 vol = 2.2    // Drums sit under heavy Ambient reverb — boost so they're audible
+            } else if trackIndex == kTrackBass && ambientMode && program == 14016 {
+                vol = 0.8    // Organ Swell (base Ambient bass, Tonewheel Organ): a steady drawbar tone; first guess, by ear (Zack, 2026-11-22)
+            } else if trackIndex == kTrackBass && ambientMode && program == 14039 {
+                vol = 1.5    // Pulse Swell (Ambient Zen bass) sat too far back at the default gain; about +3.5 dB (Zack, 2026-11-22); by ear
             } else if trackIndex == kTrackBass && ambientMode && program == 14062 {
                 vol = 0.25   // FM Swell (Ambient Zen bass) still sat forward at 0.40, so about 4 dB lower (Zack, 2026-11-20); by ear
             } else if trackIndex == kTrackBass && ambientMode && program == 62 {
@@ -1573,6 +1622,11 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.0
             }
             trackBaseVolume[trackIndex] = vol
+            // Ambient Zen's pads and bass run a tremolo whose peak is the track's base volume, so a
+            // new instrument's trim has to reach it too.
+            if cachedIsAmbientZen && (trackIndex == kTrackPads || trackIndex == kTrackBass) {
+                tremBaseVolume[trackIndex] = vol
+            }
             if !tremEnabled[trackIndex] { samplers[trackIndex].volume = vol }
             // External SF2 pianos run soft and need gain above unity; route through the boost node
             // rather than AVAudioUnitSampler.volume, which is clamped to [0, 1] by Apple.
@@ -1869,6 +1923,8 @@ final class PlaybackEngine: ObservableObject {
         ambientMode = enabled
         cachedIsAmbientPiano = enabled && songState?.isAmbientPiano == true
         cachedIsAmbientZen   = enabled && songState?.isAmbientZen == true
+        zenDials = cachedIsAmbientZen ? songState.map { AmbientZenDials.draw(seed: $0.globalSeed) } : nil
+        reverbLargeLowCut.auAudioUnit.shouldBypassEffect = true
         if !enabled {
             for i in 0..<lowEQs.count { lowEQs[i].bands[1].bypass = true }
             applyStaticPans()
@@ -1915,6 +1971,8 @@ final class PlaybackEngine: ObservableObject {
             delays[kTrackLead1].feedback      = 0
             delays[kTrackLead1].lowPassCutoff = 2800
         }
+        if !cachedIsAmbientPiano && !cachedIsAmbientZen { applyBaseAmbientSpace() }
+        if cachedIsAmbientPiano { applyAmbientPianoPadSpace() }
         if cachedIsAmbientZen { applyAmbientZenAudio() }
         // Enable HPF (250 Hz) on Lead and Texture to prevent reverb low-end muddiness. Ambient
         // Zen leaves it off Texture: the pedal's fundamental is 131 to 370 Hz.
@@ -1931,11 +1989,41 @@ final class PlaybackEngine: ObservableObject {
         }
     }
 
+    /// Base Ambient's space (Zack, 2026-11-22: more spacey and grand). Pads, both leads, Rhythm and
+    /// Texture share a Cathedral on the large bus, with the lows cut from what feeds it so the
+    /// sends can run wetter without mud; Bass and Drums stay on the Medium Hall. Ambient Piano and
+    /// Ambient Zen keep their own spaces.
+    private func applyBaseAmbientSpace() {
+        setBusPresets(large: .cathedral)
+        reverbLargeLowCut.auAudioUnit.shouldBypassEffect = false
+        connectSend(kTrackPads,    to: .large, wetDryMix: 80)
+        connectSend(kTrackLead1,   to: .large, wetDryMix: 72)
+        connectSend(kTrackLead2,   to: .large, wetDryMix: 68)
+        connectSend(kTrackRhythm,  to: .large, wetDryMix: 55)
+        connectSend(kTrackTexture, to: .large, wetDryMix: 55)
+        for t in [kTrackPads, kTrackLead1, kTrackLead2, kTrackRhythm, kTrackTexture] {
+            perTrackReverbPresets[t] = .cathedral
+        }
+    }
+
+    /// Ambient Piano's pads take the same grand space as base Ambient's (Zack, 2026-11-22): the
+    /// Cathedral on the large bus with its low cut, a deeper send and the pads' quiet echo. The
+    /// piano, on Lead 1, keeps its own small-bus space; only the pads and Texture ride the large bus.
+    private func applyAmbientPianoPadSpace() {
+        setBusPresets(large: .cathedral)
+        reverbLargeLowCut.auAudioUnit.shouldBypassEffect = false
+        connectSend(kTrackPads, to: .large, wetDryMix: 80)
+        perTrackReverbPresets[kTrackPads] = .cathedral
+    }
+
     /// Ambient Zen's space (docs/Ambient-Zen-plan.md, section 7): a long hall on the large bus for
     /// everything but the bass and drums, a near-dry centred bass on the small bus, and a long,
     /// darkening echo. Existing settings with new values only.
     private func applyAmbientZenAudio() {
-        setBusPresets(large: .largeHall2, small: .mediumHall)
+        // Cathedral with the large bus low cut, for a grander hall that stays clear (Zack, 2026-11-22).
+        setBusPresets(large: .cathedral, small: .mediumHall)
+        reverbLargeLowCut.auAudioUnit.shouldBypassEffect = false
+        if let s = songState, let d = zenDials { zenSwell = AmbientZenPlan.swell(for: s, dials: d) }
         connectSend(kTrackPads,      to: .large, wetDryMix: 75)
         connectSend(kTrackLead1,     to: .large, wetDryMix: 68)
         connectSend(kTrackLead2,     to: .large, wetDryMix: 68)
@@ -1944,17 +2032,17 @@ final class PlaybackEngine: ObservableObject {
         connectSend(kTrackBass,      to: .small, wetDryMix: 10)
         connectSend(kTrackDrums,     to: .small, wetDryMix: 35)
         connectSend(kTrackLeadSynth, to: .small, wetDryMix: 0)
-        perTrackReverbPresets[kTrackLead1]     = .largeHall2
-        perTrackReverbPresets[kTrackLead2]     = .largeHall2
-        perTrackReverbPresets[kTrackPads]      = .largeHall2
-        perTrackReverbPresets[kTrackRhythm]    = .largeHall2
-        perTrackReverbPresets[kTrackTexture]   = .largeHall2
+        perTrackReverbPresets[kTrackLead1]     = .cathedral
+        perTrackReverbPresets[kTrackLead2]     = .cathedral
+        perTrackReverbPresets[kTrackPads]      = .cathedral
+        perTrackReverbPresets[kTrackRhythm]    = .cathedral
+        perTrackReverbPresets[kTrackTexture]   = .cathedral
         perTrackReverbPresets[kTrackBass]      = .mediumHall
         perTrackReverbPresets[kTrackDrums]     = .mediumHall
         perTrackReverbPresets[kTrackLeadSynth] = .mediumHall
         let tempo    = songState?.frame.tempo ?? 72
         let beatSecs = 60.0 / Double(tempo)
-        let feedback = songState.map { AmbientZenDials.draw(seed: $0.globalSeed).echoFeedbackPercent } ?? 76
+        let feedback = zenDials?.echoFeedbackPercent ?? 76
         for i in 0..<Swift.min(delays.count, zenDelayWet.count) where zenDelayWet[i] >= 0 {
             delays[i].delayTime     = Swift.min(2.0, beatSecs * zenDelayBeats[i])
             delays[i].feedback      = feedback
@@ -2126,10 +2214,11 @@ final class PlaybackEngine: ObservableObject {
                 let beatSecs = 60.0 / Double(songState?.frame.tempo ?? 120)
                 delays[trackIndex].delayTime = Swift.min(2.0, beatSecs * 0.75)
             }
-            if ambientMode, trackIndex < ambientDelayWetTable.count, ambientDelayWetTable[trackIndex] >= 0 {
+            let wetTable = ambientMode ? ambientDelayWetTable : []
+            if ambientMode, trackIndex < wetTable.count, wetTable[trackIndex] >= 0 {
                 let wet: Float = (trackIndex == kTrackLead1 && songState?.isAmbientPiano == true)
                     ? 14   // piano needs a touch of thickening, not an audible repeating echo
-                    : ambientDelayWetTable[trackIndex]
+                    : wetTable[trackIndex]
                 delays[trackIndex].wetDryMix = enabled ? wet : 0
             } else if chillPadsMode && trackIndex == kTrackLead1 {
                 delays[trackIndex].wetDryMix = enabled ? 30 : 0  // St. Germain echo: subtle shadow
@@ -2146,7 +2235,10 @@ final class PlaybackEngine: ObservableObject {
         case .pan:
             if enabled {
                 let hz: Double
-                if ambientMode && cachedIsAmbientZen && trackIndex == kTrackRhythm {
+                if ambientMode && cachedIsAmbientZen && trackIndex == kTrackPads {
+                    // Ambient Zen's pads drift across the room, one full sweep about every 30 s.
+                    hz = 1.0 / 30.0
+                } else if ambientMode && cachedIsAmbientZen && trackIndex == kTrackRhythm {
                     // Ambient Zen's bell Rhythm: one slow sweep every 8 bars.
                     hz = Double(songState?.frame.tempo ?? 72) / (240.0 * 8.0)
                 } else if (ambientMode || kosmicStyle) && trackIndex == kTrackTexture {
@@ -2182,9 +2274,17 @@ final class PlaybackEngine: ObservableObject {
             // Compensates for the loudness increase from soft-clip harmonic generation.
             fanMixers[trackIndex].outputVolume = enabled ? Self.distCompGain : 1.0
         case .lowShelf:
+            // Ambient Zen's bass takes a gentler +3 dB of floor under the bed (Zack, 2026-11-22).
+            lowEQs[trackIndex].bands[0].gain = Self.lowShelfGain(zenBass: ambientMode && cachedIsAmbientZen && trackIndex == kTrackBass)
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .air:
             airEnabled[trackIndex] = enabled
+            // Ambient wants a soft top-end sheen, not the presence bite the Air chip gives leads
+            // elsewhere: no 4 kHz peak, a 3.5 dB shelf from 10 kHz (Zack, 2026-11-22).
+            let gentleAir = ambientMode
+            airEQs[trackIndex].bands[0].bypass    = gentleAir
+            airEQs[trackIndex].bands[1].frequency = gentleAir ? 10000 : 8000
+            airEQs[trackIndex].bands[1].gain      = gentleAir ? 3.5 : 7.5
             airEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb, .space:
             // Zero reverb restores the dry leg to unity too, so switching it off makes the
@@ -2319,7 +2419,15 @@ final class PlaybackEngine: ObservableObject {
         // Sweep — ~20fps, all active tracks (skipped for tracks overridden by global sweep)
         for i in 0..<kTrackCount where sweepEnabled[i] && globalSweepTicksRemaining == 0 {
             let cutoff: Float
-            if ambientMode && i == kTrackBass && !cachedIsAmbientZen {
+            if ambientMode && cachedIsAmbientZen && i == kTrackPads && !zenSwell.isEmpty {
+                // Ambient Zen pads brighten with the song's swell (Zack, 2026-11-22): about 1 kHz
+                // at a swell of -0.5, 4.5 kHz at 0.9, interpolated across the bar.
+                let pos  = Double(currentStep) / 16.0
+                let bar  = Swift.max(0, Swift.min(zenSwell.count - 1, Int(pos)))
+                let next = Swift.min(zenSwell.count - 1, bar + 1)
+                let frac = Swift.max(0, Swift.min(1, pos - Double(bar)))
+                cutoff = Self.zenPadCutoff(swell: zenSwell[bar] + (zenSwell[next] - zenSwell[bar]) * frac)
+            } else if ambientMode && i == kTrackBass && !cachedIsAmbientZen {
                 // Amplitude-coupled: cutoff tracks the boost node volume (300 Hz closed → 3500 Hz open).
                 // Not in Ambient Zen, which has no per-note fade: its bass sweep is an ordinary LFO.
                 cutoff = 300 + 3200 * boosts[kTrackBass].outputVolume
@@ -2374,12 +2482,6 @@ final class PlaybackEngine: ObservableObject {
 
     }
 
-    // MARK: - Bass slides
-
-    /// Bends the bass off pitch before its note starts, then glides it to pitch over the slide's
-    /// length on the curve ChillBassSlides.remaining gives. Runs on stepTimerQueue, where the note itself is fired, so the first bend always
-    /// precedes the note-on. A stop or seek mid-glide sends the wheel straight back to centre,
-    /// so the next note is never left out of tune.
     // MARK: - Ambient Zen Slow Glide
 
     /// One step of the Slow Glide, on stepTimerQueue before the step's note-ons. A new scheduler
@@ -2455,21 +2557,24 @@ final class PlaybackEngine: ObservableObject {
         sampler.sendController(100, withValue: 127, onChannel: ch)
     }
 
-    nonisolated private func startBassSlide(_ slide: BassSlide, channel: UInt8, schedulerID: Int) {
-        let sampler = samplers[kTrackBass]
-        let from    = Double(slide.fromSemitones)
-        func send(_ semis: Double) {
-            let v = ChillBassSlides.bendValue(semitones: semis)
-            sampler.sendMIDIEvent(0xE0 | channel, data1: UInt8(v & 0x7F), data2: UInt8(v >> 7))
-        }
-        send(from)
+    /// A Chill bass slide: the held note (the slide's first note, already sounding) bends to the
+    /// target's pitch on ChillBassSlides.progress, starting `delay` seconds from now and arriving
+    /// on the target's start, in 8 ms ticks on stepTimerQueue. A new scheduler (stop, seek) or the
+    /// next bass note stops it; that next note sends the bend home first (chillSlideBent).
+    nonisolated private func startChillSlide(_ slide: BassSlide, after delay: Double, schedulerID: Int) {
+        glideToken += 1
+        let token   = glideToken
+        let target  = Double(slide.semitones)
         let seconds = slide.glideSteps * bassSlideSecondsPerStep
         let ticks   = Swift.max(4, Int(seconds / 0.008))
-        for k in 1...ticks {
-            stepTimerQueue.asyncAfter(deadline: .now() + seconds * Double(k) / Double(ticks)) { [weak self] in
-                guard let self else { return }
-                let t = self.currentSchedulerID == schedulerID ? Double(k) / Double(ticks) : 1.0
-                send(from * ChillBassSlides.remaining(t))
+        let start   = Swift.max(0, delay)
+        for k in 0...ticks {
+            stepTimerQueue.asyncAfter(deadline: .now() + start + seconds * Double(k) / Double(ticks)) { [weak self] in
+                guard let self, self.currentSchedulerID == schedulerID, self.glideToken == token else { return }
+                let value = target * ChillBassSlides.progress(Double(k) / Double(ticks))
+                self.chillSlideBent = true
+                self.glideSemis = value
+                self.sendBassBend(value)
             }
         }
     }
@@ -2485,6 +2590,9 @@ final class PlaybackEngine: ObservableObject {
 
     /// True for the Rhodes (GM 4, Electric Piano 1). A Rhodes tremolo is the amp's, slow and
     /// shallow like a guitar's, not an organ's Leslie.
+    /// The low shelf's lift at 80 Hz: +5 dB, or +3 dB on the Ambient Zen bass.
+    nonisolated static func lowShelfGain(zenBass: Bool) -> Float { zenBass ? 3.0 : 5.0 }
+
     nonisolated static func isRhodesProgram(_ program: Int) -> Bool {
         program % 1000 == 4
     }
@@ -2495,7 +2603,7 @@ final class PlaybackEngine: ObservableObject {
             // Ambient Zen pads: a slow 0.06 Hz swell (a 17 s cycle) at depth 0.30.
             tremPhaseInc[i]   = 0.018850   // 2π × 0.06 Hz / 20 fps
             tremDepth[i]      = 0.30
-            tremBaseVolume[i] = 1.0
+            tremBaseVolume[i] = trackBaseVolume[i]   // the instrument's trim (Glass Swell 0.7); 1.0 for the rest
         } else if ambientMode && cachedIsAmbientZen && i == kTrackBass {
             // Ambient Zen bass: a slow, shallow 0.08 Hz movement under the bed, never above the
             // track's calibrated volume. A sine bass wants some motion (by ear, 2026-11-20).
@@ -2550,7 +2658,6 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Vibrato LFO
 
     private func startVibrato(forTrack i: Int) {
-        if i == kTrackBass { stepTimerQueue.sync { bassSlidesSuppressed = true } }
         vibPhaseInc[i] = 0.5760   // 2π × 5.5 Hz / 60 fps
         vibDepth[i]    = 12.0     // ±12 cents
         vibEnabled[i]  = true
@@ -2561,7 +2668,6 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func stopVibrato(forTrack i: Int) {
-        if i == kTrackBass { stepTimerQueue.sync { bassSlidesSuppressed = false } }
         vibEnabled[i] = false
         vibPhase[i]   = 0.0
         let ch = kTrackMIDIChannels[i]
@@ -2589,6 +2695,12 @@ final class PlaybackEngine: ObservableObject {
     }
     private func ambientSweepHalfRangeFor(_ i: Int) -> Float {
         cachedIsAmbientZen && i == kTrackPads ? 1000 : ambientSweepHalfRange[i]
+    }
+
+    /// Ambient Zen's pad cutoff for a swell value: 1000 Hz at -0.5, 4500 Hz at 0.9, exponential,
+    /// held between 800 and 5000 Hz.
+    nonisolated static func zenPadCutoff(swell: Double) -> Float {
+        Float(Swift.max(800, Swift.min(5000, 1000 * pow(4.5, (swell + 0.5) / 1.4))))
     }
 
     private func startSweep(forTrack i: Int) {
@@ -2638,7 +2750,8 @@ final class PlaybackEngine: ObservableObject {
         panPhase[i]    = 0.0
         panPhaseInc[i] = 2.0 * Double.pi * hz / 20.0  // increment per 20fps tick
         panDepth[i]    = (kosmicStyle && i == kTrackRhythm && songState?.isKosmicSpace == true) ? 0.4
-                       : (ambientMode && cachedIsAmbientZen && i == kTrackRhythm) ? 0.35 : 1.0
+                       : (ambientMode && cachedIsAmbientZen && i == kTrackRhythm) ? 0.35
+                       : (ambientMode && cachedIsAmbientZen && i == kTrackPads) ? 0.6 : 1.0
         anyLFOActive   = true
         startSharedLFO()
     }
@@ -3157,7 +3270,13 @@ final class PlaybackEngine: ObservableObject {
         engine.attach(reverbBusMixerSmall)
         engine.attach(reverbBusLarge)
         engine.attach(reverbBusSmall)
-        engine.connect(reverbBusMixerLarge, to: reverbBusLarge, format: nil)
+        reverbLargeLowCut.bands[0].filterType = .highPass
+        reverbLargeLowCut.bands[0].frequency  = 300
+        reverbLargeLowCut.bands[0].bypass     = false
+        reverbLargeLowCut.auAudioUnit.shouldBypassEffect = true
+        engine.attach(reverbLargeLowCut)
+        engine.connect(reverbBusMixerLarge, to: reverbLargeLowCut, format: nil)
+        engine.connect(reverbLargeLowCut, to: reverbBusLarge, format: nil)
         engine.connect(reverbBusMixerSmall, to: reverbBusSmall, format: nil)
         // Return the two buses on input buses ABOVE the track range, explicitly.
         //

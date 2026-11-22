@@ -2,6 +2,8 @@
 
 ## V 3.1 (Build 139)
 
+**Work in progress, minor tuning.** The 2026-11-22 Mac DMG is a snapshot of build 139 while Ambient Zen, base Ambient and the Chill bass slides are still being tuned by ear.
+
 - **Ambient Zen, phase 1: the bed** — (2026-11-20, build 139) A third Ambient substyle, a homage to AMB-1 and Eno's Music for Airports (docs/Ambient-Zen-plan.md). Each song draws its own mode, tempo and settings, and walks a slow journey of random 7th chords that leaves home and returns, over breathing pads, a held Texture drone and a droning root bass.
 
 - **Ambient Zen, phase 2: the bells and the swell** — (2026-11-21, build 139) Three bell loops of 13, 17 and 23 beats phase against each other over the bed, and a slow swell makes them sparser or fuller over the song. Zen follows the normal Evolve passes.
@@ -10,15 +12,21 @@
 
 - **Ambient Zen titles** — (2026-11-21, build 139) Zen songs get their own short titles, gentle jokes on Eno and air travel: "Music for Rebooking", "Thursday Nap", "United Delay 2/1", "1/1 (Decaf)", and now and then an odd number such as "Gate 7/11" or "Lounge 24/7".
 
-- **Base Ambient: more musical** — (2026-11-21, build 139) Base Ambient songs now move through short chord cycles with smooth changes, and the bass names each new chord. Pads and held basses can play soft swell instruments, some songs use 7th chords or Airports 2/1 voices, and Lead 1 now and then drops an octave for a few passes.
+- **Base Ambient: more musical** — (2026-11-21, build 139) Base Ambient songs now move through short chord cycles with smooth changes, and the bass names each new chord. Pads and held basses can play soft swell instruments, some songs use 7th chords or Airports 2/1 voices, and Lead 1 now and then drops an octave for a few passes. Also added more reverb and air. 
 
-- **Minor improvements to Chill, 2026-11-20.** Chill leads and bass repeat fewer notes, and the Mac Track View Generation Log is now resizable. 
+- **Minor improvements to Chill, 2026-11-20.** Chill leads and bass repeat fewer notes. Improved the bass slide in Chill Soho and Chill Blues (2026-11-22).
+
+- **Minor improvements to Ambient Piano, 2026-11-22.** More reverb on the pads and some swell pads. The three lead rules are renamed Floating Buds, Satin Melody and Koln Winter Arc.
 
 - **Ambient Lead 1 no-repeat fix** — (2026-11-21, build 139) Stereo Piano and Ocarina can no longer play Lead 1 in two Ambient songs running.
+
+- **Substyle stored with every song, 2026-11-22.** Kosmic and Motorik songs now remember their substyle (Drift, Space, Noir, Arcade, Europe) as Ambient and Chill do, so a saved song reloads the same whatever the style shares are later.
 
 - **Resizable Generation Log on Mac** — (2026-11-20, build 139) In Track View, drag the Generation Log bar up to grow the log over the track rows, from the bottom row up; a grip at its right end and the up-down cursor show where to grab, and a double-click resets it. The height is remembered between launches. Mac only.
 
 - **Fewer repeated notes in Chill leads and bass** — (2026-11-20, build 139) Chill leads and bass repeat the same note less often to avoid unnecessary "flattening" of melodies when avoiding tonal clashes.
+
+- **Regeneration fixes, 2026-11-22.** Regenerating a track now picks a rule at random wherever there is more than one.
 
 - **Evolve log order** — (2026-11-21, build 139) In every style an Evolve pass logs each track's new instrument under its REGEN line, above its rules, as a manual regen does.
 

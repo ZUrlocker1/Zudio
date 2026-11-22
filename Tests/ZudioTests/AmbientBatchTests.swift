@@ -66,7 +66,7 @@ struct AmbientBatchTests {
         let existing = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         for url in existing { try? fm.removeItem(at: url) }
 
-        print("\n=== Generating 20 AMB-PNO-003 (Dramatic Arc) songs ===")
+        print("\n=== Generating 20 AMB-PNO-003 (Koln Winter Arc) songs ===")
         print("Output: \(dir.path)\n")
 
         for i in 1...20 {

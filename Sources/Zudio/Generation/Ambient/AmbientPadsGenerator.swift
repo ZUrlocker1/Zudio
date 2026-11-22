@@ -238,7 +238,7 @@ struct AmbientPadsGenerator {
         }
     }
 
-    // AMB-PADS-007: Sparse Drone — paired with Floating Tones (AMB-PNO-001)
+    // AMB-PADS-007: Sparse Drone — paired with Floating Buds (AMB-PNO-001)
     // Root + fifth, 14-21 bar sustain followed by a 4-8 bar silence so the chord
     // "reveals" itself 2-3 times as the piano pauses, rather than sustaining invisibly
     // for the entire song and only becoming audible once.
@@ -265,7 +265,7 @@ struct AmbientPadsGenerator {
         return events
     }
 
-    // AMB-PADS-008: Staggered Strings — paired with Pensive Melody (AMB-PNO-002)
+    // AMB-PADS-008: Staggered Strings — paired with Satin Melody (AMB-PNO-002)
     // Drone (re-attack 256-384 steps = 16-24 bars) + optional rising string arc at high register.
     private static func staggeredStringsFullSong(tonalMap: TonalGovernanceMap, totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
@@ -312,7 +312,7 @@ struct AmbientPadsGenerator {
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
-    // AMB-PADS-009: Warm Sustain — paired with Dramatic Arc (AMB-PNO-003)
+    // AMB-PADS-009: Warm Sustain — paired with Koln Winter Arc (AMB-PNO-003)
     // Drone (re-attack 128-256 steps = 8-16 bars) + optional static pedal tone at 2nd or 4th scale degree.
     private static func warmSustainFullSong(tonalMap: TonalGovernanceMap, totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
