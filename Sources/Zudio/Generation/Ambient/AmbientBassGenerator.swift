@@ -1,10 +1,12 @@
 // AmbientBassGenerator.swift — Ambient bass generation
 // Copyright (c) 2026 Zack Urlocker
-// AMB-BASS-001: Root-held drone — long holds using the active chord root, with silences.
+// Base Ambient only (Ambient Piano returns before the bass, Zen has its own). Every rule holds
+// its notes for bars, so the swell basses have time to fade in (Zack, 2026-11-22).
+// AMB-BASS-001: Root-held drone — holds of 3–6 bars on the active chord root, rests of 1–2 bars.
 // AMB-BASS-000: Bass absent (30% chance).
 // AMB-BASS-003: Root+fifth drone — holds alternate root / fifth; occasional major third (10%).
-// AMB-BASS-004: ECM pluck — short staccato plucks (6–10 steps) spaced 3–5 bars apart,
-//               walking stepwise through scale tones. Eberhard Weber / ECM records feel.
+// AMB-BASS-004: Drone walk — walks stepwise through the chord's tones, each held 3–4 bars,
+//               on the root at every chord change.
 // AMB-BASS-005: Octave double — root note at two octaves simultaneously; long holds.
 //               Thick organ-pipe quality. Harold Budd / Eno Ambient 2 feel.
 // AMB-BASS-006: Slow pendulum — alternates root with b7 (minor modes) or 4th (major),
@@ -46,8 +48,9 @@ struct AmbientBassGenerator {
 
         switch ruleID {
         case "AMB-BASS-004":
-            return ecmPluckWalk(frame: frame, tonalMap: tonalMap, rng: &rng, scaleNotes: scaleNotes,
-                                totalSteps: totalSteps, silentBars: silentBars)
+            return droneWalk(frame: frame, tonalMap: tonalMap, rng: &rng,
+                             low: bounds.low, high: bounds.high,
+                             totalSteps: totalSteps, silentBars: silentBars)
         case "AMB-BASS-005":
             return octaveDouble(frame: frame, tonalMap: tonalMap, rng: &rng,
                                 low: bounds.low, high: bounds.high,
@@ -70,8 +73,8 @@ struct AmbientBassGenerator {
         var template: [HoldSlot] = []
         var tCursor = 0
         while tCursor < loopSteps {
-            let hold   = 32 + rng.nextInt(upperBound: 33)   // 32–64 steps
-            let silent = 24 + rng.nextInt(upperBound: 25)   // 24–48 steps
+            let hold   = 48 + rng.nextInt(upperBound: 49)   // 48–96 steps (3–6 bars)
+            let silent = 16 + rng.nextInt(upperBound: 17)   // 16–32 steps (1–2 bars)
             template.append(HoldSlot(hold: hold, silent: silent))
             tCursor += hold + silent
         }
@@ -85,9 +88,10 @@ struct AmbientBassGenerator {
 
         while cursor < totalSteps {
             let slot = template[slotIdx % template.count]
-            let dur  = Swift.min(slot.hold, totalSteps - cursor)
+            let (start, dur) = fitHold(start: cursor, dur: Swift.min(slot.hold, totalSteps - cursor),
+                                       tonalMap: tonalMap)
 
-            let currentBar = cursor / 16
+            let currentBar = start / 16
             if dur >= 4, !silentBars.contains(currentBar), let entry = tonalMap.entry(atBar: currentBar) {
                 let cw       = entry.chordWindow
                 if cw.startBar != lastWindow { lastWindow = cw.startBar; holdIndex = 0 }
@@ -113,34 +117,30 @@ struct AmbientBassGenerator {
                     noteToPlay = rootNote
                 }
 
-                // Plan L: 20% chance of neighbour-tone inflection for AMB-BASS-001 root holds.
+                // Plan L: 20% chance of neighbour-tone inflection for AMB-BASS-001 root holds of 5
+                // bars or more: the root, then the last 2 bars on a scale neighbour, so no piece is
+                // too short for a swell bass to bloom.
                 var didNeighbour = false
-                if !useRootFifth && noteToPlay == rootNote && dur >= 12 && rng.nextDouble() < 0.20 {
+                if !useRootFifth && noteToPlay == rootNote && dur >= 80 && rng.nextDouble() < 0.20 {
                     if let rootIdx = scaleNotes.firstIndex(of: rootNote) {
                         let neighbour: Int? = rootIdx > 0 && rootIdx < scaleNotes.count - 1
                             ? (rng.nextDouble() < 0.5 ? scaleNotes[rootIdx - 1] : scaleNotes[rootIdx + 1])
                             : rootIdx > 0 ? scaleNotes[rootIdx - 1]
                             : rootIdx < scaleNotes.count - 1 ? scaleNotes[rootIdx + 1] : nil
                         if let neigh = neighbour {
-                            let rootPart  = Int(Double(dur) * 0.60)
-                            let neighPart = Int(Double(dur) * 0.25)
-                            let retPart   = dur - rootPart - neighPart
+                            let neighPart = 32
+                            let rootPart  = dur - neighPart
                             let neighVel  = UInt8(Swift.max(20, Int(vel) - 10))
-                            events.append(MIDIEvent(stepIndex: cursor, note: UInt8(rootNote),
+                            events.append(MIDIEvent(stepIndex: start, note: UInt8(rootNote),
                                                     velocity: vel, durationSteps: rootPart))
-                            events.append(MIDIEvent(stepIndex: cursor + rootPart, note: UInt8(neigh),
+                            events.append(MIDIEvent(stepIndex: start + rootPart, note: UInt8(neigh),
                                                     velocity: neighVel, durationSteps: neighPart))
-                            if retPart >= 4 {
-                                events.append(MIDIEvent(stepIndex: cursor + rootPart + neighPart,
-                                                        note: UInt8(rootNote), velocity: vel,
-                                                        durationSteps: retPart))
-                            }
                             didNeighbour = true
                         }
                     }
                 }
                 if !didNeighbour {
-                    events.append(MIDIEvent(stepIndex: cursor, note: UInt8(noteToPlay),
+                    events.append(MIDIEvent(stepIndex: start, note: UInt8(noteToPlay),
                                             velocity: vel, durationSteps: dur))
                 }
                 holdIndex += 1
@@ -152,77 +152,70 @@ struct AmbientBassGenerator {
         return events
     }
 
-    // MARK: - AMB-BASS-004: ECM Pluck Walk
+    // MARK: - AMB-BASS-004: Drone Walk
 
-    /// Short staccato plucks (6–10 steps) spaced 3–5 bars apart, each at a different
-    /// scale tone walking stepwise up or down through the bass register.
-    private static func ecmPluckWalk(
+    /// A slow walk through the chord's tones (Zack, 2026-11-22): each note held 3–4 bars, then a
+    /// short breath of a quarter to three quarters of a bar. Every chord starts on its root, on the
+    /// change's downbeat, and the walk moves one chord tone up or down from there, kept within
+    /// about an octave above the low E so the line stays in one register. A note never crosses a
+    /// chord change; one that would leave too little room for another bar-long note holds to it.
+    private static func droneWalk(
         frame: GlobalMusicalFrame,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        scaleNotes: [Int],
+        low: Int, high: Int,
         totalSteps: Int,
         silentBars: Set<Int>
     ) -> [MIDIEvent] {
-        guard !scaleNotes.isEmpty else { return [] }
         var events: [MIDIEvent] = []
+        let top = Swift.min(high, low + 15)     // walk range: E2 to G3
+        var cursor     = 0
+        var lastWindow = -1
+        var current    = -1                     // the note last played
+        var dir        = 1
 
-        // Start in the lower third of the scale range
-        var walkIdx = rng.nextInt(upperBound: Swift.max(1, scaleNotes.count / 3))
-        var cursor  = rng.nextInt(upperBound: 16)  // slight rhythmic offset within bar 0
-
-        // Each chord change gets a pluck on its downbeat, on the new root, and the walk goes on
-        // from there, so the bass names every chord (Zack, 2026-11-21).
-        var lastWindow   = tonalMap.entry(atBar: 0)?.chordWindow.startBar ?? 0
-        var pendingRoot  = true   // the song opens on the root too
-        var lastPluckEnd = 0
         while cursor < totalSteps {
-            if let w = tonalMap.entry(atBar: cursor / 16)?.chordWindow, w.startBar != lastWindow {
+            let bar = cursor / 16
+            if silentBars.contains(bar) { cursor = (bar + 1) * 16; continue }
+            guard let w = tonalMap.entry(atBar: bar)?.chordWindow else { cursor += 16; continue }
+            let rootPC   = (frame.keySemitoneValue + degreeSemitone(w.chordRoot)) % 12
+            let tones    = (low...top).filter { w.chordTones.contains($0 % 12) || $0 % 12 == rootPC }
+            let rootNote = closestNote(pitchClass: rootPC, near: current < 0 ? 47 : current, low: low, high: top)
+
+            let note: Int
+            if w.startBar != lastWindow || current < 0 || tones.isEmpty {
                 lastWindow = w.startBar
-                pendingRoot = true
-                if w.startBar * 16 >= lastPluckEnd { cursor = w.startBar * 16 }
-            }
-            let currentBar = cursor / 16
-            if silentBars.contains(currentBar) { cursor += 16; continue }
-
-            if pendingRoot, let w = tonalMap.entry(atBar: currentBar)?.chordWindow {
-                let rootPC = (frame.keySemitoneValue + degreeSemitone(w.chordRoot)) % 12
-                if let i = scaleNotes.indices.filter({ scaleNotes[$0] % 12 == rootPC })
-                    .min(by: { abs($0 - walkIdx) < abs($1 - walkIdx) }) { walkIdx = i }
-                pendingRoot = false
-            }
-            let note    = scaleNotes[walkIdx]
-            let dur     = 6 + rng.nextInt(upperBound: 5)           // 6–10 steps
-            let safeDur = Swift.min(dur, totalSteps - cursor)
-            if safeDur >= 4 {
-                let vel = UInt8(40 + rng.nextInt(upperBound: 16))  // 40–55
-                events.append(MIDIEvent(stepIndex: cursor, note: UInt8(note),
-                                        velocity: vel, durationSteps: safeDur))
-            }
-            lastPluckEnd = cursor + safeDur
-
-            // Stepwise walk: ±1 position (75%) or ±2 (25%), slight upward bias
-            let step = rng.nextDouble() < 0.75 ? 1 : 2
-            let dir  = rng.nextDouble() < 0.55 ? 1 : -1
-            let next = walkIdx + dir * step
-            if next >= 0 && next < scaleNotes.count {
-                walkIdx = next
+                note = rootNote
             } else {
-                // Hit boundary — reverse
-                walkIdx = Swift.max(0, Swift.min(scaleNotes.count - 1, walkIdx - dir * step))
+                // One chord tone up or down, slight upward lean; turn round at the edges.
+                if rng.nextDouble() < (dir > 0 ? 0.65 : 0.35) { dir = 1 } else { dir = -1 }
+                let above = tones.filter { $0 > current }.min()
+                let below = tones.filter { $0 < current }.max()
+                if dir > 0, let a = above { note = a }
+                else if let b = below { note = b; dir = -1 }
+                else { note = above ?? rootNote; dir = 1 }
             }
 
-            // Long silence: 48–80 steps (3–5 bars)
-            let silent = 48 + rng.nextInt(upperBound: 33)
-            cursor += safeDur + silent
+            let windowEnd = Swift.min(w.endBar * 16, totalSteps)
+            var end = Swift.min(cursor + 48 + rng.nextInt(upperBound: 17), windowEnd)   // 3–4 bars
+            if windowEnd - end < 28 { end = windowEnd }   // no stub under a bar after the breath
+            let dur = end - cursor
+            if dur >= 16 {
+                let vel = UInt8(52 + rng.nextInt(upperBound: 12))  // 52–63
+                events.append(MIDIEvent(stepIndex: cursor, note: UInt8(note),
+                                        velocity: vel, durationSteps: dur))
+                current = note
+            }
+            // A breath before the next note, except at a chord change, whose root enters on the downbeat.
+            cursor = end == windowEnd ? end : end + 4 + rng.nextInt(upperBound: 9)
         }
         return events
     }
 
     // MARK: - AMB-BASS-005: Octave Double
 
-    /// Root note sounded at two octaves simultaneously. Long holds (32–64 steps),
-    /// long silences (24–48 steps). Thick organ-pipe quality.
+    /// Root note sounded at two octaves simultaneously. Long holds (48–96 steps),
+    /// rests of 16–32 steps. Thick organ-pipe quality.
     private static func octaveDouble(
         frame: GlobalMusicalFrame,
         tonalMap: TonalGovernanceMap,
@@ -236,11 +229,12 @@ struct AmbientBassGenerator {
         var cursor = 0
 
         while cursor < totalSteps {
-            let hold   = 32 + rng.nextInt(upperBound: 33)  // 32–64 steps
-            let silent = 24 + rng.nextInt(upperBound: 25)  // 24–48 steps
-            let dur    = Swift.min(hold, totalSteps - cursor)
+            let hold   = 48 + rng.nextInt(upperBound: 49)  // 48–96 steps (3–6 bars)
+            let silent = 16 + rng.nextInt(upperBound: 17)  // 16–32 steps (1–2 bars)
+            let (start, dur) = fitHold(start: cursor, dur: Swift.min(hold, totalSteps - cursor),
+                                       tonalMap: tonalMap)
 
-            let currentBar = cursor / 16
+            let currentBar = start / 16
             if dur >= 4, !silentBars.contains(currentBar), let entry = tonalMap.entry(atBar: currentBar) {
                 let cw     = entry.chordWindow
                 let rootPC = (frame.keySemitoneValue + degreeSemitone(cw.chordRoot)) % 12
@@ -250,9 +244,9 @@ struct AmbientBassGenerator {
                 let hi     = lo + 12
                 let velLo  = UInt8(38 + rng.nextInt(upperBound: 10))  // 38–47
                 let velHi  = UInt8(28 + rng.nextInt(upperBound: 8))   // 28–35, softer upper voice
-                events.append(MIDIEvent(stepIndex: cursor, note: UInt8(lo),
+                events.append(MIDIEvent(stepIndex: start, note: UInt8(lo),
                                         velocity: velLo, durationSteps: dur))
-                events.append(MIDIEvent(stepIndex: cursor, note: UInt8(hi),
+                events.append(MIDIEvent(stepIndex: start, note: UInt8(hi),
                                         velocity: velHi, durationSteps: dur))
             }
 
@@ -315,7 +309,19 @@ struct AmbientBassGenerator {
         return events
     }
 
-    // MARK: - Helper
+    // MARK: - Helpers
+
+    /// A held note that crosses a chord change would be split there by the chord follow. If either
+    /// piece would be under 2 bars, keep only the longer one (the later one starts on the change,
+    /// so its pitch comes from the new chord). A swell bass never blooms on a shorter piece.
+    private static func fitHold(start: Int, dur: Int, tonalMap: TonalGovernanceMap) -> (Int, Int) {
+        guard let w = tonalMap.entry(atBar: start / 16)?.chordWindow else { return (start, dur) }
+        let change = w.endBar * 16
+        guard start + dur > change else { return (start, dur) }
+        let head = change - start, tail = start + dur - change
+        if head >= 32 && tail >= 32 { return (start, dur) }
+        return head >= tail ? (start, head) : (change, tail)
+    }
 
     private static func closestNote(pitchClass: Int, near target: Int, low: Int, high: Int) -> Int {
         var best = low; var bestDist = Int.max

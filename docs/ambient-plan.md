@@ -443,17 +443,20 @@ Bass in Ambient is minimal — a sub-presence that confirms the harmonic root, n
 
 **AMB-BASS-002: Absent** (30%) — no bass events; pads carry low-end harmonic content.
 
+Every base bass rule holds its notes for bars, so the swell basses have time to fade in (Zack): notes run a median of about 4 bars, and about 5 percent are under 2 bars (50 songs).
+
 **AMB-BASS-001: Root-held drone** (35% of non-absent) — long holds using active chord root
-- Hold duration: 32–64 steps; silence gap: 24–48 steps
+- Hold duration: 48–96 steps (3–6 bars); silence gap: 16–32 steps (1–2 bars)
+- A hold that crosses a chord change with a piece under 2 bars on either side keeps only its longer piece (`fitHold`); the later piece starts on the change, on the new chord.
 - Velocity: 55–65; resolves pitch from TonalGovernanceMap at each hold position
-- 20% chance of neighbour-tone inflection: splits hold as root (60%) → scale neighbour (25%) → root (15%)
+- 20% chance of neighbour-tone inflection on holds of 5 bars or more: the root, then the last 2 bars on a scale neighbour
 
 **AMB-BASS-003: Root+fifth drone** (35% of non-absent) — alternates root / fifth holds; 10% chance of third instead of fifth
 - Same hold/gap timing as AMB-BASS-001; minor third used in minor modes to avoid clashes
 
-**AMB-BASS-004: ECM Pluck** *(added v1.1)* — short staccato plucks (6–10 steps) spaced 3–5 bars apart, each at a different scale tone, stepwise walk. Eberhard Weber / ECM records feel — the bass is a melodic colour rather than a harmonic anchor.
+**AMB-BASS-004: Drone walk** — a slow walk through the chord's tones, each held 3–4 bars with a breath of a quarter to three quarters of a bar between. Each chord starts on its root on the change's downbeat; the walk moves one chord tone up or down from there, within E2 to G3. A note never crosses a chord change; one that would leave too little room for another bar-long note holds to the change.
 
-**AMB-BASS-005: Octave Double** *(added v1.1)* — root note played simultaneously at two octaves; long holds. Adds low-end weight without harmonic complexity.
+**AMB-BASS-005: Octave Double** *(added v1.1)* — root note played simultaneously at two octaves; the same holds, gaps and chord-change fit as AMB-BASS-001. Adds low-end weight without harmonic complexity.
 
 **AMB-BASS-006: Slow Pendulum** *(added v1.1)* — alternates root with b7 (minor modes) or 4th (major modes) on a slow long-note rhythm. Two-note oscillation that implies harmonic motion without chord changes.
 
@@ -1172,14 +1175,14 @@ Inspired by the classic analog pad ornamental melody in "Oxygenerator" (bars 5�
 
 **Rule:** AMB-BASS-001 enhancement (no new rule ID)
 
-**What:** The existing Loscil drone root holds the root note for 32–64 steps. Plan L gives the bass a small amount of melodic motion: on approximately 20% of holds, after holding the root for half the hold duration, the bass steps to the scale note immediately above or below (±1 scale step), then returns to root for the final portion. The effect is a barely-perceptible melodic inflection — not a melody, just a breath.
+**What:** The Loscil drone root holds the root note for 3–6 bars. Plan L gives the bass a small amount of melodic motion: on approximately 20% of holds of 5 bars or more, the last 2 bars move to the scale note immediately above or below (±1 scale step). The effect is a barely-perceptible melodic inflection — not a melody, just a breath.
 
 **Why:** A completely static bass drone has no character. The Loscil aesthetic uses very slow glides and subtle pitch movement to animate otherwise static tones. A single note a semitone or scale-step away, appearing once every 4–6 minutes, is enough to make the bass feel alive rather than programmed.
 
 **Parameters:**
 - Probability: 20% of individual holds in AMB-BASS-001
 - Neighbour: ±1 scale step from root (prefers scale tones, avoids chromatic neighbours unless mode requires)
-- Split: hold root for first 60% of hold duration, neighbour for next 25%, root again for final 15%
+- Split: root for all but the last 2 bars, then the neighbour; no return, so no piece is too short for a swell bass
 - Velocity: neighbour note is 10 points softer than root note
 
 **Files to modify:**
@@ -1269,17 +1272,22 @@ At every bar boundary, the lowest note of the pad voicing must match the bass no
 ## Chord movement in base Ambient
 
 Base Ambient only; Ambient Piano and Zen don't share these:
-- **How chords reach the tracks.** The chord plan is the one harmonic source. Every pitched base track (pads, Lead 1 and its section solos, Lead 2, Rhythm, Texture, bass, the Airports voices) passes through AmbientChordFollow (AmbientLoopTiler.swift) on generation and on every regeneration, and each call names its track, which sets its seam (`AmbientChordFollow.seam(for:)`). The passes after it (HarmonicFilter, void fill, breath and intro filters) keep pitch classes or read the same plan; the X-Files whistle is the one deliberate exception.
+- **How chords reach the tracks.** The chord plan is the one harmonic source. Every pitched base track (pads, Lead 1 and its section solos, Lead 2, Rhythm, Texture, bass, the Airports voices) passes through AmbientChordFollow (AmbientLoopTiler.swift) on generation and on every regeneration, and each call names its track, which sets its seam (`AmbientChordFollow.seam(for:)`). The passes after it (HarmonicFilter, void fill, breath and intro filters) keep pitch classes or read the same plan; the X-Files whistle is the one deliberate exception, so the bed gives way to it: a pads, Rhythm, Texture or bass note it overlaps a semitone, major 7th or minor 9th away is cut for those beats (`clearAgainstWhistle`, also on pads regeneration).
 - **The follow.** A note sounds as a chord tone or a clear tension (a scale note a semitone from no chord tone and no other clear tension); otherwise it moves to the nearest chord tone. A note held across a change is split there. A rubbing passing note of an eighth or less is dropped, so the line gets a gap, not a repeat.
 - **Seams.** A held note that must change pitch lets go up to a quarter before the change and its new pitch enters late: pads a half note, rolled up two sixteenths a voice; the rest a quarter. The bass enters on the downbeat and on the new chord's root. A split fragment shorter than a quarter is dropped.
-- **The bass names every chord.** Each bass rule starts each new chord on its root: the drone and root-fifth rules (001, 003) and the pendulum (006) restart on the root, and the ECM pluck walk (004) plucks the root on the change's downbeat and walks on from there.
+- **The bass names every chord.** Each bass rule starts each new chord on its root: the drone and root-fifth rules (001, 003) and the pendulum (006) restart on the root, and the drone walk (004) starts the root on the change's downbeat and walks on from there.
 - **Chord cycles.** Two- and three-chord songs repeat a cycle drawn per song, ending on the tonic. Chord length is drawn per song (`ambientCycleBars`): three- and four-chord cycles 8, 16 or 24 bars (40/40/20), two-chord cycles 16 or 24 (60/40). The cycle: a pair for two-chord songs, three or four chords for three-chord songs, every chord diatonic, tonic first, no maj7 (`ambientCycles` in SongGenerator.swift; for example Dorian i bVII IV, i IV bVII, i bIII IV or i v bVII IV). Single-chord families stay drones. Drawn on their own stream (trackSeed index 141). The log's Chords line names the cycle, and each chord is annotated the first time it comes round.
 - **Family weights (Zack).** One-chord drones 10 percent (droneSingle 0.04, suspendedDrone 0.03, dissonantHaze 0.03), two-chord cycles (droneTwo) 10 percent, three- or four-chord cycles (modalDrift) 80 percent. Ambient Piano and Zen keep the old weights.
 - **7th chords** in 25 percent of songs: minor triads become minor 7ths, major triads dominant 7ths where the mode has the flat 7th; never a major 7th; sus2 stays.
-- **AMB-PADS-014 Airports 2/1** in 20 percent of songs, in place of the pad loop: four voices (the opening chord's root, 3rd, 5th and its 9th or 13th), each on its own loop of 17 to 31 seconds, sounding 45 to 60 percent of it, so the chord is whichever notes overlap.
+- **Pad rules a song hears** (Zack): AMB-PADS-001 Sustained chord 25 percent, 002 Slow cascade 28, 003 Modal cloud 22, 014 Airports 2/1 25. 001 covers the least of the song (about 57 percent, against 73 to 90 for the others in 50 songs), so it was cut back.
+- **AMB-PADS-014 Airports 2/1** in 25 percent of songs, in place of the pad loop: four voices (the opening chord's root, 3rd, 5th and its 9th or 13th), each on its own loop of 17 to 31 seconds, sounding 45 to 60 percent of it, so the chord is whichever notes overlap.
 - The 7ths and Airports draws come from their own stream (trackSeed index 140), so no other draw moves.
-- **Swell instruments** (Zack, for a smoother, more relaxed sound): base Ambient's pads draw Sweep Pad, Synth Strings, Soundtrack, Warm Swell, Halo Swell and Glass Swell (equal weights), and its bass Cello, French Horn, FM Synth and Metallic Pad, plus Saw Bass Swell and Brass Swell under the held bass rules (001, 003, 005, 006), never under the ECM pluck (004), whose short notes the slow fade-in would swallow. The bass rule is read from the song's log (`instrumentPickPoolStatic` in AppState.swift). Halo Pad and Voice Oohs are out of base's picks but stay in the pool (Zen's pads use Halo Pad; Ambient Piano uses both). Ambient Piano's picks are unchanged.
+- **Swell instruments** (Zack, for a smoother, more relaxed sound), 55 percent of base picks on both tracks (`instrumentPickPoolStatic` in AppState.swift):
+  - Pads: Sweep Pad, Synth Strings and Soundtrack 15 percent each; Sweep Pad Swell 19, Synth Strings Swell 18 and Halo Swell 18.
+  - Bass: Cello, French Horn and FM Synth 11 percent each, Metallic Pad 12; Metallic Pad Swell 28 and FM Swell 27. FM Swell is the swell copy of the FM Synth bass (Synth Brass 1). Every bass rule holds for bars, so swells play under all of them.
+  - Sweep Pad Swell, Synth Strings Swell and Metallic Pad Swell are base's own (bank 14 copies, tools/sf2_clone_presets.py set "base-ambient"); Halo Swell and FM Swell are shared with Zen.
+  - Out of base's picks but still in the pool for Zen or Ambient Piano: Halo Pad, Warm Swell, Glass Swell, Voice Oohs and Saw Bass Swell. Ambient Piano's picks are unchanged.
 - **Lead 1 down an octave** in about a third of songs: once or twice, two or three whole passes of the Lead 1 loop (at most 32 bars) inside the body play an octave lower, then return; never the first pass, never below E3 (a stretch that would go lower stays up). Applied after the HarmonicFilter, whose register pass would lift it back, and on Lead 1 regeneration at the same places. Drawn from the song seed (trackSeed index 142); the log marks "Down an octave for N bars" and "Back up". Section solos are left alone.
 - **Major Pentatonic** songs have a major tonic in base (`ambientPentatonicTonic`); the shared chord-plan builder gives a minor one, which Ambient Piano keeps.
 - **Void fill:** the pad note that fills an empty stretch is a tone of the chord at that bar and ends at the next chord change.
-- **Clash check:** 0 glaring clashes (a semitone, or a minor 9th held 2 beats at C3 or above) in 50 songs over 254 chord changes; no note is re-struck on a change's downbeat except the bass. The X-Files whistle is left unsnapped on purpose.
+- **Clash check:** 0 glaring clashes (a semitone, or a minor 9th held 2 beats at C3 or above) in 50 songs over 254 chord changes; no note is re-struck on a change's downbeat except the bass. The X-Files whistle is left unsnapped on purpose; the bed is cut around it.

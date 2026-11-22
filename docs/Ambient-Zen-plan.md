@@ -294,13 +294,13 @@ Zen's sounds are appended to the Ambient pools, so base Ambient and Ambient Pian
 - **Pads, Rhodes-like:** Warm Pad, Halo Pad, Fantasia, FM Piano, Warm Swell, Halo Swell.
 - **Pads, glass and strings:** Glass Swell, Strings 3 Swell, Strings 5 Swell.
 - **Texture:** Tonewheel, Synth Voice, Space Voice, Solar Swell and Sine Swell, equal weights (the two voices don't sound too much like voices). No Choir Aahs in Zen picks or the ⚡ shuffle; the picker still offers the whole Ambient pool, as every style does.
-- **Bass:** Synth Bass 101, Saw Bass Swell, Brass Swell, Pulse Swell, Bass Swell, Synth Swell, Polysynth Swell. All synth, all long-sustaining.
-- **Lead 1:** Vibraphone, Tine EP and Harp, 30 percent each; Echo Drops 10 percent. Echo Drops sounds like a choir, so it never plays two songs running (noRepeatInstruments) and the Lead 2 lock never copies it.
+- **Bass:** Synth Bass 101, Saw Bass Swell, FM Swell, Pulse Swell, Bass Swell, Synth Swell, Polysynth Swell. All synth, all long-sustaining.
+- **Lead 1:** Vibraphone, Tine EP and Harp, 20 percent each; the bells Church Bells and Bell Tower, 15 percent each; Echo Drops 10 percent. Echo Drops sounds like a choir, so it never plays two songs running (noRepeatInstruments) and the Lead 2 lock never copies it.
 - **Lead 2:** Tinkling Bells, Christmas Bells, Kalimba, Harp.
 - **Rhythm:** Glockenspiel, Celesta, Tinker Bell, Synth Chime, Christmas Bells.
 - **Lead 2 lock.** In 25 percent of songs (the dial), when Lead 2 plays and Lead 1 isn't Echo Drops, Lead 2 takes Lead 1's instrument, logged "Lead 2 <name> locked to L1".
 
-**Gain trims** in setProgram, by ear: Tonewheel 0.8, Solar Swell 0.8, Sine Swell 0.7 (all against the Ambient Texture boost of 2.0); Bass Swell 0.56, Polysynth Swell 0.5, Brass Swell 0.25. Not yet set: the Saw Bass, Pulse and Synth Swell basses, and every bell.
+**Gain trims** in setProgram, by ear: Tonewheel 0.8, Solar Swell 0.8, Sine Swell 0.7 (all against the Ambient Texture boost of 2.0); Bass Swell 0.56, Polysynth Swell 0.5, FM Swell 0.25; Church Bells and Bell Tower 1.4 on Lead 1 (measured about 6 dB under Vibraphone). Not yet set: the Saw Bass, Pulse and Synth Swell basses, and the other bells.
 
 ## 10. The space: reverb, echo, pans and chips
 
@@ -343,7 +343,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 - AMB-PADS-015 Big Ship Cycle (section 5), with breathing pads or block chords.
 - AMB-TEXT-011 Low Tide, a lighter Texture rule in 40 percent of songs (section 7).
 - AMB-PADS-016 Shell Voices and AMB-BASS-009 Slow Glide (section 7).
-- Saw Bass Swell holds its notes (preset sustain 6.4 dB down, as Brass Swell's).
+- Saw Bass Swell holds its notes (preset sustain 6.4 dB down, as FM Swell's).
 
 ## 14. On the shelf
 

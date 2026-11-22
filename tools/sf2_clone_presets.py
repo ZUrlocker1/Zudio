@@ -44,7 +44,7 @@ TARGET_ATTACK, TARGET_RELEASE = 3000, 2600       # about 5.6 s and 4.5 s
 CLONE_BANK = 14
 # (source bank, program, new name); the clone keeps the program number unless NEW_PROG maps
 # (source bank, program) to another one (needed when two sources share a program, as 0:89 and 11:89 do)
-NEW_PROG = {(11, 89): 88, (8, 38): 37}
+NEW_PROG = {(11, 89): 88, (8, 38): 37, (0, 50): 48}
 def tp(bank, prog): return NEW_PROG.get((bank, prog), prog)
 CLONES = [(0, 89, "Warm Swell"), (0, 94, "Halo Swell"), (0, 52, "Choir Swell"), (0, 91, "Voice Swell")]
 # Second set (2026-11-20): glass and strings pad colour, and two low synth basses, all swell copies
@@ -57,7 +57,10 @@ CLONES_PEDAL = [(0, 71, "Clarinet Swell"), (0, 90, "Polysynth Swell")]
 CLONES_SYNTH = [(11, 39, "Pulse Bass Swell"), (11, 89, "Solar Wind Swell")]
 # Fifth set (2026-11-20): Sine Wave moves to the pedal (as a swell); two more low synth basses
 CLONES_SINE_BASS = [(8, 80, "Sine Swell"), (0, 87, "Lead Bass Swell"), (8, 38, "Synth Bass 3 Swell")]
-SETS = {"sine-bass": CLONES_SINE_BASS, "pads": CLONES, "glass-strings-bass": CLONES_GLASS_STRINGS_BASS, "pedal": CLONES_PEDAL, "synth": CLONES_SYNTH}
+# Sixth set (2026-11-22): base Ambient's own swells, a Metal Pad bass and two pads. Base Ambient's
+# "FM Synth" bass is Synth Brass 1 (0:62), whose swell copy is the existing Brass Swell.
+CLONES_BASE_AMBIENT = [(0, 93, "Metal Pad Swell"), (0, 95, "Sweep Pad Swell"), (0, 50, "Synth Strings Swell")]
+SETS = {"base-ambient": CLONES_BASE_AMBIENT, "sine-bass": CLONES_SINE_BASS,"pads": CLONES, "glass-strings-bass": CLONES_GLASS_STRINGS_BASS, "pedal": CLONES_PEDAL, "synth": CLONES_SYNTH}
 BACKUP = "/private/tmp/claude-502/-Users-urlocker-Downloads-Zudio/e54396ca-747a-4e83-bd56-b2891d1bef81/scratchpad/Zudio.sf2.orig"
 
 

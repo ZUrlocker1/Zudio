@@ -758,7 +758,8 @@ final class AppState: ObservableObject {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet","Flute","Soprano Sax","Recorder"]
         // + Ambient Zen's bells (2026-11-20): Vibraphone, Tine EP and Echo Drops; Zen also draws Harp.
         case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi",
-                                                "Vibraphone","Tine EP","Echo Drops"]
+                                                "Vibraphone","Tine EP","Echo Drops",
+                                                "Church Bells","Bell Tower"]   // + Zen Lead 1 bells (2026-11-22)
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai",
                                                 "Synth Brass 1","Synth Brass 2","5th Saw Wave","Bright Saw"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
@@ -799,7 +800,8 @@ final class AppState: ObservableObject {
         // only what Zen, base Ambient or Ambient Piano use; Zen's choir voices were removed.
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack",
                                                 "Warm Pad","Fantasia","FM Piano","Warm Swell","Halo Swell",
-                                                "Glass Swell","Strings 3 Swell","Strings 5 Swell"]
+                                                "Glass Swell","Strings 3 Swell","Strings 5 Swell",
+                                                "Sweep Pad Swell","Synth Strings Swell"]   // + base Ambient's own swells
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2",
                                                 "Synth Strings 3","Synth Strings 4","Synth Strings 5","Stereo Strings Slow"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
@@ -834,7 +836,8 @@ final class AppState: ObservableObject {
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         // + Ambient Zen's long-sustain basses (Voice Oohs is shared).
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad",
-                                                "Synth Bass 101","Saw Bass Swell","Brass Swell","Pulse Swell","Bass Swell","Synth Swell","Polysynth Swell"]
+                                                "Synth Bass 101","Saw Bass Swell","FM Swell","Pulse Swell","Bass Swell","Synth Swell","Polysynth Swell",
+                                                "Metallic Pad Swell"]   // + base Ambient's own swell
         case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad",
                                                 "Fretless Bass","Synth Bass 101","Mean Saw Bass"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 3"]
@@ -861,7 +864,8 @@ final class AppState: ObservableObject {
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71, 73, 64, 74]
-        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77, 11, 4, 102]   // + Zen: Vibraphone, Tine EP, Echo Drops
+        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77, 11, 4, 102,   // + Zen: Vibraphone, Tine EP, Echo Drops
+                                              8014, 11014]                                     // + Zen Lead 1 bells: Church Bells, Bell Tower
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111,  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
                                               62, 63, 86, 11100]                     // + Space: Synth Brass 1/2, 5th Saw, Bright Saw
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
@@ -873,7 +877,8 @@ final class AppState: ObservableObject {
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97,
                                               89, 88, 5, 14089, 14094,         // + Zen: Warm Pad, Fantasia, FM Piano, Warm Swell, Halo Swell
-                                              14092, 14050, 14051]             // + Zen glass and strings: Glass, Strings 3, Strings 5 (all Swell copies; Slow Strings removed 2026-11-21)
+                                              14092, 14050, 14051,             // + Zen glass and strings: Glass, Strings 3, Strings 5 (all Swell copies; Slow Strings removed 2026-11-21)
+                                              14095, 14048]                    // + base Ambient: Sweep Pad Swell, Synth Strings Swell (Synth Strings 1, 0:50)
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088,
                                               8050, 11050, 11051, 49]                // + Space: Synth Strings 3/4/5, Stereo Strings Slow
         case (kTrackPads, .chill):     return [89, 48, 95, 97, 42, 11051, 49, 94, 92]
@@ -892,7 +897,8 @@ final class AppState: ObservableObject {
         case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031, 93, 96, 11096]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
-        case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93, 1038, 14038, 14062, 14039, 14087, 14037, 14090]   // + Zen: Synth Bass 101, then swell copies: Saw Bass, Brass, Pulse Bass, Lead Bass, Synth Bass 3, Polysynth
+        case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93, 1038, 14038, 14062, 14039, 14087, 14037, 14090,   // + Zen: Synth Bass 101, then swell copies: Saw Bass, Brass, Pulse Bass, Lead Bass, Synth Bass 3, Polysynth
+                                               14093]   // + base Ambient: Metallic Pad Swell (Metal Pad, 0:93)
         case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89, 35, 1038, 12038]  // + Space: Fretless Bass, Synth Bass 101, Mean Saw Bass
         case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 8038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
@@ -2807,10 +2813,14 @@ final class AppState: ObservableObject {
                 // The bells (phase 2). AMB-1 plays all its bell loops on one voice, so a sound may
                 // be shared between bell tracks (Zack, 2026-11-20): Harp on both leads. Celesta is
                 // Rhythm's only (Zack, 2026-11-21).
-                // Lead 1: Vibraphone [8], Tine EP [9], Harp [6], 6 entries each, and Echo Drops [10]
-                // at 2 of 20 (10 percent): it sounds like a choir, so it is rare, never two songs
-                // running (noRepeatInstruments) and never copied to Lead 2 by the lock (Zack, 2026-11-21).
-                case kTrackLead1:   return ([8,8,8,8,8,8, 9,9,9,9,9,9, 6,6,6,6,6,6, 10,10] as [Int]).filter { $0 < poolCount }
+                // Lead 1, in percent: Vibraphone [8], Tine EP [9] and Harp [6] 20 each; the bells
+                // Church Bells [11] and Bell Tower [12] 15 each (Zack, 2026-11-22; Crystal is left
+                // to base Ambient's Rhythm and Lead 2); Echo Drops [10] 10: it sounds like a choir,
+                // so it is rare, never two songs running (noRepeatInstruments) and never copied to
+                // Lead 2 by the lock (Zack, 2026-11-21).
+                case kTrackLead1:
+                    let w: [(Int, Int)] = [(8, 4), (9, 4), (6, 4), (11, 3), (12, 3), (10, 2)]   // of 20
+                    return w.flatMap { Array(repeating: $0.0, count: $0.1) }.filter { $0 < poolCount }
                 // Lead 2: Tinkling Bells [8], Christmas Bells [9], Kalimba [7], Harp [0]. Celesta [5]
                 // and Marimba [6] (too wooden) are out (Zack, 2026-11-21); they stay in the pool so
                 // later indices don't move. Xylophone was tried briefly and dropped.
@@ -2823,23 +2833,25 @@ final class AppState: ObservableObject {
                 default: break
                 }
             }
-            // Base Ambient (not Ambient Piano) also draws swell instruments, for a smoother, more
-            // relaxed sound (Zack, 2026-11-21): Warm Swell [7], Halo Swell [8] and Glass Swell [9] on
-            // the pads, and Saw Bass Swell [6] and Brass Swell [7] on the bass, but only under the
-            // held bass rules (001 drone, 003 root and fifth, 005 octave double, 006 pendulum): the
-            // slow fade-in would swallow the ECM pluck's (004) short notes. The song's bass rule is
-            // the last AMB-BASS tag in its log, so a bass regeneration counts.
-            // Out of base, for more swells (Zack, 2026-11-21): Halo Pad [2] (Halo Swell is the same
-            // sound, faded in) and Voice Oohs [2] on the bass (a choir). Both stay in the pool:
-            // Zen's pads use Halo Pad, and Ambient Piano uses both.
+            // Base Ambient (not Ambient Piano) draws swell instruments, for a smoother, more relaxed
+            // sound, about 55 percent of the time (Zack, 2026-11-22). Its swells are mostly its own:
+            // pads Sweep Pad Swell [12] and Synth Strings Swell [13], plus Zen's Halo Swell [8]; bass
+            // Metallic Pad Swell [12] and FM Swell [7], the swell copy of the FM Synth bass (Synth
+            // Brass 1), which Zen shares. Every base bass rule holds for bars, so swells go under all
+            // of them. Weights are percentages, listed as that many copies of the index.
+            // Out of base picks but kept in the pool for Zen or Ambient Piano: Halo Pad [2], Voice
+            // Oohs [2] on the bass, Warm Swell [7], Glass Swell [9] and Saw Bass Swell [6].
             if let s = state, !s.isAmbientPiano {
+                func weighted(_ w: [(Int, Int)]) -> [Int] {
+                    w.flatMap { Array(repeating: $0.0, count: $0.1) }.filter { $0 < poolCount }
+                }
                 switch trackIndex {
                 case kTrackPads:
-                    return ([0, 1, 3, 7, 8, 9] as [Int]).filter { $0 < poolCount }
+                    // Sweep Pad, Synth Strings, Soundtrack 15 each; the three swells 55 in all.
+                    return weighted([(0, 15), (1, 15), (3, 15), (12, 19), (13, 18), (8, 18)])
                 case kTrackBass:
-                    let held: Set<String> = ["AMB-BASS-001", "AMB-BASS-003", "AMB-BASS-005", "AMB-BASS-006"]
-                    let rule = s.generationLog.last(where: { $0.tag.hasPrefix("AMB-BASS-") })?.tag ?? ""
-                    return ([0, 1, 3, 4] + (held.contains(rule) ? [6, 7] : [])).filter { $0 < poolCount }
+                    // Cello, French Horn, FM Synth, Metallic Pad about 11 each; the two swells 55.
+                    return weighted([(0, 11), (1, 11), (3, 11), (4, 12), (12, 28), (7, 27)])
                 default: break
                 }
             }

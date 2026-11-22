@@ -33,6 +33,9 @@ struct GenerationLogEntry: Sendable {
         // Base Ambient, radically changed (2026-11-21): AMB-PADS-014 Airports 2/1 is new; Modal
         // cloud's clusters now follow the chord, so they lose their semitone rubs.
         "AMB-PADS-003", "AMB-PADS-014",
+        // Base Ambient bass held for bars (2026-11-22): AMB-BASS-004 rewritten as Drone walk, and
+        // the drones hold 3–6 bars.
+        "AMB-BASS-001", "AMB-BASS-003", "AMB-BASS-004", "AMB-BASS-005",
     ]
 
     /// TESTING ONLY. Rules fixed in the current round, marked with "F " ("AMB-LEAD-003 F  ...").
@@ -45,7 +48,7 @@ struct GenerationLogEntry: Sendable {
         "AMB-LEAD-006", "AMB-LEAD-007", "AMB-LEAD-008", "AMB-LEAD-009", "AMB-LEAD-010",
         "AMB-RTHM-001", "AMB-RTHM-002", "AMB-RTHM-003", "AMB-RTHM-005", "AMB-RTHM-006",
         "AMB-TEXT-001", "AMB-TEXT-002",
-        "AMB-BASS-001", "AMB-BASS-003", "AMB-BASS-004", "AMB-BASS-005", "AMB-BASS-006",
+        "AMB-BASS-006",
     ]
 
     /// The testing markers a description can start with: "* " new or radically changed, "F "

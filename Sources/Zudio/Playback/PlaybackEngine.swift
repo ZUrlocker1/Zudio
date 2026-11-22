@@ -1372,6 +1372,8 @@ final class PlaybackEngine: ObservableObject {
             let vol: Float
             if trackIndex == kTrackLead1 && program == 61001 {
                 vol = 1.0    // Stereo Piano — gain via boostBaseMultiplier
+            } else if trackIndex == kTrackLead1 && ambientMode && (program == 8014 || program == 11014) {
+                vol = 1.4    // Church Bells, Bell Tower (Zen Lead 1) render about 6 dB under Vibraphone (RMS), with louder strikes; +3 dB, by ear
             } else if trackIndex == kTrackLead1 && program == 46 {
                 vol = 1.35   // Harp runs soft in GM on Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 56 {
@@ -1478,7 +1480,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackDrums && ambientMode {
                 vol = 2.2    // Drums sit under heavy Ambient reverb — boost so they're audible
             } else if trackIndex == kTrackBass && ambientMode && program == 14062 {
-                vol = 0.25   // Brass Swell (Ambient Zen bass) still sat forward at 0.40, so about 4 dB lower (Zack, 2026-11-20); by ear
+                vol = 0.25   // FM Swell (Ambient Zen bass) still sat forward at 0.40, so about 4 dB lower (Zack, 2026-11-20); by ear
             } else if trackIndex == kTrackBass && ambientMode && program == 62 {
                 vol = 0.40   // FM Synth (Synth Brass 1) runs loud on Ambient bass — pull back
             } else if trackIndex == kTrackRhythm && ambientMode && program == 8 {

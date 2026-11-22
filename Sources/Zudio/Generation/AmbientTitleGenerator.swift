@@ -685,7 +685,7 @@ struct AmbientZenTitleGenerator {
         "Group 9", "Customs", "Carousels", "Gate B12", "Group 5", "Pre-Check",
     ]
 
-    // 2. One Eno title bent each.
+    // 2. One Eno title bent each, then Eno-ish jokes that bend no title (Zack, 2026-11-22).
     static let spoofs = [
         "Discreet Snacks",      // Discreet Music
         "Thursday Nap",         // Thursday Afternoon
@@ -698,11 +698,8 @@ struct AmbientZenTitleGenerator {
         "Lux Lite",             // Lux
         "Apollo Snooze",        // Apollo
         "Oat Milk Sea",         // Small Craft on a Milk Sea
-        "The Pearl Barley",     // The Pearl
-        "Big Ship, Small Tub",  // Big Ship
         "Ascent (Escalator)",   // An Ending (Ascent)
         "Dunwich Beach Towel",  // Dunwich Beach, Autumn, 1960
-        "Neroli Ravioli",       // Neroli
         "Ambient 1½",           // Ambient 1
         "Reflection (Glare)",   // Reflection
         "By This Carousel",     // By This River
@@ -710,6 +707,14 @@ struct AmbientZenTitleGenerator {
         "Lantern Mall",         // Lantern Marsh
         "Fickle Wi-Fi",         // Fickle Sun
         "Music for Thinkpads",  // Music for Thinking
+        "4th World Problems",
+        "Mild Ambient Peril",
+        "Slow Release Tablet",
+        "Low Battery Hymn",
+        "Nothing Much Occurs",
+        "Another Green Tea",
+        "Generative Nap",
+        "Fog Machine Repair",
     ].filter { $0.count <= maxLength }
 
     // 3. After Music for Airports' 1/1, 1/2, 2/1 and 2/2.

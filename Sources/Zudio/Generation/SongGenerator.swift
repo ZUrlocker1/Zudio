@@ -1205,10 +1205,11 @@ struct SongGenerator {
             frame: frame, ambientProgFamily: ambientProgFamily, rng: &rng
         )
         // Base Ambient colour (Zack, 2026-11-21), on its own stream so no other draw moves:
-        // 7th chords in 25 percent of songs, AMB-PADS-014 Airports 2/1 in 20 percent.
+        // 7th chords in 25 percent of songs, AMB-PADS-014 Airports 2/1 in 25 percent (Zack,
+        // 2026-11-22: more of the pad rules that cover the song).
         var ambColourRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: Self.ambientColourIndex))
         let ambSevenths  = ambColourRNG.nextDouble() < 0.25
-        let ambAirports  = ambColourRNG.nextDouble() < 0.20
+        let ambAirports  = ambColourRNG.nextDouble() < 0.25
         if !isAmbientPiano {
             structure = Self.ambientChordCycle(structure, frame: frame, family: ambientProgFamily, seed: seed)
             structure = Self.ambientPentatonicTonic(structure, frame: frame)
@@ -1667,6 +1668,11 @@ struct SongGenerator {
                     bar: blockStart + 1, frame: frame, tonalMap: tonalMap, rng: &lead1RNG)
                 trackEvents[kTrackLead1] = (trackEvents[kTrackLead1] + whistleEvents)
                     .sorted { $0.stepIndex < $1.stepIndex }
+                // The whistle stays as written, so the bed gives way: a held note that would rub
+                // against it is cut for those beats (Zack, 2026-11-22).
+                for t in [kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass] {
+                    trackEvents[t] = clearAgainstWhistle(trackEvents[t], whistle: whistleEvents)
+                }
                 // AMB-XFILES-001 intentionally not logged — playback annotation "Bar N  Spooky X-Files theme" is sufficient
                 ambientXFilesBars = [blockStart + 1]
             }
@@ -2144,6 +2150,10 @@ struct SongGenerator {
                     loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
                 events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars,
                                            chords: songState.structure.chordPlan, track: kTrackPads)
+                if let block = songState.ambientXFilesBlockRange {
+                    let whistle = songState.trackEvents[kTrackLead1].filter { block.contains($0.stepIndex) }
+                    events = clearAgainstWhistle(events, whistle: whistle)
+                }
             } else if isKosmic {
                 events = KosmicPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -3986,6 +3996,31 @@ struct SongGenerator {
 
     /// Removes events that start inside [from, to) and truncates any event that starts before
     /// `from` but whose duration bleeds into the range. Used by breath silence and X-Files block.
+    /// Base Ambient's X-Files whistle is left unsnapped, so a bed note it overlaps a semitone, a
+    /// major 7th or a minor 9th away is cut from the first such whistle note to the end of the
+    /// last; a piece under a quarter on either side is dropped (Zack, 2026-11-22).
+    private static func clearAgainstWhistle(_ events: [MIDIEvent], whistle: [MIDIEvent]) -> [MIDIEvent] {
+        guard !whistle.isEmpty else { return events }
+        return events.flatMap { e -> [MIDIEvent] in
+            let s = e.stepIndex, t = s + e.durationSteps
+            let rubs = whistle.filter { w in
+                let d = abs(Int(w.note) - Int(e.note))
+                return Swift.min(t, w.stepIndex + w.durationSteps) > Swift.max(s, w.stepIndex)
+                    && (d == 1 || d == 11 || d == 13)
+            }
+            guard let cutS = rubs.map(\.stepIndex).min(),
+                  let cutE = rubs.map({ $0.stepIndex + $0.durationSteps }).max() else { return [e] }
+            var out: [MIDIEvent] = []
+            if cutS - s >= 4 {
+                out.append(MIDIEvent(stepIndex: s, note: e.note, velocity: e.velocity, durationSteps: cutS - s))
+            }
+            if t - cutE >= 4 {
+                out.append(MIDIEvent(stepIndex: cutE, note: e.note, velocity: e.velocity, durationSteps: t - cutE))
+            }
+            return out
+        }
+    }
+
     private static func clearStepRange(_ events: [MIDIEvent], from: Int, to: Int) -> [MIDIEvent] {
         events.compactMap { ev in
             if ev.stepIndex >= from && ev.stepIndex < to { return nil }
@@ -4119,7 +4154,7 @@ struct SongGenerator {
         case "AMB-BASS-001":  return "Loscil drone root"
         case "AMB-BASS-000":  return "No bass"
         case "AMB-BASS-003":  return "Root+fifth drone"
-        case "AMB-BASS-004":  return "ECM pluck"
+        case "AMB-BASS-004":  return "Drone walk"
         case "AMB-BASS-005":  return "Octave double"
         case "AMB-BASS-006":  return "Slow pendulum"
         // Ambient Zen

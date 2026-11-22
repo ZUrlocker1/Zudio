@@ -1,9 +1,11 @@
 // AmbientPadsGenerator.swift — Ambient pads generation
 // Copyright (c) 2026 Zack Urlocker
-// One rule per song, chosen by weighted roll:
-//   AMB-PADS-001 (45%): Sustained chord — long held voicings, harp-roll onset, inversion rotation
-//   AMB-PADS-002 (35%): Slow cascade — 3-note low/mid/high stagger, re-attack every 128–192 steps
-//   AMB-PADS-003 (20%): Modal cloud — all 7 scale tones, upper-middle register, very soft clusters
+// One rule per song, chosen by weighted roll (base Ambient only; AMB-PADS-014 Airports 2/1 then
+// replaces the loop in 25 percent of songs, so a song hears 001 25%, 002 28%, 003 22%, 014 25%;
+// Zack, 2026-11-22: 001 covers the least of the song):
+//   AMB-PADS-001 (33.3%): Sustained chord — long held voicings, harp-roll onset, inversion rotation
+//   AMB-PADS-002 (37.4%): Slow cascade — 3-note low/mid/high stagger, re-attack every 128–192 steps
+//   AMB-PADS-003 (29.3%): Modal cloud — all 7 scale tones, upper-middle register, very soft clusters
 
 import Foundation
 
@@ -30,9 +32,9 @@ struct AmbientPadsGenerator {
         let ruleID: String
         if let forced = forceRuleID, validRules.contains(forced) {
             ruleID = forced
-        } else if roll < 0.45 {
+        } else if roll < 0.333 {
             ruleID = "AMB-PADS-001"
-        } else if roll < 0.80 {
+        } else if roll < 0.707 {
             ruleID = "AMB-PADS-002"
         } else {
             ruleID = "AMB-PADS-003"
