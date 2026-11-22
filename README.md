@@ -19,8 +19,9 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v3.1/Zudio-3.1.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-**Zudio 3.0 is a major release, with many improvements across all four styles.** Build 138 was the release candidate for V3 and was submitted to the App Store on 2026-11-15. Highlights: Chill has new jazz leads, second-soloist answers and chords that move; Kosmic gains the Jean-Michel Jarre-style Space substyle; Motorik Noir and Europe get new leads transcribed from real tracks; Chill Soho brings back the St Germain beat; playback is smoother with a lighter visualizer; and iPhone audio recovers better from a stuck output. The sections below list the details.
 **v3.1 (build 139, 2026-11-22) is a minor release, work in progress with minor tuning, and the Mac download is this build.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords, and base Ambient moves through short chord cycles with swell pads and basses and a grander reverb. Chill leads and bass repeat fewer notes, and the Mac Track View Generation Log is now resizable. Smaller touches include smoother bass slides in Chill Soho and Blues and more reverb on Ambient Piano's pads. Details in the [change log](docs/change-log.md).
+
+**Zudio 3.0 is a major release, with many improvements across all four styles.** Build 138 was the release candidate for V3 and was submitted to the App Store on 2026-11-15. Highlights: Chill has new jazz leads, second-soloist answers and chords that move; Kosmic gains the Jean-Michel Jarre-style Space substyle; Motorik Noir and Europe get new leads transcribed from real tracks; Chill Soho brings back the St Germain beat; playback is smoother with a lighter visualizer; and iPhone audio recovers better from a stuck output. The sections below list the details.
 
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
@@ -29,18 +30,6 @@ Universal binary — runs natively on both Apple Silicon and Intel Macs. Downloa
 **new lead rules for Kosmic and Motorik:** New more musical Lead 1 and Lead 2 rules replace some of the original rules in base Motorik and  Kosmic. Each plays a hook or answer taken from a real record, reworked per song rather than copied. There is also more coordination between Lead 1 and Lead 2. Roughly three in four base Motorik songs and over half of base Kosmic songs now use a new or lightly changed Lead 1 rule. Motorik Europe leans on the Kraftwerk hooks (Model, Tour de France and Radioactivity riffs), and base Motorik adds a short Pocket Calculator riff. Details are in the [Solo improvement plan](docs/Solo-improvement-plan.md).
 
 **Smoother Track View:** The playhead now glides across the lanes at the display's refresh rate instead of stepping, and the visualizer does less redundant drawing, both of which lower CPU use. The Track View is now even more efficient than Visualizer: it generally stays under 15% of CPU on a Mac, with smoother animation. In the compact view (no visualizer, no tracks) Zudio stays under 10% for Ambient and runs slightly higher for the other styles. Details are in the [change log](docs/change-log.md) and the [optimization plan](docs/optimization-plan.md).
-
-**v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. Each part draws from several rules derived from his songs. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
-
-**What's new — v2.8 iPhone Duo:** Zudio now has a layout made for the iPhone Duo, the foldable iPhone. Tested on a real Duo. Folded, it is the iPhone player it always was. Unfolded, it is the iPad layout, opening on Visuals with the track view one tap away on the Tracks tab. Fold and unfold mid-song and playback carries on.
-
-- **Fits the unfolded screen in portrait** — the top bar drops Mood and Key, moves Reset beside BPM, and puts Help, About, Sleep and Share in a row under it, so every control is on screen and Ambient is spelled out in full. The track rows give the MIDI lane the room back
-- **Fits the unfolded screen in landscape** — the generation log steps aside on the Tracks tab, the buttons and tab strip are a little smaller, and the track rows are a little shorter, so all seven tracks are visible at once
-- **Chosen by window size, not by device** — the same compact layouts apply to iPad Split View, Slide Over and resizable windows, and to any future small iPad. Every current iPad and iPhone looks as it did
-- **More flexible Endless** — tap a style to choose the next song's style
-- **Better audio recovery** after Bluetooth and route changes
-- **Multitasking on iPad** — tested on iPad simulators: Zudio runs alongside other apps in a smaller window, in Split View and in resizable floating windows. It works, with some clipping at certain widths
-- Details are in the [iPhone Duo plan](docs/iphone-duo-plan.md)
 
 Earlier releases are covered in the [change log](docs/change-log.md).
 
