@@ -1599,7 +1599,8 @@ final class AppState: ObservableObject {
         guard let song = songState else { return [] }
         let key = autoSweepKey(song)
         if autoSweepCache.key != key {
-            var steps = Set(KosmicAutoSweep.steps(for: song))
+            var steps = Set(song.style == .ambient ? AmbientAutoTide.steps(for: song)
+                                                    : KosmicAutoSweep.steps(for: song))
             if playMode == .evolve, let anchor = evolveAnchorState,
                anchor.style == .kosmic, !anchor.isKosmicDrift, !anchor.isKosmicSpace {
                 let pass1Start = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars)
@@ -1624,12 +1625,31 @@ final class AppState: ObservableObject {
     /// Fires the global filter sweep (audio plus canvas flash) and logs it. Used by the tap-empty
     /// gesture, the Kosmic automatic sweeps and the Evolve phase changes. A trigger that lands
     /// while a sweep is still running restarts it but adds no second log line.
-    func triggerFilterSweep(bar: Int? = nil) {
+    func triggerFilterSweep(bar: Int? = nil, step: Int? = nil) {
         let wasRunning = playback.isGlobalSweepRunning
-        playback.triggerGlobalFilterSweep()
+        // Ambient and Ambient Zen answer with a slow tide, out or in, three to one; a scheduled one is
+        // fixed by the song, a tap picks at random. Every other style, and Ambient Piano, keep the
+        // fast sweep. A trigger that lands while a sweep or tide runs adds no log line.
+        let slow = selectedStyle == .ambient && songState?.isAmbientPiano != true
+        var text = "Filter sweep"
+        if slow {
+            let tideIn: Bool
+            let seconds: Int
+            if let step, let seed = songState?.globalSeed {
+                tideIn = AmbientAutoTide.isTideIn(seed: seed, step: step)
+                seconds = AmbientAutoTide.tideSeconds(seed: seed, step: step)
+            } else {
+                tideIn = Int.random(in: 0..<4) == 0   // three outs to one in
+                seconds = Int.random(in: 16...24)
+            }
+            playback.triggerSlowFilterTide(tideIn: tideIn, seconds: seconds)
+            text = "Slow filter tide \(tideIn ? "in" : "out") \(seconds) seconds"
+        } else {
+            playback.triggerGlobalFilterSweep()
+        }
         guard playback.isPlaying, !wasRunning else { return }
         let b = bar ?? (playback.currentBar + 1)
-        appendToLog([GenerationLogEntry(tag: String(format: "Bar %03d", b), description: "Filter sweep")])
+        appendToLog([GenerationLogEntry(tag: String(format: "Bar %03d", b), description: text)])
     }
 
     private func emitStepAnnotations(upTo step: Int) {
@@ -1639,7 +1659,7 @@ final class AppState: ObservableObject {
         let sweepSteps = autoSweepSteps()
         for s in (lastEmittedStep + 1)...step {
             // Only a sweep that is due now; a scrub that skips over one must not replay it.
-            if step - s <= 2, sweepSteps.contains(s) { triggerFilterSweep(bar: s / 16 + 1) }
+            if step - s <= 2, sweepSteps.contains(s) { triggerFilterSweep(bar: s / 16 + 1, step: s) }
             if let entries = annotations[s] {
                 let bar = s / 16 + 1
                 let barTag = String(format: "Bar %03d", bar)
@@ -3922,6 +3942,10 @@ final class AppState: ObservableObject {
     private func seekEdgeSensitive(toBar targetBar: Int) {
         playback.seek(toStep: targetBar * 16)
         syncTextureToPlayhead()
+        // A step back must re-arm the log pointer, as seekTo(step:) does, or the bars just left
+        // never log again (X-Files lines, chord shifts, filter tides). Forward steps
+        // keep the pointer so the lines of skipped bars still log.
+        if targetBar * 16 <= lastEmittedStep { lastEmittedStep = targetBar * 16 - 1 }
 
         let totalBars  = songState?.frame.totalBars ?? 32
         let winStart   = visibleBarOffset

@@ -702,19 +702,25 @@ struct AmbientZenTitleGenerator {
         "Dunwich Beach Towel",  // Dunwich Beach, Autumn, 1960
         "Ambient 1½",           // Ambient 1
         "Reflection (Glare)",   // Reflection
-        "By This Carousel",     // By This River
+        "By The Luggage Carousel",   // By This River
         "Under Fluorescents",   // Under Stars
         "Lantern Mall",         // Lantern Marsh
         "Fickle Wi-Fi",         // Fickle Sun
         "Music for Thinkpads",  // Music for Thinking
         "4th World Problems",
         "Mild Ambient Peril",
+        "Another Day in Notting Hill",
+        "Another Week in Stroud",
+        "And Then So Loud",
         "Slow Release Tablet",
         "Low Battery Hymn",
         "Nothing Much Occurs",
+        "Done With Lunch",
+        "Another Damp Day",
         "Another Green Tea",
         "Generative Nap",
         "Fog Machine Repair",
+        "Bloom In Hell"
     ].filter { $0.count <= maxLength }
 
     // 3. After Music for Airports' 1/1, 1/2, 2/1 and 2/2.

@@ -466,6 +466,7 @@ enum OfflineExport {
                        AVEncoderBitRateKey:   128_000]
         )
         let outBuf = AVAudioPCMBuffer(pcmFormat: avFormat, frameCapacity: 4096)!
+        try writeStartGap(to: audioFile, format: avFormat)
 
         // LFO phase accumulators — one per track, updated each block.
         // Phases are advanced by exactly (2π × hz × blockFrames / sampleRate) per block,
@@ -533,6 +534,7 @@ enum OfflineExport {
 
             let status = try fxEngine.renderOffline(thisFrames, to: outBuf)
             guard status == .success else { break }
+            applyStartRamp(outBuf, startFrame: phase2Done, sampleRate: sampleRate)
             try audioFile.write(from: outBuf)
             phase2Done += Int64(thisFrames)
             // Phase 2 is 0.5…1.0 of total progress
@@ -681,6 +683,7 @@ enum OfflineExport {
                                AVNumberOfChannelsKey: nChannels,
                                AVEncoderBitRateKey:   128_000])
                 let trackBuf = AVAudioPCMBuffer(pcmFormat: avFormat, frameCapacity: 4096)!
+                try writeStartGap(to: trackFile, format: avFormat)
 
                 // LFO accumulators start at 0 — same as Phase 2, so shape matches the mix
                 var sweepPhase:   Double = 0
@@ -732,6 +735,7 @@ enum OfflineExport {
 
                     let status = try trackEngine.renderOffline(thisFrames, to: trackBuf)
                     guard status == .success else { break }
+                    applyStartRamp(trackBuf, startFrame: phase3Done, sampleRate: sampleRate)
                     try trackFile.write(from: trackBuf)
                     phase3Done += Int64(thisFrames)
 
@@ -793,6 +797,7 @@ enum OfflineExport {
                                AVNumberOfChannelsKey: nChannels,
                                AVEncoderBitRateKey:   128_000])
                 let texOutBuf  = AVAudioPCMBuffer(pcmFormat: avFormat, frameCapacity: 4096)!
+                try writeStartGap(to: texFile, format: avFormat)
                 var phase3Done: Int64 = 0
 
                 while phase3Done < phase2Total {
@@ -911,6 +916,32 @@ enum OfflineExport {
         ), "LoadInstrument")
 
         return au
+    }
+
+    /// StartGuard.gapSeconds of silence at the head of the mix and of every stem, so an export
+    /// starts like live playback. The render itself is not shifted, so effects, fades and the
+    /// texture keep their timing; every file just starts that much later.
+    /// StartGuard's ramp over the first 100 ms of rendered audio, after the start gap. Applied to
+    /// the mix and the instrument stems; the texture has its own fade-in.
+    private static func applyStartRamp(_ buf: AVAudioPCMBuffer, startFrame: Int64, sampleRate: Double) {
+        let rampFrames = Int64(StartGuard.rampSeconds * sampleRate)
+        guard startFrame < rampFrames, let data = buf.floatChannelData else { return }
+        for i in 0..<Int(buf.frameLength) {
+            let f = startFrame + Int64(i)
+            if f >= rampFrames { break }
+            let gain = StartGuard.gain(atSecond: Double(f) / sampleRate)
+            for ch in 0..<Int(buf.format.channelCount) { data[ch][i] *= gain }
+        }
+    }
+
+    private static func writeStartGap(to file: AVAudioFile, format: AVAudioFormat) throws {
+        let frames = AVAudioFrameCount(StartGuard.gapSeconds * format.sampleRate)
+        guard frames > 0, let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return }
+        buf.frameLength = frames
+        if let data = buf.floatChannelData {
+            for ch in 0..<Int(format.channelCount) { memset(data[ch], 0, Int(frames) * MemoryLayout<Float>.size) }
+        }
+        try file.write(from: buf)
     }
 
     private static func buildEvents(_ trackEvents: [MIDIEvent], track: Int,

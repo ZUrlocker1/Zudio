@@ -87,3 +87,64 @@ enum AmbientEffectDefaults {
         }
     }
 }
+
+// MARK: - Ambient filter tide schedule
+
+/// The automatic slow filter effects (a tide out or a tide in, three to one) of Ambient and Ambient Zen (not Ambient Piano): the Ambient
+/// counterpart of `KosmicAutoSweep`. 35% of songs get 1 or 2 tides, at least 32 bars apart,
+/// away from the intro and well clear of the outro. A tide runs 16 to 24 seconds, closing the
+/// filters to 600 Hz, holding, and reopening (see `PlaybackEngine.triggerSlowFilterTide`).
+///
+/// The schedule comes from the seed with its own SeededRNG, so it consumes nothing from the
+/// generator's stream and never changes a note. The same seed always gives the same tides,
+/// including after a reload, so nothing is stored in SongState.
+enum AmbientAutoTide {
+    static let songChance = 0.35
+    static let minSpacingBars = 32
+    static let introGuardBars = 8
+    static let outroGuardBars = 16
+    /// Tides start on a bar of this grid, so they follow the song's own phrasing.
+    static let gridBars = 8
+
+    /// Which way a scheduled tide runs: out (slowly darkens, then back) or in (dark at once, then
+    /// slowly brightens), three outs to one in. A pure function of the seed and the step, so the same song
+    /// always plays the same tide at the same bar, and the schedule itself is unchanged.
+    static func isTideIn(seed: UInt64, step: Int) -> Bool {
+        var rng = SeededRNG(seed: seed ^ 0xD4A1_9E5C_0B77_31F3 ^ UInt64(truncatingIfNeeded: step) &* 0x9E37_79B9_7F4A_7C15)
+        _ = rng.next()
+        return rng.next() % 4 == 0
+    }
+
+    /// How long a scheduled tide runs, in seconds: 16 to 24, from its own draw of the seed and the
+    /// step (a different salt from `isTideIn`, so length and direction are independent).
+    static func tideSeconds(seed: UInt64, step: Int) -> Int {
+        var rng = SeededRNG(seed: seed ^ 0x5B3C_A7E1_62D9_0F48 ^ UInt64(truncatingIfNeeded: step) &* 0x9E37_79B9_7F4A_7C15)
+        _ = rng.next()
+        return 16 + Int(rng.next() % 9)
+    }
+
+    static func steps(for song: SongState) -> [Int] {
+        guard song.style == .ambient, !song.isAmbientPiano else { return [] }
+        var rng = SeededRNG(seed: song.globalSeed ^ 0x71DE_F117_5EED_0A3B)
+        guard rng.nextDouble() < songChance else { return [] }
+        let wanted = 1 + Int(rng.next() % 2)
+
+        let outroStart = song.structure.outroSection?.startBar ?? song.frame.totalBars
+        let first = (song.structure.introSection?.endBar ?? 0) + introGuardBars
+        let last = outroStart - outroGuardBars
+        guard last > first else { return [] }
+
+        var pool = Array(stride(from: 0, to: song.frame.totalBars, by: gridBars))
+            .filter { $0 >= first && $0 <= last }
+        if pool.count > 1 {
+            for i in stride(from: pool.count - 1, to: 0, by: -1) {
+                pool.swapAt(i, Int(rng.next() % UInt64(i + 1)))
+            }
+        }
+        var chosen: [Int] = []
+        for bar in pool where chosen.count < wanted {
+            if chosen.allSatisfy({ abs($0 - bar) >= minSpacingBars }) { chosen.append(bar) }
+        }
+        return chosen.sorted().map { $0 * 16 }
+    }
+}

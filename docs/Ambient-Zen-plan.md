@@ -48,6 +48,7 @@ What sets it apart from base Ambient, in order of how much you hear it:
 3. By ear: the staggered endings, stop and seek tails with the 4.5 s swell release, and the iPhone speaker.
 4. Moving from a base Ambient song with an audio texture to a Zen song should stop the audio player. Not yet checked in the app.
 5. The variety features (section 13) are built but not all heard yet; the Drums level is by ear.
+5a. The filter tide (section 10): tide out is approved by ear; tide in and the 16 to 24 second lengths are unheard.
 6. Before the App Store build: rerun tools/zen_fpcheck.sh and clean up the SF2. The Big Ship share stays at 30 percent (Zack, 2026-11-22).
 
 ## 3. Ground rules
@@ -307,6 +308,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 - **Bass.** Tremolo 0.08 Hz at depth 0.15, and a hidden low shelf of +3 dB at 80 Hz for floor under the bed. The sweep, if switched on, is an ordinary LFO.
 - **No per-note fade** on Pads or Bass: it is one volume ramp per track, so with overlapping notes each note-off would duck the notes still sounding. The breath comes from the note timing and the swell presets.
 - **Pans.** Lead 1 −0.6, Lead 2 +0.35, Pads drift around the centre (above). Rhythm swings ±0.35 around +0.6 on a slow auto-pan, one sweep per 8 bars.
+- **Filter tide** (Zack, 2026-11-23, shared with base Ambient; not Ambient Piano). A tap on empty space, and 35 percent of songs on their own (1 or 2 tides, on an 8-bar grid, 32 or more bars apart, clear of the intro and the last 16 bars), run a slow low-pass tide over every non-drum track instead of the fast sweep. It lasts 16 to 24 seconds and closes to 600 Hz. Three tides out to one tide in: a tide out darkens over 40 percent of its length, holds 20, and reopens over 40; a tide in is dark at once (10 percent), holds 20, and brightens slowly over 70. Direction and length come from the seed and the bar (AmbientAutoTide), so a reload and a rewind replay them. A high-pass "drain" was tried first and removed. Log: "Slow filter tide out N seconds" or "Slow filter tide in N seconds". Details in the change log.
 - **Chips.** Defaults: Pads Hall, Trem, Sweep and a hidden Delay (the 15 percent echo) and Pan; Texture Delay, Reverb; Bass Reverb, Trem and a hidden Low shelf; Lead 1 Air (a gentle 3.5 dB shelf from 10 kHz, the chip in place of Sweep in every Ambient form), Delay, Hall; Lead 2 Delay, Hall; Rhythm Delay, Hall, Pan; Drums none. AmbientEffectDefaults holds the table.
 
 ## 11. The log
@@ -344,7 +346,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 
 These come back only if a listen says Zen is missing them. Details are in the old plan.
 - **The eight named AMB-1 recipes.** The dials do the job.
-- **Drift** (a slow per-track pitch wander). A new effect chip and new playback code.
+- **Drift** (a slow per-track pitch wander). Decided against (Zack, 2026-11-23): not being implemented, and not to be offered again. It would have needed a new effect chip and new playback code.
 - **Edge fades on Bass and Texture.** The per-note fade can't tell an edge from a join without new engine logic.
 - **The colour chord** and its clash guards.
 - **Pentatonic modes.**
@@ -363,7 +365,7 @@ These come back only if a listen says Zen is missing them. Details are in the ol
 - **SongGenerator:** the substyle roll and shares, generateAmbientZen (dials, frame at the Zen tempo, plan, bed, bells, trim), buildAmbientZenLog, rule descriptions, and the Zen branches of regenerateTrack with the bell rebuild.
 - **SongState:** isAmbientZen, passed in the initialiser and every withXxx() copy method; displayStyleName "Ambient Zen"; the testing stars.
 - **AppState:** reload (forced "Zen"), the Ambient pools (instrumentPoolNames and instrumentPoolPrograms), Zen's pick lists in instrumentPickPoolStatic, noRepeatInstruments (Echo Drops), the Lead 2 lock in applyLead2Mirror, restoreDefaultEffects, and Evolve.
-- **PlaybackEngine:** applyAmbientZenAudio (halls, sends, the zenDelayWet, zenDelayBeats and zenDelayLowpass tables), staticPans and startPan, the per-note fade skip, and gain trims in setProgram.
+- **PlaybackEngine:** triggerSlowFilterTide (the filter tide, shared with base Ambient; schedule and direction in AmbientHelpers.swift), applyAmbientZenAudio (halls, sends, the zenDelayWet, zenDelayBeats and zenDelayLowpass tables), staticPans and startPan, the per-note fade skip, and gain trims in setProgram.
 - **TrackRowView:** the chip rows; the defaults come from AmbientEffectDefaults, shared with restoreDefaultEffects (any onChange logic is still mirrored in PhonePlayerView).
 - **assets/Zudio.sf2:** the bank 14 swell presets.
 

@@ -208,6 +208,15 @@ final class PlaybackEngine: ObservableObject {
     // together, then returns each track to its previous bypass state.
     private var globalSweepTicksRemaining: Int = 0
     private var globalSweepPhase: Double = 0
+    /// True while the running global sweep is the slow Ambient tide rather than the fast Kosmic
+    /// sweep. The tide runs 16 to 24 s and, unlike the fast sweep, is
+    /// cancelled when playback stops so a song never starts dark.
+    private var globalSweepIsTide = false
+    /// True while the running tide is a tide in (dark first, then slowly brightening) rather than
+    /// a tide out (slowly darkening, then back). Only meaningful with `globalSweepIsTide`.
+    private var globalSweepIsTideIn = false
+    private var slowTotalTicks = 400        // length of the slow effect now running
+    private static let tideFloorHz: Float = 600
     private var preGlobalSweepEnabled: [Bool] = Array(repeating: false, count: kTrackCount)
 
     // Canvas-wide flash for filter-sweep gesture — set when sweep triggers, read by VisualizerView Canvas.
@@ -724,7 +733,9 @@ final class PlaybackEngine: ObservableObject {
             }
         } else {
             // Ambient: start with boost at 0 from the top so the first note fades in cleanly.
-            if ambientMode && currentStep == 0 {
+            // Not Zen: it skips the per-note boost ramp, so nothing would raise these again except
+            // an abrupt jump, which the cathedral reverb and echoes would repeat as a pop.
+            if ambientMode && !cachedIsAmbientZen && currentStep == 0 {
                 boosts[kTrackBass].outputVolume = 0.0
                 boosts[kTrackPads].outputVolume = 0.0
             }
@@ -732,13 +743,45 @@ final class PlaybackEngine: ObservableObject {
             if chillPadsMode && currentStep == 0 {
                 boosts[kTrackPads].outputVolume = 0.0
             }
-            let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: schedulerID)
-            scheduler = sched
-            sched.start()
-            recordPlaybackStart(step: currentStep, state: state)
-            if kosmicStyle              { startKosmicDroneFades(state: state) }
-            if motorikStyle || chillFade { startMotorikFades(state: state) }
-            if ambientMode               { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
+            // From the top of a song, wait 200 ms of silence so a loud bar-1 start is not
+            // instant. Resume from mid-song starts immediately. Export uses this same path.
+            let startStep = currentStep
+            // Pop guard (StartGuard): master held at 0 through the gap, then the shared ramp.
+            if startStep == 0 { engine.mainMixerNode.outputVolume = 0.0 }
+            let launch: () -> Void = { [weak self] in
+                guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else {
+                    // Stopped during the gap: do not leave the master at 0 for the next play or seek.
+                    if let self, self.currentSchedulerID == schedulerID, !self.isPlaying {
+                        self.engine.mainMixerNode.outputVolume = 1.0
+                    }
+                    return
+                }
+                let sched = StepScheduler(engine: self, songState: state, startStep: startStep, schedulerID: schedulerID)
+                self.scheduler = sched
+                sched.start()
+                self.recordPlaybackStart(step: startStep, state: state)
+                if self.kosmicStyle               { self.startKosmicDroneFades(state: state) }
+                if self.motorikStyle || self.chillFade { self.startMotorikFades(state: state) }
+                if self.ambientMode               { self.startAmbientOutroFade(state: state, schedulerID: schedulerID) }
+                if startStep == 0 { self.startPopGuardRamp(schedulerID: schedulerID) }
+            }
+            if startStep == 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + StartGuard.gapSeconds, execute: launch)
+            } else {
+                launch()
+            }
+        }
+    }
+
+    /// StartGuard's ramp: master 0.15 to 1.0 in five 20 ms steps, to absorb any DSP-init transient.
+    /// Called as the first notes fire, by Kosmic's intro start and by the no-intro start in play().
+    private func startPopGuardRamp(schedulerID: Int) {
+        engine.mainMixerNode.outputVolume = StartGuard.level(afterStep: 0)
+        for i in 1...StartGuard.rampSteps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * StartGuard.rampStepSeconds) { [weak self] in
+                guard let self, self.currentSchedulerID == schedulerID else { return }
+                self.engine.mainMixerNode.outputVolume = StartGuard.level(afterStep: i)
+            }
         }
     }
 
@@ -788,6 +831,13 @@ final class PlaybackEngine: ObservableObject {
         }
     }
 
+    /// Clears the reverb and delay buffers so a tail cannot sound later, when the master volume
+    /// is next raised. Call it while the master is silent or the song is stopped.
+    private func clearEffectTails() {
+        reverbBusLarge.reset(); reverbBusSmall.reset()
+        for del in delays { del.reset() }
+    }
+
     /// Stop the scheduler and clean up playback state without touching the AVAudioSession.
     /// Used by system-driven stop paths (interruption, headphone pull, route change) where
     /// the session is already deactivated by iOS — calling setActive(false) there is wrong.
@@ -802,14 +852,14 @@ final class PlaybackEngine: ObservableObject {
         stopMotorikFades()
         stopAmbientNoteFades()
         stopAmbientOutroFade()
+        cancelFilterTide()
         // Stop any active pan LFOs so phase state doesn't bleed into the next song.
         for i in 0..<kTrackCount where panEnabled[i] { stopPan(forTrack: i) }
         stopSharedLFOIfIdle()   // no LFO wakeups while stopped (isPlaying is now false)
         scheduleVisualizerDrain()
         // Clear reverb/delay buffers so tails don't bleed through when volume
         // is restored for the next song — applies to all styles.
-        reverbBusLarge.reset(); reverbBusSmall.reset()
-        for del in delays  { del.reset() }
+        clearEffectTails()
     }
 
     /// Stop and restart the AVAudioEngine so it re-enumerates the output device.
@@ -1189,10 +1239,20 @@ final class PlaybackEngine: ObservableObject {
             self.isPlaying = false
             // Keep currentStep / currentBar at their last-set values (end of song)
             self.allNotesOff()
+            // Motorik, Chill and Ambient fade the master mixer, which sits after the reverb and
+            // delay sends, so those buffers still hold their tail while the master is at 0. The
+            // stop*Fades calls below restore the master to 1.0 and would expose that tail as a
+            // short hiccup after the song ends. Clear the buffers first, while the master is
+            // still silent (a manual Stop does the same in stopSchedulerOnly). Kosmic fades
+            // before the sends, its master stays at 1.0, and it is left exactly as before.
+            if self.engine.mainMixerNode.outputVolume < 0.02 {
+                self.clearEffectTails()
+            }
             self.stopKosmicDroneFades()
             self.stopMotorikFades()
             self.stopAmbientNoteFades()
             self.stopAmbientOutroFade()
+            self.cancelFilterTide()
             self.stopSharedLFOIfIdle()
             self.scheduleVisualizerDrain()
             self.onSongEndNaturally?()
@@ -1215,6 +1275,7 @@ final class PlaybackEngine: ObservableObject {
             stopMotorikFades()
             stopAmbientNoteFades()
             stopAmbientOutroFade()
+            cancelFilterTide()   // a rewind replays the tide from its bar; one still running would block it
             currentStep = clampedStep
             displayStep = clampedStep
             currentBar  = clampedStep / 16
@@ -2446,27 +2507,36 @@ final class PlaybackEngine: ObservableObject {
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
         }
 
-        // Global filter sweep (iPhone two-finger gesture) — one unified phase across all tracks
+        // Global filter sweep (tap-empty gesture, Kosmic automatic sweeps, Ambient tide) — one
+        // unified phase across all tracks
         if globalSweepTicksRemaining > 0 {
             globalSweepTicksRemaining -= 1
-            globalSweepPhase += 0.052   // ~0.33 Hz → full open-close cycle in ~6 seconds
-            let cutoff = Float(300 + 5700 * (1.0 + sin(globalSweepPhase)) / 2.0)
-            for i in 0..<kTrackCount where i != kTrackDrums {
-                AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
-            }
-            if globalSweepTicksRemaining == 0 {
-                // Restore each track to its pre-sweep state and drop resonance back to static 3 dB
-                for i in 0..<kTrackCount where i != kTrackDrums {
-                    AudioUnitSetParameter(sweepFilters[i].audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0) // restore from 10 dB
-                    if preGlobalSweepEnabled[i] {
-                        // Track had its own sweep running — let sweepEnabled[] loop resume next tick
-                    } else {
-                        sweepFilters[i].auAudioUnit.shouldBypassEffect = true
-                        AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
-                    }
+            if globalSweepIsTide {
+                // Slow effect on a log frequency scale in smoothstep steps. A tide out closes over
+                // the first 40%, holds 20%, reopens over the last 40%. A tide in is the other way
+                // round: the water is over the sound at once (first 10%), holds 20%, then the
+                // brightness comes back slowly over the last 70%. Resonance stays at the static
+                // 3 dB; the fast sweep's wah boost would ring in Ambient's long echoes.
+                let p = 1.0 - Double(globalSweepTicksRemaining) / Double(slowTotalTicks)
+                let ramp: Double
+                if globalSweepIsTideIn {
+                    ramp = p < 0.1 ? p / 0.1 : (p > 0.3 ? (1.0 - p) / 0.7 : 1.0)
+                } else {
+                    ramp = p < 0.4 ? p / 0.4 : (p > 0.6 ? (1.0 - p) / 0.4 : 1.0)
                 }
-                stopSharedLFOIfIdle()
+                let closed = ramp * ramp * (3.0 - 2.0 * ramp)
+                let cutoff = 6000 * Float(pow(Double(Self.tideFloorHz / 6000), closed))
+                for i in 0..<kTrackCount where i != kTrackDrums {
+                    AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+                }
+            } else {
+                globalSweepPhase += 0.052   // ~0.33 Hz → full open-close cycle in ~6 seconds
+                let cutoff = Float(300 + 5700 * (1.0 + sin(globalSweepPhase)) / 2.0)
+                for i in 0..<kTrackCount where i != kTrackDrums {
+                    AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+                }
             }
+            if globalSweepTicksRemaining == 0 { restoreFiltersAfterGlobalSweep() }
         }
 
         // Pan — ~20fps, all active tracks.
@@ -2719,6 +2789,47 @@ final class PlaybackEngine: ObservableObject {
         stopSharedLFOIfIdle()
     }
 
+    /// Puts every non-drum filter back to its pre-sweep state and the static 3 dB resonance.
+    private func restoreFiltersAfterGlobalSweep() {
+        globalSweepIsTide = false
+        for i in 0..<kTrackCount where i != kTrackDrums {
+            AudioUnitSetParameter(sweepFilters[i].audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0) // restore from 10 dB
+            if preGlobalSweepEnabled[i] {
+                // Track had its own sweep running — let sweepEnabled[] loop resume next tick
+            } else {
+                sweepFilters[i].auAudioUnit.shouldBypassEffect = true
+                AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
+            }
+        }
+        stopSharedLFOIfIdle()
+    }
+
+    /// Ends a running Ambient tide at once and reopens the filters. Called when playback stops or
+    /// the song ends, so the next song does not start dark. The fast sweep is left alone.
+    private func cancelFilterTide() {
+        guard globalSweepIsTide, globalSweepTicksRemaining > 0 else { return }
+        globalSweepTicksRemaining = 0
+        restoreFiltersAfterGlobalSweep()
+    }
+
+    /// Slow Ambient version of the global sweep: 16 to 24 s, the filters close to 600 Hz, hold,
+    /// then reopen. Same filters and restore path as the fast sweep, but no resonance boost.
+    /// Re-triggering while a tide runs does nothing, so a double tap cannot restart it.
+    func triggerSlowFilterTide(tideIn: Bool = false, seconds: Int = 19) {
+        guard !isGlobalSweepRunning else { return }
+        preGlobalSweepEnabled = sweepEnabled
+        globalSweepIsTide = true
+        globalSweepIsTideIn = tideIn
+        slowTotalTicks = seconds * 20   // 20 ticks a second
+        globalSweepTicksRemaining = slowTotalTicks
+        canvasFlashDate = Date()
+        for i in 0..<kTrackCount where i != kTrackDrums {
+            sweepFilters[i].auAudioUnit.shouldBypassEffect = false
+            AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
+        }
+        startSharedLFO()
+    }
+
     /// Triggers a global filter sweep across all non-drum tracks (~3 seconds, open→close→open).
     /// Re-triggerable — a second call restarts from fully open so the effect is always audible.
     /// Resonance is boosted to 15 dB during the sweep for a dramatic Moog-style wah character,
@@ -2726,6 +2837,7 @@ final class PlaybackEngine: ObservableObject {
     var isGlobalSweepRunning: Bool { globalSweepTicksRemaining > 0 }
 
     func triggerGlobalFilterSweep() {
+        globalSweepIsTide = false
         preGlobalSweepEnabled = sweepEnabled
         globalSweepPhase = .pi / 2    // start at maximum cutoff (6000 Hz — fully open)
         globalSweepTicksRemaining = 60 // 60 × 50ms (20fps) ≈ 3 seconds (open → close → open)
@@ -2815,14 +2927,7 @@ final class PlaybackEngine: ObservableObject {
             // Song start: zero everything; a master ramp + intro boost ramp will open audio.
             boosts[kTrackBass].outputVolume      = 0.0
             boosts[kTrackPads].outputVolume      = 0.0
-            engine.mainMixerNode.outputVolume    = 0.15
-            // Master mixer 0.15→1 over ~100 ms to absorb any DSP-init transient.
-            for i in 1...5 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.020) { [weak self] in
-                    guard let self, self.currentSchedulerID == schedulerID else { return }
-                    self.engine.mainMixerNode.outputVolume = 0.15 + Float(i) / 5.0 * 0.85
-                }
-            }
+            startPopGuardRamp(schedulerID: schedulerID)
         } else if inIntro {
             // Mid-intro seek: jump to the proportional volume so the fade continues smoothly.
             let startProg = Float(currentStep) / Float(max(1, introEndStep))
@@ -3040,8 +3145,7 @@ final class PlaybackEngine: ObservableObject {
                         self.motorikFadeTimers[1]?.cancel()
                         self.motorikFadeTimers[1] = nil
                         self.allNotesOff()
-                        self.reverbBusLarge.reset(); self.reverbBusSmall.reset()
-                        for del in self.delays  { del.reset() }
+                        self.clearEffectTails()
                     }
                 )
             }
@@ -3168,8 +3272,7 @@ final class PlaybackEngine: ObservableObject {
                     onComplete: {
                         self.ambientOutroFadeTimer?.cancel()
                         self.ambientOutroFadeTimer = nil
-                        self.reverbBusLarge.reset(); self.reverbBusSmall.reset()
-                        for del in self.delays  { del.reset() }
+                        self.clearEffectTails()
                     }
                 )
             }
@@ -3619,7 +3722,7 @@ private func loadGMPrograms() {
             fadeStartFrame = max(0, musicFrames - Int64(5.0 * sr))
         } else {
             musicFrames    = songMusicFrames
-            totalFrames    = musicFrames + Int64(sr * 2.5)
+            totalFrames    = musicFrames + Int64(sr * 2.7)   // 2.5 s tail + 0.2 s start gap
             fadeStartFrame = Int64.max
         }
 
