@@ -12,6 +12,8 @@
 
 - **Ambient filter tides** — (2026-11-23, build 139) Ambient and Zen now answer a tap on empty space, and 35% of songs on their own, with a slow filter tide of 16 to 24 seconds: three tides out (slowly darkening) to one tide in (dark first, then brightening). 
 
+- **Ambient mix, 2026-11-23.** Substyle shares are now Zen 55, base Ambient 23 and Ambient Piano 22. Base Ambient plays an audio texture in half of its songs (was 45 percent; the no-drums weight rose to 50) and the X-Files whistle in 10 percent (was 5). Piano is unchanged. Kosmic bridges play the X-Files whistle 40 percent of the time (was 25), which lifts regular Kosmic from about 5 percent of songs to about 8.
+
 - **Ambient Zen titles** — (2026-11-21, build 139) Zen songs get their own short titles, gentle jokes on Eno and air travel: "Music for Rebooking", "Thursday Nap", "United Delay 2/1", "1/1 (Decaf)", and now and then an odd number such as "Gate 7/11" or "Lounge 24/7".
 
 - **Base Ambient: more musical** — (2026-11-21, build 139) Base Ambient songs now move through short chord cycles with smooth changes, and the bass names each new chord. Pads and held basses can play soft swell instruments, some songs use 7th chords or Airports 2/1 voices, and Lead 1 now and then drops an octave for a few passes. Also added more reverb and air. 

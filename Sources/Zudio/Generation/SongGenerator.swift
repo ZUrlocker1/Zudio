@@ -970,10 +970,10 @@ struct SongGenerator {
 
     // MARK: - Ambient generation path
 
-    // Ambient substyle shares (Zack, 2026-11-22): Piano 20, base Ambient 25, Zen 55. Piano is
-    // pianoRoll < 0.20, and Zen takes 55/80 = 0.6875 of the rest.
-    static let ambientPianoShare = 0.20
-    static let ambientZenShare   = 0.6875
+    // Ambient substyle shares (Zack, 2026-11-23): Piano 22, base Ambient 23, Zen 55. Piano is
+    // pianoRoll < 0.22, and Zen takes 55/78 of the rest.
+    static let ambientPianoShare = 0.22
+    static let ambientZenShare   = 55.0 / 78.0
 
     /// The Ambient Piano lead rule for a roll: 35 percent Floating Buds, 30 Satin Melody, 35 Koln
     /// Winter Arc. A new song draws it from the seed; a regenerated Lead 1 draws it afresh from its
@@ -1671,10 +1671,10 @@ struct SongGenerator {
         }
 
         // X-Files whistle — injected AFTER harmonic filter so the melody is not scale-snapped.
-        // 5% chance (75% in test mode) of appearing once in the 30–60 second window.
+        // 10% chance of appearing once in the 30–60 second window (Zack, 2026-11-23; was 5).
         // Plays once, starting at bar 2 of the block; phrase spills into bar 3 (bars 1 and 4 silent).
         var ambientXFilesBars: [Int] = []
-        let xFilesProb = 0.05
+        let xFilesProb = 0.10
         if lead1RNG.nextDouble() < xFilesProb {
             let stepsPerSec = (Double(frame.tempo) / 60.0) * 4.0
             let bar30 = max(0, Int(stepsPerSec * 30.0) / 16)

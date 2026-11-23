@@ -23,7 +23,7 @@ struct AmbientMusicalFrameGenerator {
         let mood       = moodOverride  ?? pickMood(rng: &rng)
         let mode       = pickMode(rng: &rng)
         let total      = pickTotalBars(tempo: tempo, rng: &rng)
-        let percStyle  = pickPercussionStyle(rng: &rng)
+        let percStyle  = pickPercussionStyle(rng: &rng, piano: pianoFamilies)
         let ambFamily  = pickAmbientProgressionFamily(rng: &rng, piano: pianoFamilies)
         let loops      = pickLoopLengths(rng: &rng)
 
@@ -70,9 +70,12 @@ struct AmbientMusicalFrameGenerator {
         return modes[rng.weightedPick(weights)]
     }
 
-    static func pickPercussionStyle(rng: inout SeededRNG) -> PercussionStyle {
+    /// Base Ambient (Zack, 2026-11-23): no drums in 50 percent of songs, and those are the songs
+    /// that get an audio texture, so audio textures play in half of base Ambient (was 45). Piano
+    /// keeps the original weights so its songs don't change.
+    static func pickPercussionStyle(rng: inout SeededRNG, piano: Bool = false) -> PercussionStyle {
         let styles:  [PercussionStyle] = [.handPercussion, .textural, .absent, .softPulse]
-        let weights: [Double]          = [0.30,            0.20,      0.45,    0.05]
+        let weights: [Double]          = piano ? [0.30, 0.20, 0.45, 0.05] : [0.25, 0.20, 0.50, 0.05]
         return styles[rng.weightedPick(weights)]
     }
 

@@ -281,12 +281,12 @@ struct KosmicLeadGenerator {
             guard section.label != .intro && section.label != .outro else { continue }
             // Drum bridges handled above — skip in main loop
             guard section.label != .bridge && section.label != .bridgeAlt else { continue }
-            // Melody bridge (B): X-Files whistle 25% of the time; otherwise generated melody
+            // Melody bridge (B): X-Files whistle 40% of the time (Zack, 2026-11-23; was 25); otherwise generated melody
             if section.label == .bridgeMelody {
                 var melodyEvents = generateBridgeMelodySection(section: section, frame: frame,
                                                                tonalMap: tonalMap, bridgeRule: bridgeMelodyRule,
                                                                rng: &rng)
-                if rng.nextDouble() < 0.25 {
+                if rng.nextDouble() < 0.40 {
                     // X-Files appears symmetrically: bookend (first+last) or middle-pair (two bars with a gap).
                     addXFilesWhistles(to: &melodyEvents, section: section, frame: frame, tonalMap: tonalMap,
                                            rng: &rng, xFilesBars: &xFilesBars)
@@ -1621,7 +1621,7 @@ struct KosmicLeadGenerator {
                             $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
                         }
                     }
-                } else if rng.nextDouble() < 0.25 {
+                } else if rng.nextDouble() < 0.40 {
                     addXFilesWhistles(to: &melodyEvents, section: section, frame: frame, tonalMap: tonalMap,
                                            rng: &rng, xFilesBars: &xFilesBars)
                 }
@@ -2018,7 +2018,7 @@ struct KosmicLeadGenerator {
 
     // MARK: - Bridge A-1 lead (escalating drums bridge)
     // Default: single sustained 5th held quietly for the full bridge.
-    // 25% chance: X-Files whistle repeats on every bar instead — more dramatic.
+    // 40% chance (was 25): X-Files whistle repeats on every bar instead — more dramatic.
 
     static func generateDrumBridgeLead(
         frame: GlobalMusicalFrame, structure: SongStructure,
@@ -2030,7 +2030,7 @@ struct KosmicLeadGenerator {
             guard section.label == .bridge else { continue }
             guard let entry = tonalMap.entry(atBar: section.startBar) else { continue }
             let rootPC = chordRootPC(frame: frame, entry: entry)
-            let useXFiles = rng.nextDouble() < 0.25
+            let useXFiles = rng.nextDouble() < 0.40
 
             if useXFiles {
                 // X-Files whistle on 1–2 bars only — the theme lands harder as a brief appearance

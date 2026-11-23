@@ -732,11 +732,11 @@ struct AmbientZenTitleGenerator {
     ]
     static let fractions = ["1/1", "1/2", "2/1", "2/2"]
     static let oddFractions = [
-        "1/37", "42/634", "1.31459", "7/11", "24/7", "1/0", "0/0", "2/3.5", "π/2", "1/∞", "13/8",
+        "1/37", "42/634", "1.31459", "7/11", "24/7", "1/0", "0/0", "2/3.5", "π/2", "1/∞", "13/8", "7/8",
         "86/1", "1.0001", "3/1-ish", "9¾", "0.999…", "10/6", "221B", "867-5309",
     ]
     static let fractionSpecials = [
-        "1/1 (Decaf)", "2/1 (Oat Milk)", "1/2 (Half-Caf)", "2/2 (Gate Lice)", "1/1 (Delayed)",
+        "1/1 (Decaf)", "2/1 (Oat Milk)", "1/2 (Half-Caf)", "2/2 (Dry)", "1/1 (Delayed)",
     ]
 
     // 4. Oblique Strategies, Eno and Peter Schmidt's card deck, and Eno's sayings.

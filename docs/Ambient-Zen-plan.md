@@ -62,7 +62,7 @@ What sets it apart from base Ambient, in order of how much you hear it:
 - **Long sustain.** Every pad, Texture and bass instrument holds for a long time without dying away.
 
 **Shares.** Zen reuses pianoRuleRoll, which only Piano songs read, so no new draw enters the shared prefix. Piano if pianoRoll < Piano share; Zen if not Piano and pianoRuleRoll < zenShare; otherwise base Ambient.
-- **Release values (Zack, 2026-11-22):** Piano 20, base Ambient 25, Zen 55 (ambientPianoShare 0.20, ambientZenShare 0.6875).
+- **Release values (Zack, 2026-11-23):** Piano 22, base Ambient 23, Zen 55 (ambientPianoShare 0.22, ambientZenShare 55/78). Base Ambient also got more audio textures (no-drums weight 45 to 50 percent, so about half of base songs) and the X-Files whistle rose from 5 to 10 percent of base songs.
 - Every Ambient song records its substyle in its forced rules: "Zen", "Piano" with its rule, or "Base". It reloads as the same substyle whatever the shares are then. Songs saved before this record nothing and reload by the current shares.
 
 ## 4. The ZenPlan: one picture of the song
