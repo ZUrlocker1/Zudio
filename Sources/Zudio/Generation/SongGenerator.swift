@@ -1257,10 +1257,11 @@ struct SongGenerator {
 
             var lead1Rules: Set<String> = []
             let pianoIntroEndBar = structure.introSection?.endBar ?? 0
+            let reachLog = ReachLog()
             trackEvents[kTrackLead1] = AmbientLeadGenerator.generateAmbientPianoLead(
                 pianoRule: pianoRule, frame: frame, totalBars: frame.totalBars,
                 rng: &lead1RNG, usedRuleIDs: &lead1Rules,
-                introEndBar: pianoIntroEndBar)
+                introEndBar: pianoIntroEndBar, reachLog: reachLog)
 
             // Trim song to where melodic content ends — avoids bass-only or silent tails.
             // Uses only notes above MIDI 57 (A3) so LH bass doesn't extend the trim point.
@@ -1280,7 +1281,7 @@ struct SongGenerator {
             let padChance: Double
             switch pianoRule {
             case "AMB-PNO-001": padChance = 1.00
-            case "AMB-PNO-003": padChance = 0.30
+            case "AMB-PNO-003": padChance = 0.15   // rare (Zack, 2026-11-24; was 0.30)
             default:            padChance = 0.50
             }
             if padsRNG.nextDouble() < padChance {
@@ -1305,6 +1306,11 @@ struct SongGenerator {
             for (bar, desc) in ambientPianoArcLines(rule: pianoRule, frame: frame) {
                 stepAnnotations[bar * 16, default: []].append(
                     GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
+            }
+            // The high-note reach (Zack, 2026-11-24), on the bar where it sounds
+            for rs in reachLog.steps.prefix(1) where rs / 16 * 16 < frame.totalBars * 16 {   // the first reach only
+                stepAnnotations[rs / 16 * 16, default: []].append(
+                    GenerationLogEntry(tag: "Arc", description: "High-note reach", isTitle: false))
             }
             var forced: [String: String] = [:]
             forced["Piano"] = pianoRule   // Piano records its rule, so it reloads as Piano (2026-11-22)
@@ -2233,13 +2239,15 @@ struct SongGenerator {
                 let regenRule = ambientPianoRule(roll: ruleRNG.nextDouble())
                 // Koln's vamp is redrawn per regen (Zack, 2026-11-24); the seed is never 0 here.
                 let variation = newTrackSeed == 0 ? 1 : newTrackSeed
+                let regenReach = ReachLog()
                 events = AmbientLeadGenerator.generateAmbientPianoLead(
                     pianoRule: regenRule,
                     frame: songState.frame, totalBars: songState.frame.totalBars,
                     rng: &rng, usedRuleIDs: &usedRules,
                     introEndBar: songState.structure.introSection?.endBar ?? 0,
-                    arcVariation: variation)
+                    arcVariation: variation, reachLog: regenReach)
                 ambientPianoArcRegen = ambientPianoArcLines(rule: regenRule, frame: songState.frame, variation: variation)
+                    + regenReach.steps.prefix(1).map { ($0 / 16, "High-note reach") }
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.lead1 ?? 11
                 var regenRules: Set<String> = []

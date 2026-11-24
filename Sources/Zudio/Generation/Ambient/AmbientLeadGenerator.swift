@@ -84,8 +84,12 @@ struct KolnArc {
         if rng.nextDouble() < 0.50 {   // about 35% of songs once the ones it doesn't fit drop out
             let end = climaxBar - 4
             // The drawn length first, then shorter ones if it doesn't fit
-            let lens = [16, 12, 8]
-            for len in lens[rng.nextInt(upperBound: 3)...] where vamp == nil {
+            // 6 to 16 bars in 2-bar steps, skewed short (Zack, 2026-11-24): 6 24%, 8 28%, 10 20%,
+            // 12 15%, 14 8%, 16 5%. The drawn length first, then shorter ones if it doesn't fit.
+            let lens = [6, 8, 10, 12, 14, 16]
+            let roll = rng.nextInt(upperBound: 100)
+            let drawn = roll < 24 ? 0 : roll < 52 ? 1 : roll < 72 ? 2 : roll < 87 ? 3 : roll < 95 ? 4 : 5
+            for len in lens[...drawn].reversed() where vamp == nil {
                 let start = end - len
                 guard start >= 10 else { continue }
                 let clear = peaks.allSatisfy { pb in ((pb - 3)...(pb + 6)).allSatisfy { !(start..<end).contains($0) } }
@@ -96,6 +100,9 @@ struct KolnArc {
                        peakBars: peaks, vampBars: vamp)
     }
 }
+
+/// Collects the steps where Koln's high-note reach sounds, so the generation log can name them.
+final class ReachLog { var steps: [Int] = [] }
 
 struct AmbientLeadGenerator {
 
@@ -649,14 +656,15 @@ struct AmbientLeadGenerator {
         usedRuleIDs: inout Set<String>,
         introEndBar: Int = 0,
         isEvolvePass: Bool = false,
-        arcVariation: UInt64 = 0
+        arcVariation: UInt64 = 0,
+        reachLog: ReachLog? = nil
     ) -> [MIDIEvent] {
         usedRuleIDs.insert(pianoRule)
         switch pianoRule {
         case "AMB-PNO-001": return floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
         case "AMB-PNO-003": return dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng,
                                                        usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass,
-                                                       arcVariation: arcVariation)
+                                                       arcVariation: arcVariation, reachLog: reachLog)
         default:            return pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
         }
     }
@@ -2095,7 +2103,8 @@ struct AmbientLeadGenerator {
 
     private static func dramaticArcFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>, isEvolvePass: Bool = false, arcVariation: UInt64 = 0
+        usedRuleIDs: inout Set<String>, isEvolvePass: Bool = false, arcVariation: UInt64 = 0,
+        reachLog: ReachLog? = nil
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let scalePCs   = frame.scalePCs
@@ -2602,8 +2611,30 @@ struct AmbientLeadGenerator {
                 guard rs < totalSteps else { break }
                 let rDur = Swift.min(12 + rng.nextInt(upperBound: 9), totalSteps - rs)
                 guard rDur >= 8 else { break }
-                events.append(MIDIEvent(stepIndex: rs, note: reachPool[rng.nextInt(upperBound: reachPool.count)],
-                                        velocity: UInt8(50 + rng.nextInt(upperBound: 18)), durationSteps: rDur))
+                let rNote = reachPool[rng.nextInt(upperBound: reachPool.count)]
+                let rVel  = UInt8(50 + rng.nextInt(upperBound: 18))
+                events.append(MIDIEvent(stepIndex: rs, note: rNote, velocity: rVel, durationSteps: rDur))
+                reachLog?.steps.append(rs)
+                // Reach echoes (Zack, 2026-11-24): one roll, a third each: the reach stands alone,
+                // gets one echo, or gets two echoes within the next 2 bars; an echo is the same pitch (40%) or another high scale tone within a fifth.
+                // Drawn on a stream of its own so no other draw in the song moves.
+                var echoRng = SeededRNG(seed: (UInt64(rs) &* 0x9E37_79B9_7F4A_7C15) ^ UInt64(rNote) ^ 0xEC40_0005_0000_0001)
+                let echoRoll = echoRng.nextDouble()
+                let echoes = echoRoll < 0.3333 ? 1 : echoRoll < 0.6667 ? 2 : 0
+                var echoStep = rs + rDur
+                for k in 0..<echoes {
+                    echoStep += (k == 0 ? 3 + echoRng.nextInt(upperBound: 5) : 6 + echoRng.nextInt(upperBound: 8))
+                    let eDur = 8 + echoRng.nextInt(upperBound: 5)
+                    guard echoStep + eDur < climaxBar * 16 - 4, echoStep + eDur <= totalSteps else { break }
+                    // 40% an exact repeat, else another high scale tone within a fifth of the reach
+                    // (a step, third, fourth or fifth either way), so the echo stays in its octave.
+                    let near = reachPool.filter { $0 != rNote && abs(Int($0) - Int(rNote)) <= 7 }
+                    let eNote = (near.isEmpty || echoRng.nextDouble() < 0.40) ? rNote
+                              : near[echoRng.nextInt(upperBound: near.count)]
+                    events.append(MIDIEvent(stepIndex: echoStep, note: eNote,
+                                            velocity: UInt8(Swift.max(30, Int(rVel) - 8 - 4 * k)), durationSteps: eDur))
+                    echoStep += eDur
+                }
             }
         }
 
