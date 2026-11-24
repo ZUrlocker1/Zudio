@@ -959,6 +959,9 @@ final class AppState: ObservableObject {
             // Warm Swell sat forward of the rest of the Ambient pad pool (Zack, 2026-11-22). 75 is
             // about 2.5 dB down from the untouched 100; Zen, base Ambient and Piano all draw it.
             case (kTrackPads,    .ambient, "Warm Swell"):   return 75
+            // Warm Pad runs loud among the Ambient pads, base and Zen alike (Zack, 2026-11-23).
+            // 70 is about 3 dB down from the untouched 100.
+            case (kTrackPads,    .ambient, "Warm Pad"):     return 70
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
             // Chill audition guitar (Zack, 2026-10-15): Jazz sat under the rest of the rhythm
             // pool. 127 is the CC7 ceiling; the rest of its lift is PlaybackEngine's rhythm boost.
@@ -1058,11 +1061,26 @@ final class AppState: ObservableObject {
                 let programs = Self.instrumentPoolPrograms(trackIndex: track, style: style, isChillSoho: isSoho)
                 let names    = Self.instrumentPoolNames(trackIndex: track, style: style, isChillSoho: isSoho)
                 if let idx = programs.firstIndex(of: program), idx < names.count { name = names[idx] }
+                // Ambient Lead 2 can play Lead 1's instrument (the mirror), which is in Lead 1's
+                // pool and not Lead 2's, so it fell through as a bare number ("L2:100", "L2:4").
+                else if track == kTrackLead2 && style == .ambient {
+                    let l1Programs = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: style, isChillSoho: isSoho)
+                    let l1Names    = Self.instrumentPoolNames(trackIndex: kTrackLead1, style: style, isChillSoho: isSoho)
+                    if let idx = l1Programs.firstIndex(of: program), idx < l1Names.count { name = l1Names[idx] }
+                }
                 if track == kTrackLeadSynth && program == 90 { name = "Polysynth" }
             }
             parts.append("\(pair[0]):\(name)")
         }
         guard !parts.isEmpty else { return entry }
+        // Lead 2 playing Lead 1's instrument (the Ambient mirror) reads as one item:
+        // "L1, L2:Harp" in place of "L1:Harp L2:Harp" (Zack, 2026-11-23).
+        if let l1 = parts.firstIndex(where: { $0.hasPrefix("L1:") }),
+           let l2 = parts.firstIndex(where: { $0.hasPrefix("L2:") }),
+           parts[l1].dropFirst(3) == parts[l2].dropFirst(3) {
+            parts[l1] = "L1, L2:" + parts[l1].dropFirst(3)
+            parts.remove(at: l2)
+        }
         return GenerationLogEntry(tag: entry.tag, description: parts.joined(separator: " "), isTitle: entry.isTitle)
     }
 
@@ -2431,6 +2449,14 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Records a mid-song instrument change (Evolve, ⚡, the picker) for the no-repeat check, so
+    /// an instrument that arrives mid-song still counts as heard in that song. Before this, only a
+    /// song's opening instruments counted, and FM Swell switched in by an Evolve pass carried into
+    /// the next Zen song unswapped (Zack, 2026-11-24).
+    private func noteInstrumentHeard() {
+        saveLastUsedInstruments(style: songState?.style ?? selectedStyle)
+    }
+
     /// If the freshly-randomized song picked the same no-repeat instrument as the
     /// previous song, swap it for a different random pick. All instruments remain
     /// equally available — this only prevents two consecutive songs from sharing
@@ -3194,7 +3220,7 @@ final class AppState: ObservableObject {
                                                            isTitle: false)))
         }
         instrumentChangeToken += 1
-        if !entries.isEmpty { evolveInstrumentsChanged = true }
+        if !entries.isEmpty { evolveInstrumentsChanged = true; saveLastUsedInstruments(style: style) }
         return entries
     }
 
@@ -4648,6 +4674,7 @@ final class AppState: ObservableObject {
     /// Holds a track's instrument line until its regen is logged (the track row's ⚡ button,
     /// which picks the instrument itself).
     func logInstrumentAfterRegen(trackIndex: Int, name: String) {
+        noteInstrumentHeard()
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
         pendingRegenInstrumentLog[trackIndex] = GenerationLogEntry(tag: "Instrument", description: "\(tName) \(name)",
                                                                    isTitle: false)
@@ -4664,6 +4691,9 @@ final class AppState: ObservableObject {
     /// ⚡ button (the Mac and iPad track row, the iPhone and the visualizer) draws through here.
     func shuffledInstrumentIndex(forTrack trackIndex: Int, style: MusicStyle, poolCount: Int, current: Int) -> Int {
         guard poolCount > 0 else { return current }
+        // Ambient Piano's Lead 1 is the Stereo Piano (pool index 0), and a ⚡ regen keeps it, even
+        // after a manual pick of something else (Zack, 2026-11-24). The picker itself stays open.
+        if style == .ambient, trackIndex == kTrackLead1, songState?.isAmbientPiano == true { return 0 }
         let zenPicks = songState?.isAmbientZen == true
             ? instrumentPickPool(trackIndex: trackIndex, style: style, poolCount: poolCount) : []
         var newIdx = current
@@ -4696,6 +4726,7 @@ final class AppState: ObservableObject {
             setEffect(.distortion, enabled: ![2, 4].contains(newIdx), forTrack: trackIndex)
         }
         instrumentChangeToken += 1
+        noteInstrumentHeard()
         triggerVisualizerFlash(trackIndex: trackIndex)
         let isDrift2 = songState?.isKosmicDrift == true
         let isSoho2 = songState?.chillSohoVariation == true
@@ -4719,6 +4750,7 @@ final class AppState: ObservableObject {
         }
         setProgram(program, forTrack: trackIndex)
         instrumentChangeToken += 1
+        noteInstrumentHeard()
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
         let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle, isChillSoho: isSoho)
         if let idx = programs.firstIndex(of: program), idx < names.count {
@@ -4729,6 +4761,7 @@ final class AppState: ObservableObject {
     /// Appends an instrument-change entry to the generation log.
     /// Called by TrackRowView.cycleInstrument() which owns the display name.
     func logInstrumentChange(trackIndex: Int, name: String) {
+        noteInstrumentHeard()
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
         appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(name)", isTitle: false)])
     }

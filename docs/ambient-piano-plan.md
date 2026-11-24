@@ -15,6 +15,48 @@ Each Ambient Piano song is shaped by one of three **lead rules** for Lead 1, cho
 
 ---
 
+## Melody round, 2026-11-24 (as built, unheard)
+
+The code had drifted from this plan before this round (four Satin phrase windows at 27, 52 and 76% of the song, a Jarrett-style opening option, a left-hand accompaniment in both AMB-PNO-002 and AMB-PNO-003). The sections below this one describe the original design; this section records what changed and why.
+
+**The problem.** Both melodic rules built every phrase from fresh random draws. Satin's "returning" phrase 3 was a new phrase, and Koln's bursts were straight scale runs that ended wherever the walk stopped. Nothing came back, so there was no tune to hold on to.
+
+**AMB-PNO-002 Satin Melody**
+- One motif per song, built once at step 0 by `pno002Phrase` (75% arc, 25% pure oscillation), ending open: the 5th, or a suspended 2nd or 4th.
+- The answer is the motif note for note with its last note moved to the nearest root and held 4 steps longer (`pnoAnswer`).
+- Placement: phrase 1 is the motif in 25% of songs (Near Light and the Jarrett opening keep their 30% and 45%); phrase 2 is the answer (35% moved up 1 or 2 scale steps), or the motif if phrase 1 was not; phrase 3 is the other one, at home; 1 or 2 echoes follow 2 to 4 bars apart (answer 40%, the motif's head 30%, the motif a scale step up or down 30%); phrase 4 is the answer again (50%) or a short cadence ending on the root.
+- Replays keep the motif's swell and set the loudest note to the old phrase caps (40, 46, 60, 56 for echoes, 36).
+- Leap landings and phrase endings use chord tones; the landing avoids the ending tone so the last note moves.
+- Rhythm cell per song for the oscillation: even [4] 20%, dotted [6, 2] 25%, long-short-short [4, 2, 2] 20%, lilting [6, 2, 4, 4] 20%, slow-quick [8, 4] 15%.
+
+**AMB-PNO-003 Koln / Winter Arc**
+- A motif per song, as scale-step moves from Koln-style families: neighbour then fall [1, -1, -1], [2, -1, -1], leap then fill [4, -1, -1], [-1, -1, 3], [1, 1, -2], [3, -1, -1, -1], plus 0 or 1 free step.
+- It opens phrase 1 (ending open), is the urgent question before the climax (50% of songs climb a scale step each time), opens the climax (70%; half of those then climb straight up to a held top note, Winston's burst, so about 35% of climaxes climb) and the withdrawal (60%), and opens the closing phrase, which ends on the root. Everything else (build, echo, connective phrases) wanders, as Jarrett improvises.
+- `emitBurst` lines: arch 55% (peak about two-thirds in), rise to the held note 20%, fall from a high start 25%; a 15% chance at each step of turning against the shape; after a wide leap the next step turns back 75% of the time; last note on a chord tone (70%) or a 2nd or 6th colour (30%), not repeating the note before it.
+- Velocity swells to the peak note and eases off after it (±2 jitter), instead of a fresh random value per note.
+- Two rhythm cells per song (70% the first), drawn from [2, 2, 4], [4, 2, 2], [2, 2, 2, 6], [6, 2], [3, 3, 2], [2, 2, 2, 2], [4, 4, 2, 6]; slower phrases stretch them by 1.5.
+- Build-zone and connective phrases stop before the next set piece instead of running into it.
+
+**AMB-PNO-001 Floating Buds, sparse mode (logged as Floating Buds — Sparse)**
+- The code had drifted from Mode 1 above: it plays 16 or more events (bell tones, dyads, rising and falling figures, skip-and-resolve, rolled chord washes) with connector notes in the gaps.
+- A colour constellation per song: root and 5th, the 9th 70%, the 6th or 3rd 50%, each placed nearest a centre of F#4 to C5. Bell tones use it 85%, dyads 80%; falling figures start on it 70%; falling and rising figures end on the nearest bell within 2 scale steps; skip-and-resolve resolves down onto a bell when one is a step away; long connector holds ring the nearest bell. Chord washes and section anchors are unchanged.
+- Measured on 20 sparse songs: distinct held pitches per song 8.2 to 6.8; held notes on the three commonest pitches 55% to 70%; phrase landings on them 48% to 57%.
+
+**Measured** (20 songs per rule, same seeds, melody phrases only, via the test probe `AmbientLeadGenerator.pianoProbe`):
+- Satin, phrase openings that return per song: 0.40 before, 2.00 after; statements of the main phrase per song: 1.4 to 3.0; chord-tone endings 72% to 78%.
+- Koln, returns per song: 0.25 to 1.25; chord-tone endings 49% to 71%; leaps that turn back 38% to 84%; phrases with an inner peak 42% to 75%; longest one-direction run 3.6 to 2.5 notes; mean velocity jump between notes 5.6 to 3.0.
+- At this stage the dissonance trimmers still dropped 19% of Satin's melody notes and 15% of Koln's; the second round below fixed that.
+
+**Second round, 2026-11-24 (ideas 6 and 8, unheard)**
+- Left hand under the melody (both rules): the chord voices are the bass note's own triad (`lhTones`), MIDI 52 to 66 or 67, at least 3 semitones below every melody note sounding over them and never a half-step, tritone or major 7th from one; where nothing fits, that beat rests. Satin: 3rd and 5th on beat 2, 5th or root on beat 3. Koln: 3rd and 5th on beat 2, 5th and root on beat 3, the 3rd on beat 4. Satin's bass gives way to root, 5th or 4th when the planned note rubs with the melody.
+- Satin's quiet returning figure takes its other note, or skips a turn, when its note would rub with the melody. Koln's bass punctuation is placed after the melody exists and picks a low note that doesn't rub with it.
+- Trimmer fix (`trimDissonances`, `trimLeadAgainstPads`, used only by Ambient Piano, so Floating Buds too): a major 2nd counts as a clash only as a real close second below MIDI 55. Before, any 9th over a low root or drone counted, which dropped the melody's 2nds over the bass and the pad drone, including Satie's suspended-2nd endings.
+- Satin pivot is a chord tone (5th 45%, 3rd 35%, root 20%); 2 to 4 oscillation cycles (was 3 to 5); a turn figure in 50% of songs (odd cycles use the neighbour on the other side: pivot, above, pivot, below). The opening gesture arrives from below when the pivot is the top note, and the low oscillation starts below the landing note, so neither repeats a note.
+- The answer moves its second-to-last note to another chord tone when it was already the root, so the final root lands fresh.
+- Measured (20 songs per rule, same seeds as the first round): melody notes dropped by the trimmers 19% to 4% (Satin) and 15% to 4% (Koln); left-hand notes at or above the melody note they sound under 58% to 6% (Satin). The remaining drops are real half-step and tritone rubs against the pads. Satin's chord-tone endings read 66% because the motif's open endings (2nd or 4th) are deliberate; answers and closing phrases land on chord tones 19 of 20 times.
+
+---
+
 ## What makes it different from base Ambient
 
 Base Ambient: multiple tracks phasing against each other, continuous sonic activity at low density, variation automatic and imperceptible moment-to-moment.
@@ -506,6 +548,24 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 - Phrase 4 (bars ~47–53): withdrawal; same shape as Phrase 3 in 3-form
 - Closing: pad fades; ends in near-silence
 - Duration: 4–5 minutes
+
+**Moving arc (2026-11-24, Zack).** The bar numbers above describe the old fixed arc (climax 60%, withdrawal 73%, close 87%). `KolnArc.draw` in AmbientLeadGenerator.swift now draws them per song from the frame alone (key, mode, mood, tempo, length), so the generator and the log's "Arc" markers agree without sharing an RNG:
+- Climax 45 to 70%; close 85 to 89%; withdrawal at least 8% after the climax, about 45% of the way to the close.
+- Pre-climax phrase (4-phrase form) at 70% of the way to the climax (the old 42% at a 60% climax).
+- Two smaller peaks in 35% of songs of 56 bars or more: a climax at 55% or earlier gets one before and one after it (after the withdrawal if the gap is too short); a later climax gets both before it, at least 8 bars apart. Each is a 5-7 note run up into a short burst in the middle register, peaking near velocity 68 (the climax reaches 88), with the motif at its head half the time.
+- A minor peak owns bars -3 to +6 around it: build phrases, the post-climax run and echo, connective phrases and aftershock stabs skip that window, and the build phrase before it ends by its run-up.
+- Evolve passes and songs under 40 bars keep the fixed proportions and no minor peaks.
+- Checked on 60 synthetic songs: climaxes spread 45 to 70%, 18 had minor peaks, and the velocity profile shows the minor peaks clearly below the climax.
+
+**Koln jazzy improv (2026-11-24, Zack; built as "live wire").** Logged as "AMB-PNO-003 Koln Winter Arc - jazzy improv" (internal ID AMB-PNO-003-LW, no separate rule). In 45% of Koln songs (Zack, 2026-11-24; was 50, first 35) (not Evolve passes, not under 40 bars), drawn after everything else so other songs are unchanged. `kolnLiveTake` works on the finished, trimmed line:
+- Blue-note graces, 2-4: a 16th a half-step below a chord tone when that note is outside the scale (b3 into 3, b5 into 5, leading tone into a minor root), never on a beat.
+- Tension notes, 1-2: an off-beat passing note (2-6 steps) moved a half-step outside the scale and resolved by step into the next note; never a half-step, tritone or major 7th from the pad drone (root, 5th) or pedal (2nd, 4th).
+- Flurries, 1-2: 6-10 sixteenths, 75% falling, one chromatic passing note on an odd 16th, landing on a held chord tone; placed after the climax, after a minor peak, or late in the build, in a gap with no melody.
+- Ornaments, 1-2: a trill or turn over the first beat of a held top note.
+- Enclosures, 1-2: scale note above, then the half-step below, into a chord tone.
+- Climax cluster (75%): a scale note added inside the block chord with no half-step rub.
+- Guards: nothing a half-step or major 7th from a sounding note within an octave; liberties 2 bars apart; at most 8 chromatic notes. `trimLeadAgainstPads(keepGraces:)` leaves Koln's 16ths alone.
+- Probe on 120 synthetic songs at 35%: 41 live, chromatic notes 6.1 on average (max 8), 0 on a beat, 0 glaring rubs.
 
 ---
 

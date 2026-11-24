@@ -1287,7 +1287,8 @@ struct SongGenerator {
                     pianoRule: pianoRule, frame: frame, tonalMap: tonalMap,
                     totalBars: frame.totalBars, rng: &padsRNG, usedRuleIDs: &padRules)
                 trackEvents[kTrackLead1] = AmbientLeadGenerator.trimLeadAgainstPads(
-                    trackEvents[kTrackLead1], pads: trackEvents[kTrackPads], totalSteps: frame.totalBars * 16)
+                    trackEvents[kTrackLead1], pads: trackEvents[kTrackPads], totalSteps: frame.totalBars * 16,
+                    keepGraces: pianoRule == "AMB-PNO-003")
             }
 
             let title = AmbientTitleGenerator.generate(rng: &rng)
@@ -1301,15 +1302,17 @@ struct SongGenerator {
                 structure: structure, trackEvents: trackEvents,
                 frame: frame, isAmbient: true, includeDrumFills: false)
             if pianoRule == "AMB-PNO-003" {
-                let climaxBar      = frame.totalBars * 60 / 100
-                let withdrawBar    = frame.totalBars * 73 / 100
-                let closingBar     = frame.totalBars * 87 / 100
+                let arc            = KolnArc.draw(frame: frame, totalBars: frame.totalBars)
+                let climaxBar      = arc.climaxBar
+                let withdrawBar    = arc.withdrawBar
+                let closingBar     = arc.closingBar
                 let urgentBar      = climaxBar - 4
                 let aftershockBase = withdrawBar + 2
                 let ann: (Int, String) -> Void = { bar, desc in
                     stepAnnotations[bar * 16, default: []].append(
                         GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
                 }
+                for pb in arc.peakBars { ann(pb, "Smaller peak") }
                 if urgentBar > 5 { ann(urgentBar, "Building tension") }
                 ann(climaxBar, "Climax")
                 if aftershockBase < closingBar - 2 { ann(aftershockBase, "Aftershock") }
@@ -2667,7 +2670,7 @@ struct SongGenerator {
             for ruleID in usedRules.sorted() {
                 // No per-song draws in parentheses: the log stays short (Zack, 2026-11-02)
                 let desc = ruleDescription(ruleID, trackIndex: trackIndex)
-                let tag  = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
+                let tag  = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ambientPianoLogTag(ruleID)
                 regenLog.append(GenerationLogEntry(tag: tag, description: desc))
             }
         }
@@ -3468,7 +3471,7 @@ struct SongGenerator {
 
         // Lead 1
         for ruleID in lead1Rules.sorted() {
-            let tag = ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
+            let tag = ambientPianoLogTag(ruleID)
             log.append(GenerationLogEntry(tag: tag, description: lead1RuleDescription(ruleID)))
         }
         if lead1Rules.isEmpty {
@@ -4180,7 +4183,7 @@ struct SongGenerator {
             }
         }
         for ruleID in lead1Rules.sorted() {
-            let tag = ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
+            let tag = ambientPianoLogTag(ruleID)
             log.append(GenerationLogEntry(tag: tag, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead2Rules.sorted() {
@@ -4204,6 +4207,12 @@ struct SongGenerator {
 
     // MARK: - Ambient rule descriptions
 
+    /// Ambient Piano variants log under their parent rule's ID: the Floating Buds modes as
+    /// AMB-PNO-001, Koln's jazzy improv as AMB-PNO-003 (Zack: no suffixes in the log).
+    static func ambientPianoLogTag(_ ruleID: String) -> String {
+        ruleID.hasPrefix("AMB-PNO-00") && ruleID.count > 11 ? String(ruleID.prefix(11)) : ruleID
+    }
+
     private static func ambientRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         // Ambient Piano — Lead
@@ -4213,6 +4222,7 @@ struct SongGenerator {
         case "AMB-PNO-001-PD": return "Floating Buds — Pendulum"
         case "AMB-PNO-002":  return "Satin Melody"
         case "AMB-PNO-003":  return "Koln Winter Arc"
+        case "AMB-PNO-003-LW": return "Koln Winter Arc - jazzy improv"
         // Ambient Piano — Pads
         case "AMB-PADS-007": return "Sparse drone"
         case "AMB-PADS-008": return "Staggered strings"

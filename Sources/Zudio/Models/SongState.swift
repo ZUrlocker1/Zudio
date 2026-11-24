@@ -36,6 +36,13 @@ struct GenerationLogEntry: Sendable {
         // Base Ambient bass held for bars (2026-11-22): AMB-BASS-004 rewritten as Drone walk, and
         // the drones hold 3–6 bars.
         "AMB-BASS-001", "AMB-BASS-003", "AMB-BASS-004", "AMB-BASS-005",
+        // Ambient Piano melodies (2026-11-24): a returning motif with question and answer, chord-tone
+        // phrase endings, a rhythm cell per song; Koln lines shaped as arches with a velocity swell.
+        "AMB-PNO-002", "AMB-PNO-003",
+        // Koln's jazzy improv take (2026-11-24) logs under AMB-PNO-003, already starred.
+        // Floating Buds (2026-11-24): the sparse mode's floating notes start and rest on a colour
+        // constellation. The log shows every Floating Buds mode as AMB-PNO-001, so all three get the star.
+        "AMB-PNO-001",
     ]
 
     /// TESTING ONLY. Rules fixed in the current round, marked with "F " ("AMB-LEAD-003 F  ...").
