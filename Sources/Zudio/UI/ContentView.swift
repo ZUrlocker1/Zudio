@@ -319,6 +319,7 @@ struct ContentView: View {
                     }
                 )
                 .padding(.top, 2)
+                .modifier(TrackWindowScroller(laneWidth: max(0, contentWidth - midiLaneLeading - midiLaneTrailing)))
                 .gesture(
                     MagnificationGesture()
                         .onChanged { scale in
@@ -740,6 +741,7 @@ struct ContentView: View {
             )
             .padding(.top, 2)
             .layoutPriority(1)
+            .modifier(TrackWindowScroller(laneWidth: max(0, contentWidth - midiLaneLeading - midiLaneTrailing)))
             .gesture(
                 MagnificationGesture()
                     .onChanged { scale in
@@ -1331,3 +1333,148 @@ struct HorizontalScrollBar: View {
         }
     }
 }
+
+// MARK: - Two-finger horizontal scroll of the track window
+
+/// Pans the visible-bar window left and right with a two-finger horizontal swipe
+/// (Mac trackpad, iPad touch, iPad trackpad). Pinch zoom is untouched: this only
+/// reacts to a horizontal-dominant pan and never claims a pinch.
+/// Place it as a `.background` of the track rows; it never blocks hits.
+struct TrackWindowScroller: ViewModifier {
+    @EnvironmentObject var appState: AppState
+    let laneWidth: CGFloat
+
+    func body(content: Content) -> some View {
+        content.background(
+            TrackScrollCatcher { dx in
+                let total = appState.songState?.frame.totalBars ?? 0
+                let visible = appState.visibleBars
+                guard total > visible, laneWidth > 0 else { return dx }
+                let pxPerBar = laneWidth / CGFloat(max(1, visible))
+                let maxOffset = total - visible
+                // Content follows the fingers: swipe right shows earlier bars.
+                let moved = Int((-dx / pxPerBar).rounded(.towardZero))
+                guard moved != 0 else { return 0 }
+                let new = max(0, min(maxOffset, appState.visibleBarOffset + moved))
+                if new != appState.visibleBarOffset { appState.visibleBarOffset = new }
+                return -CGFloat(moved) * pxPerBar   // points consumed; the catcher keeps the rest
+            }
+        )
+    }
+}
+
+#if os(macOS)
+struct TrackScrollCatcher: NSViewRepresentable {
+    /// Receives accumulated horizontal points; returns the points consumed.
+    let onScroll: (CGFloat) -> CGFloat
+
+    func makeNSView(context: Context) -> CatcherView {
+        let v = CatcherView()
+        v.onScroll = onScroll
+        return v
+    }
+    func updateNSView(_ v: CatcherView, context: Context) { v.onScroll = onScroll }
+    static func dismantleNSView(_ v: CatcherView, coordinator: ()) { v.removeMonitor() }
+
+    final class CatcherView: NSView {
+        var onScroll: ((CGFloat) -> CGFloat)?
+        private var monitor: Any?
+        private var pending: CGFloat = 0
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            removeMonitor()
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] e in
+                self?.handle(e) ?? e
+            }
+        }
+
+        func removeMonitor() {
+            if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
+        }
+
+        private func handle(_ e: NSEvent) -> NSEvent? {
+            guard e.window === window, e.hasPreciseScrollingDeltas else { return e }
+            let p = convert(e.locationInWindow, from: nil)
+            guard bounds.contains(p) else { return e }
+            let dx = e.scrollingDeltaX, dy = e.scrollingDeltaY
+            // Horizontal-dominant only; vertical scrolls pass through untouched.
+            guard abs(dx) > abs(dy) else { return e }
+            if e.phase == .began { pending = 0 }
+            pending += dx
+            if let used = onScroll?(pending) { pending -= used }   // keep the sub-bar remainder
+            return nil
+        }
+    }
+}
+#else
+struct TrackScrollCatcher: UIViewRepresentable {
+    let onScroll: (CGFloat) -> CGFloat
+
+    func makeUIView(context: Context) -> CatcherView {
+        let v = CatcherView()
+        v.onScroll = onScroll
+        return v
+    }
+    func updateUIView(_ v: CatcherView, context: Context) { v.onScroll = onScroll }
+    static func dismantleUIView(_ v: CatcherView, coordinator: ()) { v.detach() }
+
+    final class CatcherView: UIView, UIGestureRecognizerDelegate {
+        var onScroll: ((CGFloat) -> CGFloat)?
+        private var pan: UIPanGestureRecognizer?
+        private weak var host: UIView?
+        private var pending: CGFloat = 0
+        private var lastX: CGFloat = 0
+
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool { false }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            detach()
+            guard let w = window else { return }
+            let g = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+            g.minimumNumberOfTouches = 2        // one finger stays with the lanes (seek/edit)
+            g.maximumNumberOfTouches = 2
+            g.allowedScrollTypesMask = .continuous   // trackpad two-finger scroll
+            g.cancelsTouchesInView = false
+            g.delegate = self
+            w.addGestureRecognizer(g)
+            pan = g
+            host = w
+        }
+
+        func detach() {
+            if let g = pan { host?.removeGestureRecognizer(g) }
+            pan = nil
+        }
+
+        override func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            guard g === pan, let g = g as? UIPanGestureRecognizer, window != nil else {
+                return super.gestureRecognizerShouldBegin(g)
+            }
+            guard bounds.contains(g.location(in: self)) else { return false }
+            let v = g.velocity(in: self)
+            return abs(v.x) > abs(v.y)
+        }
+
+        func gestureRecognizer(_ a: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith b: UIGestureRecognizer) -> Bool { true }
+
+        @objc private func handlePan(_ g: UIPanGestureRecognizer) {
+            switch g.state {
+            case .began:
+                pending = 0; lastX = 0
+            case .changed:
+                let x = g.translation(in: self).x
+                pending += x - lastX
+                lastX = x
+                if let used = onScroll?(pending) { pending -= used }
+            default: break
+            }
+        }
+    }
+}
+#endif
