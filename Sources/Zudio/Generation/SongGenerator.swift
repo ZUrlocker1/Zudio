@@ -970,10 +970,11 @@ struct SongGenerator {
 
     // MARK: - Ambient generation path
 
-    // Ambient substyle shares (Zack, 2026-11-23): Piano 22, base Ambient 23, Zen 55. Piano is
-    // pianoRoll < 0.22, and Zen takes 55/78 of the rest.
-    static let ambientPianoShare = 0.22
-    static let ambientZenShare   = 55.0 / 78.0
+    // Ambient substyle shares. Release (Zack, 2026-11-23): Piano 22, base Ambient 23, Zen 55.
+    // TESTING (Zack, 2026-11-24): Piano 60, base 20, Zen 20, to hear the Koln vamp; set back
+    // to 0.22 and 55.0 / 78.0 after testing. Piano is pianoRoll < share; Zen takes its fraction of the rest.
+    static let ambientPianoShare = 0.60
+    static let ambientZenShare   = 20.0 / 40.0
 
     /// The Ambient Piano lead rule for a roll: 35 percent Floating Buds, 30 Satin Melody, 35 Koln
     /// Winter Arc. A new song draws it from the seed; a regenerated Lead 1 draws it afresh from its
@@ -1301,33 +1302,9 @@ struct SongGenerator {
             var stepAnnotations = buildStepAnnotations(
                 structure: structure, trackEvents: trackEvents,
                 frame: frame, isAmbient: true, includeDrumFills: false)
-            if pianoRule == "AMB-PNO-003" {
-                let arc            = KolnArc.draw(frame: frame, totalBars: frame.totalBars)
-                let climaxBar      = arc.climaxBar
-                let withdrawBar    = arc.withdrawBar
-                let closingBar     = arc.closingBar
-                let urgentBar      = climaxBar - 4
-                let aftershockBase = withdrawBar + 2
-                let ann: (Int, String) -> Void = { bar, desc in
-                    stepAnnotations[bar * 16, default: []].append(
-                        GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
-                }
-                for pb in arc.peakBars { ann(pb, "Smaller peak") }
-                if urgentBar > 5 { ann(urgentBar, "Building tension") }
-                ann(climaxBar, "Climax")
-                if aftershockBase < closingBar - 2 { ann(aftershockBase, "Aftershock") }
-            }
-            if pianoRule == "AMB-PNO-002" {
-                let buildingBar   = frame.totalBars * 38 / 100
-                let climaxBar     = frame.totalBars * 52 / 100
-                let denouementBar = frame.totalBars * 76 / 100
-                let ann: (Int, String) -> Void = { bar, desc in
-                    stepAnnotations[bar * 16, default: []].append(
-                        GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
-                }
-                if buildingBar > 3 { ann(buildingBar, "Building tension") }
-                ann(climaxBar, "Climax")
-                ann(denouementBar, "Denouement")
+            for (bar, desc) in ambientPianoArcLines(rule: pianoRule, frame: frame) {
+                stepAnnotations[bar * 16, default: []].append(
+                    GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
             }
             var forced: [String: String] = [:]
             forced["Piano"] = pianoRule   // Piano records its rule, so it reloads as Piano (2026-11-22)
@@ -2095,6 +2072,7 @@ struct SongGenerator {
         // Chill Rhythm comping-mode switch point — same staleness concern as bass variation:
         // captured here so the regenerated track's own switch bar/rule replaces the old one.
         var chillRhythmSwitchRegen: (bar: Int, ruleID: String)? = nil
+        var ambientPianoArcRegen: [(Int, String)]? = nil   // a regenerated Ambient Piano Lead 1's Arc lines
         switch trackIndex {
         case kTrackDrums:
             if let plan = zenPlan, plan.dials.pulse {
@@ -2252,11 +2230,16 @@ struct SongGenerator {
                 // A fresh roll on a stream of its own, so the notes' draws don't move: any of the
                 // three rules (Zack, 2026-11-22). The song's pads and tempo keep the original rule.
                 var ruleRNG = SeededRNG(seed: newTrackSeed ^ 0x9150_7E40_AB1E_0001)
+                let regenRule = ambientPianoRule(roll: ruleRNG.nextDouble())
+                // Koln's vamp is redrawn per regen (Zack, 2026-11-24); the seed is never 0 here.
+                let variation = newTrackSeed == 0 ? 1 : newTrackSeed
                 events = AmbientLeadGenerator.generateAmbientPianoLead(
-                    pianoRule: ambientPianoRule(roll: ruleRNG.nextDouble()),
+                    pianoRule: regenRule,
                     frame: songState.frame, totalBars: songState.frame.totalBars,
                     rng: &rng, usedRuleIDs: &usedRules,
-                    introEndBar: songState.structure.introSection?.endBar ?? 0)
+                    introEndBar: songState.structure.introSection?.endBar ?? 0,
+                    arcVariation: variation)
+                ambientPianoArcRegen = ambientPianoArcLines(rule: regenRule, frame: songState.frame, variation: variation)
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.lead1 ?? 11
                 var regenRules: Set<String> = []
@@ -2709,6 +2692,20 @@ struct SongGenerator {
                     GenerationLogEntry(tag: "Rhythm", description: "switch to \(chillRhythmShortName(ruleID))"))
             }
             newStepAnnotations = cleared
+        }
+
+        // Ambient Piano Lead 1 regen: the old rule's Arc lines go, and the new rule's come in
+        // (a regen can switch rule, and Koln's vamp is redrawn).
+        if let lines = ambientPianoArcRegen {
+            var notes = newStepAnnotations ?? songState.stepAnnotations
+            for key in notes.keys {
+                notes[key]?.removeAll { $0.tag == "Arc" }
+                if notes[key]?.isEmpty == true { notes.removeValue(forKey: key) }
+            }
+            for (bar, desc) in lines {
+                notes[bar * 16, default: []].append(GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
+            }
+            newStepAnnotations = notes
         }
 
         // Kosmic Space: a regenerated drum track may be a different box, with its own fills and
@@ -4207,6 +4204,27 @@ struct SongGenerator {
 
     // MARK: - Ambient rule descriptions
 
+    /// The "Arc" playback lines for an Ambient Piano Lead 1 rule, as (bar, text). Koln's come from
+    /// its KolnArc (a regen passes its track seed as `variation`, which redraws the vamp); Satin's
+    /// are fixed proportions; Floating Buds has none.
+    static func ambientPianoArcLines(rule: String, frame: GlobalMusicalFrame, variation: UInt64 = 0) -> [(Int, String)] {
+        var out: [(Int, String)] = []
+        let bars = frame.totalBars
+        if rule == "AMB-PNO-003" {
+            let arc = KolnArc.draw(frame: frame, totalBars: bars, variation: variation)
+            for pb in arc.peakBars { out.append((pb, "Smaller peak")) }
+            if let v = arc.vampBars { out.append((v.lowerBound, "Two-chord vamp - \(v.count) bars")) }
+            if arc.climaxBar - 4 > 5 { out.append((arc.climaxBar - 4, "Building tension")) }
+            out.append((arc.climaxBar, "Climax"))
+            if arc.withdrawBar + 2 < arc.closingBar - 2 { out.append((arc.withdrawBar + 2, "Aftershock")) }
+        } else if rule == "AMB-PNO-002" {
+            if bars * 38 / 100 > 3 { out.append((bars * 38 / 100, "Building tension")) }
+            out.append((bars * 52 / 100, "Climax"))
+            out.append((bars * 76 / 100, "Denouement"))
+        }
+        return out
+    }
+
     /// Ambient Piano variants log under their parent rule's ID: the Floating Buds modes as
     /// AMB-PNO-001, Koln's jazzy improv as AMB-PNO-003 (Zack: no suffixes in the log).
     static func ambientPianoLogTag(_ ruleID: String) -> String {
@@ -4223,6 +4241,8 @@ struct SongGenerator {
         case "AMB-PNO-002":  return "Satin Melody"
         case "AMB-PNO-003":  return "Koln Winter Arc"
         case "AMB-PNO-003-LW": return "Koln Winter Arc - jazzy improv"
+        case "AMB-PNO-003-VP": return "Koln Winter Arc - vamp"
+        case "AMB-PNO-003-VL": return "Koln Winter Arc - vamp, jazzy improv"
         // Ambient Piano — Pads
         case "AMB-PADS-007": return "Sparse drone"
         case "AMB-PADS-008": return "Staggered strings"

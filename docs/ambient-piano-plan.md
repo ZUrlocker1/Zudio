@@ -567,6 +567,14 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 - Guards: nothing a half-step or major 7th from a sounding note within an octave; liberties 2 bars apart; at most 8 chromatic notes. `trimLeadAgainstPads(keepGraces:)` leaves Koln's 16ths alone.
 - Probe on 120 synthetic songs at 35%: 41 live, chromatic notes 6.1 on average (max 8), 0 on a beat, 0 glaring rubs.
 
+**Koln two-chord vamp (2026-11-24, Zack; idea 6, after Koln Part IIa).** Logged as "AMB-PNO-003 Koln Winter Arc - vamp" ("- vamp, jazzy improv" when both; internal IDs AMB-PNO-003-VP and -VL, no separate rule), with a playback annotation "Arc Two-chord vamp - 8 bars" (its length) at its first bar.
+- Placement is drawn in `KolnArc.draw` after every other arc position, so the climax and peaks don't move: 50% draw, which lands in about 37% of songs once the ones it doesn't fit drop out. 16, 12 or 8 bars, ending at the urgent question (4 bars before the climax), starting at bar 10 or later, clear of the minor peaks' bars. Never in Evolve passes or songs under 40 bars.
+- Left hand (`kolnVamp`): the normal left hand and bass punctuation stand aside for those bars. A low pedal on the root (an octave pair), struck every 2 bars and held a dotted half (the low octave a half note, softer; Zack: a 2-bar hold sat heavy); the 5th if the root would rub the melody, else none. Over it the home chord rocks with a neighbour chord: the flat 7th, else the 4th, else the 2nd. One pattern per song: straight half notes, syncopated (a pickup on the and of 2 and 4), or a bar of quarter-note pulses on each chord. Chord tones come from `lhTones`, under the melody and never rubbing it or the pedal. Velocity rises through the section (chords about 32 to 50, pedal 40 to 50).
+- Right hand over the vamp: any 2-bar slot the melody leaves nearly empty gets a short phrase (3 to 6 notes, climbing and louder as the vamp goes on, a third of them opening with the motif); 40% of them repeat the previous one as a riff.
+- Regens: the vamp was drawn from the song's frame alone, so every Lead 1 regen of a song gave the same answer and Zack never heard one. A regen now passes its track seed to `KolnArc.draw(variation:)`, which redraws only the vamp (the climax and peaks stay put); about 29% of Koln regens get one. A Lead 1 regen also replaces the old Arc playback lines with the new rule's (`ambientPianoArcLines`), so Koln markers no longer linger after a regen to Satin or Floating Buds.
+- Songs without a vamp are note-for-note unchanged, titles included (the draw uses the arc's own RNG; the main RNG is touched only inside vamp songs).
+- Probe, 400 synthetic Koln songs: 149 vamps, 251 others identical to before, no glaring rub from the vamp. The only rubs inside vamp bars were jazzy improv 16th graces crushing into a note the pad holds, which is the grace's design.
+
 ---
 
 ## Pad rules (AMB-PADS)

@@ -25,8 +25,13 @@ struct KolnArc {
     let closingBar: Int
     /// 0 or 2 minor peaks, in bar order: before the climax, or one each side of it.
     let peakBars: [Int]
+    /// The vamp section's bars, if the song has one (never in Evolve passes or songs under 40 bars).
+    var vampBars: Range<Int>? = nil
 
-    static func draw(frame: GlobalMusicalFrame, totalBars: Int, isEvolvePass: Bool = false) -> KolnArc {
+    /// `variation`: 0 for a new song; a Lead 1 regen passes its track seed, which redraws the
+    /// vamp (only the vamp: the climax and peaks stay where the song has them).
+    static func draw(frame: GlobalMusicalFrame, totalBars: Int, isEvolvePass: Bool = false,
+                     variation: UInt64 = 0) -> KolnArc {
         // FNV-1a over the frame's fields: String.hashValue is salted per launch.
         var h: UInt64 = 0xcbf2_9ce4_8422_2325
         for b in "\(frame.key)|\(frame.mode.rawValue)|\(frame.mood.rawValue)|\(frame.tempo)|\(totalBars)".utf8 {
@@ -69,7 +74,26 @@ struct KolnArc {
                 }
             }
         }
-        return KolnArc(climaxBar: climaxBar, withdrawBar: withdrawBar, closingBar: closingBar, peakBars: peaks)
+        // Vamp (after Koln Part IIa, Zack 2026-11-24): in 35 percent of songs, 8, 12 or 16 bars
+        // of rocking left hand over a pedal, ending where the urgent question starts (4 bars before
+        // the climax), clear of the minor peaks' bars. Drawn after everything above, so no other
+        // position moves.
+        var vamp: Range<Int>? = nil
+        // A regen draws the vamp on a stream of its own, so each regen can get one (Zack, 2026-11-24).
+        if variation != 0 { rng = SeededRNG(seed: h ^ variation ^ 0x7A3F_0003_5EED_0002) }
+        if rng.nextDouble() < 0.50 {   // about 35% of songs once the ones it doesn't fit drop out
+            let end = climaxBar - 4
+            // The drawn length first, then shorter ones if it doesn't fit
+            let lens = [16, 12, 8]
+            for len in lens[rng.nextInt(upperBound: 3)...] where vamp == nil {
+                let start = end - len
+                guard start >= 10 else { continue }
+                let clear = peaks.allSatisfy { pb in ((pb - 3)...(pb + 6)).allSatisfy { !(start..<end).contains($0) } }
+                if clear { vamp = start..<end }
+            }
+        }
+        return KolnArc(climaxBar: climaxBar, withdrawBar: withdrawBar, closingBar: closingBar,
+                       peakBars: peaks, vampBars: vamp)
     }
 }
 
@@ -624,13 +648,15 @@ struct AmbientLeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         introEndBar: Int = 0,
-        isEvolvePass: Bool = false
+        isEvolvePass: Bool = false,
+        arcVariation: UInt64 = 0
     ) -> [MIDIEvent] {
         usedRuleIDs.insert(pianoRule)
         switch pianoRule {
         case "AMB-PNO-001": return floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
         case "AMB-PNO-003": return dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng,
-                                                       usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
+                                                       usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass,
+                                                       arcVariation: arcVariation)
         default:            return pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
         }
     }
@@ -2069,7 +2095,7 @@ struct AmbientLeadGenerator {
 
     private static func dramaticArcFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>, isEvolvePass: Bool = false
+        usedRuleIDs: inout Set<String>, isEvolvePass: Bool = false, arcVariation: UInt64 = 0
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let scalePCs   = frame.scalePCs
@@ -2091,7 +2117,8 @@ struct AmbientLeadGenerator {
 
         // Arc positions per song (KolnArc): climax 45-70%, close 85-89%, and in some songs two
         // smaller peaks. p1Bar=1 ensures piano enters after at most 1 bar of silence.
-        let arc          = KolnArc.draw(frame: frame, totalBars: totalBars, isEvolvePass: isEvolvePass)
+        let arc          = KolnArc.draw(frame: frame, totalBars: totalBars, isEvolvePass: isEvolvePass,
+                                        variation: arcVariation)
         let p1Bar        = 1
         let climaxBar    = arc.climaxBar
         let withdrawBar  = arc.withdrawBar
@@ -2649,6 +2676,42 @@ struct AmbientLeadGenerator {
             }
         }
 
+        // Right hand over the vamp: each 2-bar slot the melody leaves nearly empty gets a short
+        // phrase, climbing and louder as the vamp goes on; 40% of them repeat the last one as a
+        // riff, a third open with the motif.
+        if let vamp = arc.vampBars {
+            var lastRiff: [MIDIEvent] = [], riffOffset = 0
+            var slot = vamp.lowerBound
+            while slot + 1 < vamp.upperBound {
+                let s0 = slot * 16, s1 = Swift.min(vamp.upperBound, slot + 2) * 16
+                let p = Double(slot - vamp.lowerBound) / Double(Swift.max(1, vamp.count - 2))
+                let busy = events.filter { $0.note >= 62 && $0.stepIndex >= s0 && $0.stepIndex < s1 }.count
+                    + events.filter { $0.note >= 62 && $0.stepIndex < s0 && $0.stepIndex + $0.durationSteps > s0 + 8 }.count * 2
+                if busy < 3 {
+                    let velHi = 48 + Int(p * 18)
+                    if !lastRiff.isEmpty && rng.nextDouble() < 0.40 {
+                        events += pnoReplay(lastRiff, at: s0 + riffOffset, velCap: velHi,
+                                            totalSteps: totalSteps).filter { $0.stepIndex < s1 }
+                    } else {
+                        let start = Int(Double(midNotes.count - 1) * (0.25 + p * 0.45))
+                        let ph = emitBurst(bar: slot, pool: midNotes, count: 3 + Int(p * 3) + rng.nextInt(upperBound: 2),
+                                           velMin: velHi - 14, velMax: velHi, ioi: p < 0.5 ? 3 : 2,
+                                           holdDur: 6 + rng.nextInt(upperBound: 5), startNear: start,
+                                           head: rng.nextDouble() < 0.33 ? motifMoves : nil,
+                                           accents: false, endBy: s1 - 1).events
+                        events += ph
+                        probe("vamp", ph)
+                        if let f = ph.first {
+                            riffOffset = f.stepIndex % 16
+                            lastRiff = ph.map { MIDIEvent(stepIndex: $0.stepIndex - f.stepIndex, note: $0.note,
+                                                          velocity: $0.velocity, durationSteps: $0.durationSteps) }
+                        }
+                    }
+                }
+                slot += 2
+            }
+        }
+
         // Bass punctuation (placed once the melody exists) — low note held 1–3 bars, scattered ~every 12 bars through the build zone
         // plus one anchor in the withdrawal zone. Typically 3–5 occurrences per song.
         if !lowNotes.isEmpty {
@@ -2662,7 +2725,8 @@ struct AmbientLeadGenerator {
             let wAnchor = withdrawBar + 2 + rng.nextInt(upperBound: 4)
             if wAnchor < closingBar - 2 { bassBars.append(wAnchor) }
             for bBar in bassBars where bBar < totalBars {
-                let bd = Swift.min(Swift.min(16 + rng.nextInt(upperBound: 33), 48), totalSteps - bBar * 16)
+                if let v = arc.vampBars, bBar + 3 > v.lowerBound && bBar < v.upperBound { continue }   // the vamp has its own pedal
+                let bd    = Swift.min(Swift.min(16 + rng.nextInt(upperBound: 33), 48), totalSteps - bBar * 16)
                 // A low note that doesn't rub (half-step, tritone, major 7th) with the melody over it
                 let over  = events.filter { $0.stepIndex < bBar * 16 + bd && $0.stepIndex + $0.durationSteps > bBar * 16 }
                 let clean = lowNotes.filter { n in !over.contains { [1, 6, 11].contains(abs(Int($0.note) - Int(n)) % 12) } }
@@ -2699,6 +2763,7 @@ struct AmbientLeadGenerator {
             for lhBar in 0..<totalBars {
                 let barStep = lhBar * 16
                 guard barStep < totalSteps else { break }
+                if arc.vampBars?.contains(lhBar) == true { continue }   // the vamp plays these bars
                 // Bass steps through the full pool every 2 bars (previously only covered half).
                 let defaultIdx = (lhRootIdx + (lhBar / 2)) % lhBass.count
                 let barEnd = barStep + 16
@@ -2782,6 +2847,13 @@ struct AmbientLeadGenerator {
                     events.append(MIDIEvent(stepIndex: barStep + 12, note: t,
                                             velocity: UInt8(22 + rng.nextInt(upperBound: 8)), durationSteps: 4))
                 }
+            }
+
+            // Vamp (after Koln Part IIa): the left hand rocks between the home chord and a
+            // neighbour chord over a low pedal, building to the urgent question.
+            if let vamp = arc.vampBars {
+                events += kolnVamp(bars: vamp, frame: frame, lhBass: lhBass, lhRoot: lhRoot,
+                                   melody: melodySnap, totalSteps: totalSteps, rng: &rng)
             }
         }
 
@@ -2897,11 +2969,78 @@ struct AmbientLeadGenerator {
         }
 
         let trimmed = trimDissonances(events, totalSteps: totalSteps)
+        // The vamp logs as "Koln Winter Arc - vamp" under AMB-PNO-003 (no separate rule).
+        if arc.vampBars != nil { usedRuleIDs.remove("AMB-PNO-003"); usedRuleIDs.insert("AMB-PNO-003-VP") }
         // Live wire (Koln's live take): drawn last, so a song without it is note for note what it was.
         // Logged as "AMB-PNO-003 Koln Winter Arc - jazzy improv" (Zack, 2026-11-24).
         guard !isEvolvePass, totalBars >= 40, rng.nextDouble() < 0.45 else { return trimmed }   // 45% of Koln songs (Zack, 2026-11-24)
-        usedRuleIDs.remove("AMB-PNO-003"); usedRuleIDs.insert("AMB-PNO-003-LW")
+        usedRuleIDs.remove("AMB-PNO-003"); usedRuleIDs.remove("AMB-PNO-003-VP")
+        usedRuleIDs.insert(arc.vampBars != nil ? "AMB-PNO-003-VL" : "AMB-PNO-003-LW")
         return kolnLiveTake(trimmed, frame: frame, arc: arc, totalBars: totalBars, rng: &rng)
+    }
+
+    // MARK: AMB-PNO-003 vamp — Koln Part IIa
+
+    /// The vamp's left hand: a low pedal (the root, struck every 2 bars and held a dotted half, an
+    /// octave pair when there is room) under two chords that rock back and forth, the home chord and its neighbour (the
+    /// flat 7th, else the 4th, else the 2nd). One pattern per song: straight half notes,
+    /// syncopated (a pickup on the and of 2 and 4), or a bar of quarter-note pulses on each chord.
+    /// Chord tones sit under the melody and never rub it (lhTones); a pedal that would rub moves
+    /// to the 5th, or rests. Velocity rises through the section.
+    private static func kolnVamp(bars: Range<Int>, frame: GlobalMusicalFrame, lhBass: [UInt8], lhRoot: UInt8,
+                                 melody: [MIDIEvent], totalSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        let scalePCs = frame.scalePCs
+        let rootPC   = Int(lhRoot) % 12
+        guard let nPC = [10, 5, 2].map({ (rootPC + $0) % 12 }).first(where: { scalePCs.contains($0) }) else { return [] }
+        let homeBass  = UInt8(48 + rootPC), nbrBass = UInt8(48 + nPC)
+        let pattern   = rng.nextInt(upperBound: 3)
+        // Hits per bar as (step, length); in the two-bar pattern, odd bars take the neighbour chord.
+        let hits: [(Int, Int, Bool)] = {   // step, length, neighbour chord?
+            switch pattern {
+            case 0:  return [(0, 7, false), (8, 7, true)]
+            case 1:  return [(0, 5, false), (6, 2, false), (8, 5, true), (14, 2, true)]
+            default: return [(0, 3, false), (4, 3, false), (8, 3, false), (12, 3, false)]
+            }
+        }()
+        func rubs(_ n: Int, _ s: Int, _ e: Int) -> Bool {
+            melody.contains { $0.stepIndex < e && $0.stepIndex + $0.durationSteps > s
+                              && [1, 6, 11].contains(abs(Int($0.note) - n) % 12) }
+        }
+        var ev: [MIDIEvent] = []
+        var pedal: UInt8? = nil
+        let len = bars.count
+        for (k, bar) in bars.enumerated() {
+            let bs = bar * 16
+            guard bs < totalSteps else { break }
+            let lift = Double(k) / Double(Swift.max(1, len - 1))            // 0 to 1 across the vamp
+            // Pedal, every 2 bars
+            if k % 2 == 0 {
+                let pd = Swift.min(32, bars.upperBound * 16 - bs, totalSteps - bs)
+                let fifth = lhBass.first { Int($0) % 12 == (rootPC + 7) % 12 }
+                pedal = [lhRoot, fifth].compactMap({ $0 }).first(where: { !rubs(Int($0), bs, bs + pd) })
+                if let p = pedal {
+                    let pv = 40 + Int(lift * 10)
+                    // Held a dotted half, the low octave a half note and softer: a piano bass note
+                    // doesn't ring for 2 bars, and a 2-bar hold sat heavy (Zack, 2026-11-24).
+                    ev.append(MIDIEvent(stepIndex: bs, note: p, velocity: UInt8(pv), durationSteps: Swift.min(12, pd)))
+                    if p >= 40 { ev.append(MIDIEvent(stepIndex: bs, note: p - 12, velocity: UInt8(pv - 12), durationSteps: Swift.min(8, pd))) }
+                }
+            }
+            for (h, (s, d, nbrHit)) in hits.enumerated() {
+                let useNbr = pattern == 2 ? k % 2 == 1 : nbrHit
+                let st = bs + s
+                guard st + d <= totalSteps else { continue }
+                let tones = lhTones(bass: useNbr ? nbrBass : homeBass, scalePCs: scalePCs, low: 52, high: 67,
+                                    target: 59, prefer: [1, 2, 0], count: 3, melody: melody, start: st, end: st + d)
+                    .filter { t in pedal.map { ![1, 6, 11].contains(abs(Int(t) - Int($0)) % 12) } ?? true }
+                let accent = (pattern == 1 && (h == 1 || h == 3)) ? -6 : (s == 0 ? 4 : 0)
+                let cv = 32 + Int(lift * 18) + accent + rng.nextInt(upperBound: 5)
+                for (i, t) in tones.enumerated() {
+                    ev.append(MIDIEvent(stepIndex: st, note: t, velocity: UInt8(Swift.max(20, cv - i * 3)), durationSteps: d))
+                }
+            }
+        }
+        return ev
     }
 
     // MARK: AMB-PNO-003 live wire — Koln Live Take
