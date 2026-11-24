@@ -971,10 +971,10 @@ struct SongGenerator {
     // MARK: - Ambient generation path
 
     // Ambient substyle shares. Release (Zack, 2026-11-23): Piano 22, base Ambient 23, Zen 55.
-    // TESTING (Zack, 2026-11-24): Piano 60, base 20, Zen 20, to hear the Koln vamp; set back
-    // to 0.22 and 55.0 / 78.0 after testing. Piano is pianoRoll < share; Zen takes its fraction of the rest.
-    static let ambientPianoShare = 0.60
-    static let ambientZenShare   = 20.0 / 40.0
+    // Restored to release values 2026-11-24 after the Koln vamp testing (was Piano 60 / base 20 / Zen 20).
+    // Piano is pianoRoll < share; Zen takes its fraction of the rest (55 of 78).
+    static let ambientPianoShare = 0.22
+    static let ambientZenShare   = 55.0 / 78.0
 
     /// The Ambient Piano lead rule for a roll: 35 percent Floating Buds, 30 Satin Melody, 35 Koln
     /// Winter Arc. A new song draws it from the seed; a regenerated Lead 1 draws it afresh from its
