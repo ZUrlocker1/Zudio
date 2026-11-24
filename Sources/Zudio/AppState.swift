@@ -1619,21 +1619,24 @@ final class AppState: ObservableObject {
         if autoSweepCache.key != key {
             var steps = Set(song.style == .ambient ? AmbientAutoTide.steps(for: song)
                                                     : KosmicAutoSweep.steps(for: song))
-            if playMode == .evolve, let anchor = evolveAnchorState,
-               anchor.style == .kosmic, !anchor.isKosmicDrift, !anchor.isKosmicSpace {
-                let pass1Start = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars)
-                switch evolvePhase {
-                case .pass1:
-                    steps.insert(pass1Start * 16)
-                case .pass2, .outro:
-                    steps.insert(pass1Start * 16)
-                    steps.insert((pass1Start + evolvePass1Bars) * 16)
-                case .inactive, .original: break
-                }
-            }
+            steps.formUnion(evolveBoundarySweepSteps())
             autoSweepCache = (key, steps)
         }
         return autoSweepCache.steps
+    }
+
+    /// The steps where Evolve on a Kosmic (not Drift or Space) song fires a sweep as a pass begins: the
+    /// start of pass 1, and of pass 2 once it is under way. Empty in every other mode. Used by
+    /// live playback and by export, so an evolved song exports with the sweeps it was heard with.
+    private func evolveBoundarySweepSteps() -> [Int] {
+        guard playMode == .evolve, let anchor = evolveAnchorState,
+              anchor.style == .kosmic, !anchor.isKosmicDrift, !anchor.isKosmicSpace else { return [] }
+        let pass1Start = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars)
+        switch evolvePhase {
+        case .pass1:           return [pass1Start * 16]
+        case .pass2, .outro:   return [pass1Start * 16, (pass1Start + evolvePass1Bars) * 16]
+        case .inactive, .original: return []
+        }
     }
 
     private func autoSweepKey(_ song: SongState) -> String {
@@ -5174,6 +5177,7 @@ final class AppState: ObservableObject {
         }
         let rawSnapshots    = playback.effectSnapshots()
         let beatFixupOn     = playback.beatFixupEnabled   // so export matches what is heard
+        let evolveSweeps    = evolveBoundarySweepSteps()   // an evolved song keeps its pass-boundary sweeps
         // Apply mute/solo: mirror PlaybackEngine.applyMuteState() so export
         // matches what the user hears during playback.
         let anySolo = soloState.contains(true)
@@ -5221,6 +5225,7 @@ final class AppState: ObservableObject {
                     outputURL: url,
                     separateTracks: separateTracks,
                     beatFixupEnabled: beatFixupOn,
+                    evolveSweepSteps: evolveSweeps,
                     onProgress: { p in
                         Task { @MainActor [weak self] in self?.audioExportProgress = p }
                     },

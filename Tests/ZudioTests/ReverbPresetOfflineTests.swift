@@ -12,9 +12,9 @@
 // then takes effect, but the reverb stops producing a tail: one short burst and silence. So
 // there is no ordering that both applies the preset and leaves the reverb working.
 //
-// These tests pin both halves of that. If a future OS fixes either one, a test here fails and
-// the note in OfflineExport.swift can be revisited — at which point exported tracks could
-// finally get their per-track rooms instead of the default.
+// These tests pin both halves of that. The way round it (2026-11-24) is the unit's own
+// `auAudioUnit.currentPreset`, which applies the room and keeps the tail; OfflineExport.applyRoom
+// uses it, and the last test below pins that rooms really differ.
 //
 // This is a limitation of offline manual-rendering engines. Live playback uses a real-time
 // engine and is not covered here; it cannot be exercised without an audio device.
@@ -29,7 +29,7 @@ import AVFoundation
     /// Renders a burst through a 100%-wet reverb offline and returns the output level of each
     /// 100 ms bucket. `loadAfterPrepare` selects which of the two orderings to use.
     private func render(preset: AVAudioUnitReverbPreset,
-                        loadAfterPrepare: Bool) throws -> [Float] {
+                        loadAfterPrepare: Bool, useApplyRoom: Bool = false) throws -> [Float] {
         let sr = 44100.0
         let fmt = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 2)!
         let engine = AVAudioEngine()
@@ -44,7 +44,8 @@ import AVFoundation
             reverb.loadFactoryPreset(preset)
             reverb.wetDryMix = 100      // loadFactoryPreset resets this, so it comes after
         }
-        if !loadAfterPrepare { load() }
+        if useApplyRoom { OfflineExport.applyRoom(preset, to: reverb, wetDryMix: 100) }
+        else if !loadAfterPrepare { load() }
         try engine.enableManualRenderingMode(.offline, format: fmt, maximumFrameCount: 4096)
         if loadAfterPrepare { engine.prepare(); load() }
         try engine.start()
@@ -115,5 +116,20 @@ import AVFoundation
             #expect(!hasTail(buckets),
                     "\(preset) kept its tail when loaded after prepare — offline export could now be reordered to honour per-track rooms")
         }
+    }
+
+    /// The fix: rooms set through OfflineExport.applyRoom differ, and each keeps a tail.
+    @Test func applyRoomGivesDistinctRoomsWithTails() throws {
+        func seconds(_ b: [Float]) -> Double {
+            guard let peak = b.max(), peak > 0 else { return 0 }
+            let last = b.indices.last { b[$0] > peak / 1000 } ?? 0
+            return Double(last + 1) * 0.1
+        }
+        let small = try render(preset: .smallRoom, loadAfterPrepare: false, useApplyRoom: true)
+        let hall = try render(preset: .mediumHall, loadAfterPrepare: false, useApplyRoom: true)
+        let cathedral = try render(preset: .cathedral, loadAfterPrepare: false, useApplyRoom: true)
+        #expect(hasTail(hall) && hasTail(cathedral), "a room set through applyRoom lost its tail")
+        #expect(seconds(small) < seconds(hall), "small room should decay faster than medium hall")
+        #expect(seconds(hall) < seconds(cathedral), "medium hall should decay faster than cathedral")
     }
 }

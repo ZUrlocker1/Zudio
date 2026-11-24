@@ -5,13 +5,10 @@
 //
 // WHY THIS EXISTS
 // ---------------
-// The same effect chain is built in three places:
-//
-//   1. PlaybackEngine  — live playback nodes
-//   2. OfflineExport   — Phase 2, the main M4A mix
-//   3. OfflineExport   — Phase 3, per-track stems ("separate tracks")
-//
-// Nothing forces them to agree, and in Build 128 (commit 8a73f5b) they silently
+// The same effect chain used to be built in three places: PlaybackEngine (live), OfflineExport
+// Phase 2 (the M4A mix) and Phase 3 (the stems). Phases 2 and 3 now share one ExportTrackChain,
+// so only live and export remain to keep in step; the audio texture still has a copy in each
+// phase. Nothing forces them to agree, and in Build 128 (commit 8a73f5b) they silently
 // diverged: the Air effect was tuned up to a two-band shape (4 kHz presence peak +
 // 8 kHz high shelf) in PlaybackEngine and Phase 2, but the Phase 3 copy was left on
 // the original single 12 kHz +3.5 dB shelf. Air-enabled Motorik stems therefore
@@ -96,7 +93,7 @@ struct EffectChainParityTests {
         let src = try Self.source("Sources/Zudio/Assets/OfflineExport.swift")
 
         let phase2 = Self.region(src, from: "MARK: Phase 2", to: "MARK: Phase 3")
-        let phase3 = Self.region(src, from: "MARK: Phase 3", to: nil)
+        let phase3 = Self.region(src, from: "MARK: Phase 3", to: "MARK: - One track's effect chain")
 
         #expect(!phase2.isEmpty, "Could not locate the Phase 2 marker in OfflineExport.swift")
         #expect(!phase3.isEmpty, "Could not locate the Phase 3 marker in OfflineExport.swift")
@@ -122,23 +119,58 @@ struct EffectChainParityTests {
     //
     // The specific regression from Build 128, pinned across all three chains.
 
+    /// The Air bands as set for every style but Ambient: `gentleAir ? A : B` reads as B and a bare
+    /// `= gentleAir` as false. Ambient's gentler values are compared in `ambientAirMatches...`.
     private static func airBands(of text: String) -> [String] {
-        effectParameters(of: text).filter { $0.hasPrefix("airEQ.bands[") }
+        let normal = text
+            .replacingOccurrences(of: #"gentleAir\s*\?\s*[\d.]+\s*:\s*([\d.]+)"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"=\s*gentleAir\b"#, with: "= false", options: .regularExpression)
+        return effectParameters(of: normal).filter { $0.hasPrefix("airEQ.bands[") }
+    }
+
+    @Test func ambientAirMatchesAcrossPlaybackAndExport() throws {
+        let engineSrc = try Self.source("Sources/Zudio/Playback/PlaybackEngine.swift")
+        let exportSrc = try Self.source("Sources/Zudio/Assets/OfflineExport.swift")
+        // Live: `gentleAir ? 10000 : 8000` and `gentleAir ? 3.5 : 7.5`, in the same order as export.
+        let pattern = #"gentleAir\s*\?\s*([\d.]+)\s*:\s*([\d.]+)"#
+        let live   = Self.matches(pattern, in: engineSrc).map { Array($0[1...2]) }
+        let export = Self.matches(pattern, in: exportSrc).map { Array($0[1...2]) }
+        #expect(!live.isEmpty && live == export, "Ambient Air: live \(live) vs export \(export)")
     }
 
     @Test func airMatchesAcrossPlaybackAndExport() throws {
         let engineSrc = try Self.source("Sources/Zudio/Playback/PlaybackEngine.swift")
         let exportSrc = try Self.source("Sources/Zudio/Assets/OfflineExport.swift")
 
-        let live   = Self.airBands(of: engineSrc)
-        let phase2 = Self.airBands(of: Self.region(exportSrc, from: "MARK: Phase 2", to: "MARK: Phase 3"))
-        let phase3 = Self.airBands(of: Self.region(exportSrc, from: "MARK: Phase 3", to: nil))
+        let live  = Self.airBands(of: engineSrc)
+        let chain = Self.airBands(of: Self.region(exportSrc, from: "private final class ExportTrackChain",
+                                                  to: "MARK: - Chill Pads fade envelope"))
 
         #expect(!live.isEmpty, "Found no airEQ band settings in PlaybackEngine")
+        #expect(live == chain, "Live Air \(live) differs from the export chain's Air \(chain)")
+    }
 
-        #expect(live == phase2,
-                "Live Air \(live) differs from main-mix export Air \(phase2)")
-        #expect(live == phase3,
-                "Live Air \(live) differs from stem export Air \(phase3) — this is the Build 128 bug")
+    // MARK: - Export builds each track through the one chain
+
+    @Test func exportPhasesBuildTracksThroughTheSharedChain() throws {
+        let src = try Self.source("Sources/Zudio/Assets/OfflineExport.swift")
+        let phase2 = Self.region(src, from: "MARK: Phase 2", to: "MARK: Phase 3")
+        let phase3 = Self.region(src, from: "MARK: Phase 3", to: "// Texture stem")
+
+        for (name, text) in [("Phase 2", phase2), ("Phase 3", phase3)] {
+            #expect(text.contains("ExportTrackChain("), "\(name) must build tracks with ExportTrackChain")
+            #expect(!text.contains("AVAudioUnitDelay()") && !text.contains("airEQ"),
+                    "\(name) builds its own track effects; they belong in ExportTrackChain")
+        }
+    }
+
+    // MARK: - Timed automation is shared, not copied
+
+    @Test func playbackTimersUseTheSharedCurves() throws {
+        let engineSrc = try Self.source("Sources/Zudio/Playback/PlaybackEngine.swift")
+        #expect(engineSrc.contains("MixAutomation.tideCutoff("), "Live tides must use MixAutomation.tideCutoff")
+        #expect(engineSrc.contains("MixAutomation.fastSweepCutoff("), "Live sweeps must use MixAutomation.fastSweepCutoff")
+        #expect(engineSrc.contains("MixAutomation.drumFire("), "Live drums must use MixAutomation.drumFire")
+        #expect(!engineSrc.contains("let closed = ramp * ramp"), "A copy of the tide curve is back in PlaybackEngine")
     }
 }

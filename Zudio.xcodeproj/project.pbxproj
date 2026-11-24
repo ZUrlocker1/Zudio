@@ -89,6 +89,7 @@
 		AA000000000000000000067 /* ChillTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000067 /* ChillTitleGenerator.swift */; };
 		AA000000000000000000068 /* AudioTexturePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000068 /* AudioTexturePlayer.swift */; };
 		AA000000000000000000990 /* StartGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000990 /* StartGuard.swift */; };
+		AA000000000000000000991 /* MixAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000991 /* MixAutomation.swift */; };
 		AA000000000000000000069 /* Sources/Zudio/Resources/Textures in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Sources/Zudio/Resources/Textures */; };
 		AA00000000000000000006A /* AudioWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006A /* AudioWaveformView.swift */; };
 		AA000000000000000000201 /* assets/SC55 Piano_V2.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000201 /* assets/SC55 Piano_V2.sf2 */; };
@@ -193,6 +194,7 @@
 		IS000000000000000000067 /* ChillTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000067 /* ChillTitleGenerator.swift */; };
 		IS000000000000000000068 /* AudioTexturePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000068 /* AudioTexturePlayer.swift */; };
 		IS000000000000000000990 /* StartGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000990 /* StartGuard.swift */; };
+		IS000000000000000000991 /* MixAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000991 /* MixAutomation.swift */; };
 		IS00000000000000000006A /* AudioWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006A /* AudioWaveformView.swift */; };
 		IS00000000000000000007B /* NowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007B /* NowPlayingController.swift */; };
 		IS00000000000000000007C /* CosmicHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007C /* CosmicHelpers.swift */; };
@@ -344,6 +346,7 @@
 		BB000000000000000000067 /* ChillTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillTitleGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000068 /* AudioTexturePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTexturePlayer.swift; sourceTree = "<group>"; };
 		BB000000000000000000990 /* StartGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartGuard.swift; sourceTree = "<group>"; };
+		BB000000000000000000991 /* MixAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MixAutomation.swift; sourceTree = "<group>"; };
 		BB000000000000000000069 /* Sources/Zudio/Resources/Textures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Sources/Zudio/Resources/Textures; sourceTree = "<group>"; };
 		BB00000000000000000006A /* AudioWaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformView.swift; sourceTree = "<group>"; };
 		BB000000000000000000201 /* assets/SC55 Piano_V2.sf2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "assets/SC55 Piano_V2.sf2"; sourceTree = "<group>"; };
@@ -509,6 +512,7 @@
 				BB000000000000000000017 /* PlaybackEngine.swift */,
 				BB000000000000000000068 /* AudioTexturePlayer.swift */,
 				BB000000000000000000990 /* StartGuard.swift */,
+				BB000000000000000000991 /* MixAutomation.swift */,
 				BB00000000000000000007B /* NowPlayingController.swift */,
 			);
 			path = Playback;
@@ -1007,6 +1011,7 @@
 				AA000000000000000000067 /* ChillTitleGenerator.swift in Sources */,
 				AA000000000000000000068 /* AudioTexturePlayer.swift in Sources */,
 				AA000000000000000000990 /* StartGuard.swift in Sources */,
+				AA000000000000000000991 /* MixAutomation.swift in Sources */,
 				AA00000000000000000007B /* NowPlayingController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1118,6 +1123,7 @@
 				IS000000000000000000067 /* ChillTitleGenerator.swift in Sources */,
 				IS000000000000000000068 /* AudioTexturePlayer.swift in Sources */,
 				IS000000000000000000990 /* StartGuard.swift in Sources */,
+				IS000000000000000000991 /* MixAutomation.swift in Sources */,
 				IS00000000000000000007B /* NowPlayingController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

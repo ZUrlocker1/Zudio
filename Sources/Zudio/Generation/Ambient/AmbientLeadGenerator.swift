@@ -660,13 +660,25 @@ struct AmbientLeadGenerator {
         reachLog: ReachLog? = nil
     ) -> [MIDIEvent] {
         usedRuleIDs.insert(pianoRule)
+        let events: [MIDIEvent]
         switch pianoRule {
-        case "AMB-PNO-001": return floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
-        case "AMB-PNO-003": return dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng,
+        case "AMB-PNO-001": events = floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
+        case "AMB-PNO-003": events = dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng,
                                                        usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass,
                                                        arcVariation: arcVariation, reachLog: reachLog)
-        default:            return pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
+        default:            events = pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
         }
+        return events.map { capPianoSustain($0) }
+    }
+
+    /// The longest a piano note is written: one bar. A piano does not sustain much past that, so a
+    /// 3-bar low note or closing chord (Soft Landing in the Open Plan, bars 18, 28 and the outro,
+    /// Zack 2026-11-24) read in the piano roll as a hold the sound never had. Applied to the rules'
+    /// finished notes, so no random draw changes.
+    static let pianoMaxSustainSteps = 16
+    private static func capPianoSustain(_ e: MIDIEvent) -> MIDIEvent {
+        e.durationSteps <= pianoMaxSustainSteps ? e
+            : MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity, durationSteps: pianoMaxSustainSteps)
     }
 
     // MARK: AMB-PNO-001 — Floating Buds (Harold Budd)
@@ -2298,7 +2310,7 @@ struct AmbientLeadGenerator {
 
         // Urgent question: a 3-5 note fragment repeated 2-3x with escalating velocity,
         // 4 bars before climax — Jarrett's classic "asking more urgently each time" device.
-        // Ends with a bold foreshadow chord stab (vel 68-79) that hints at the coming climax.
+        // Ends with a bold foreshadow chord stab (vel 58-69) that hints at the coming climax.
         let urgentBar = climaxBar - 4
         if urgentBar > p1Bar + 4 && urgentBar >= 0 && !midNotes.isEmpty {
             // The fragment is the motif's head; 50% of songs push it up a scale step each time.
@@ -2316,7 +2328,7 @@ struct AmbientLeadGenerator {
                 for n in 0..<fragLen {
                     guard qs < totalSteps else { break }
                     let idx = Swift.max(0, Swift.min(fragBase + fragIdx[n] + (rising ? r : 0), fragArr.count - 1))
-                    let vel = UInt8(Swift.min(74, 42 + r * 10 + rng.nextInt(upperBound: 8)))
+                    let vel = UInt8(Swift.min(64, 42 + r * 10 + rng.nextInt(upperBound: 8)))
                     let dur = Swift.min(2, totalSteps - qs)
                     guard dur >= 1 else { break }
                     events.append(MIDIEvent(stepIndex: qs, note: fragArr[idx], velocity: vel, durationSteps: dur))
@@ -2329,7 +2341,7 @@ struct AmbientLeadGenerator {
             let foreshadowLimit = (climaxBar - 2) * 16 - 4
             if qs < foreshadowLimit && !fragArr.isEmpty {
                 let fNote = fragArr[Swift.max(0, Swift.min(fragArr.count - 1, fragBase + fragLen))]
-                let fVel  = UInt8(68 + rng.nextInt(upperBound: 12))
+                let fVel  = UInt8(58 + rng.nextInt(upperBound: 12))
                 let fDur  = Swift.min(6 + rng.nextInt(upperBound: 5), foreshadowLimit - qs)
                 if fDur >= 4 {
                     events.append(MIDIEvent(stepIndex: qs, note: fNote, velocity: fVel, durationSteps: fDur))
@@ -2342,7 +2354,7 @@ struct AmbientLeadGenerator {
             }
         }
 
-        // Fast 16th-note scalar run into the climax — 8-12 consecutive scale steps at 1-step IOI, vel rising 60→80.
+        // Fast 16th-note scalar run into the climax — 8-12 consecutive scale steps at 1-step IOI, vel rising 55→75.
         let scalarRunBar = climaxBar - 2
         if scalarRunBar >= 0 && scalarRunBar < totalBars && !midNotes.isEmpty {
             let runCount  = 8 + rng.nextInt(upperBound: 5)
@@ -2350,14 +2362,14 @@ struct AmbientLeadGenerator {
             let startIdx  = ascending
                 ? rng.nextInt(upperBound: Swift.max(1, midNotes.count / 3))
                 : midNotes.count / 2 + rng.nextInt(upperBound: Swift.max(1, midNotes.count / 2))
-            let baseVel = 60 + rng.nextInt(upperBound: 10)
+            let baseVel = 55 + rng.nextInt(upperBound: 10)
             var rs = scalarRunBar * 16 + rng.nextInt(upperBound: 4)
             for i in 0..<runCount {
                 guard rs < totalSteps else { break }
                 let idx = ascending
                     ? Swift.min(startIdx + i, midNotes.count - 1)
                     : Swift.max(0, startIdx - i)
-                let vel = UInt8(Swift.min(80, baseVel + i * 2))
+                let vel = UInt8(Swift.min(75, baseVel + i * 2))
                 let dur = Swift.min(2, totalSteps - rs)
                 guard dur >= 1 else { break }
                 events.append(MIDIEvent(stepIndex: rs, note: midNotes[idx], velocity: vel, durationSteps: dur))
@@ -2365,14 +2377,14 @@ struct AmbientLeadGenerator {
             }
         }
 
-        // Climax phrase — velocity ceiling raised to 88 (Jarrett/Winston bold peak)
+        // Climax phrase — velocity ceiling 83 (Jarrett/Winston bold peak; was 88 until 2026-11-24, lowered to 78 with Lead 1 raised +2 dB, then 5 restored by Zack)
         var highestNote: UInt8 = 0
         let climaxHead: [Int]? = rng.nextDouble() < 0.70 ? motifMoves : nil   // the motif up high, then away
         // Half of the motif climaxes then climb straight to the held top note instead of arching
         let climaxClimb = climaxHead != nil && rng.nextDouble() < 0.50
         if useCallResp {
             let callResult = emitBurst(bar: climaxBar, pool: highNotes, count: 6 + rng.nextInt(upperBound: 3),
-                                       velMin: 58, velMax: 88, ioi: 2, holdDur: 8, head: climaxHead,
+                                       velMin: 58, velMax: 83, ioi: 2, holdDur: 8, head: climaxHead,
                                        climb: climaxClimb)
             let respResult = emitBurst(bar: climaxBar + 2, pool: midNotes, count: 7 + rng.nextInt(upperBound: 3),
                                        velMin: 45, velMax: 68, ioi: 2, holdDur: 10)
@@ -2381,7 +2393,7 @@ struct AmbientLeadGenerator {
             highestNote = (callResult.events + respResult.events).max(by: { $0.note < $1.note })?.note ?? 0
         } else {
             let cResult = emitBurst(bar: climaxBar, pool: highNotes, count: 9 + rng.nextInt(upperBound: 4),
-                                    velMin: 58, velMax: 88, ioi: 2, holdDur: 16, head: climaxHead,
+                                    velMin: 58, velMax: 83, ioi: 2, holdDur: 16, head: climaxHead,
                                     climb: climaxClimb)
             events += cResult.events
             probe("climax", cResult.events)
@@ -2394,7 +2406,7 @@ struct AmbientLeadGenerator {
         if chordStep < totalSteps - 8, !highNotes.isEmpty {
             let rootIdx   = rng.nextInt(upperBound: Swift.max(1, highNotes.count / 2))
             let chordRoot = highNotes[rootIdx]
-            let chordVel  = UInt8(78 + rng.nextInt(upperBound: 12))
+            let chordVel  = UInt8(73 + rng.nextInt(upperBound: 12))
             let chordDur  = Swift.min(8 + rng.nextInt(upperBound: 5), totalSteps - chordStep)
             events.append(MIDIEvent(stepIndex: chordStep, note: chordRoot, velocity: chordVel, durationSteps: chordDur))
             if let third = highNotes.first(where: { [3, 4].contains(Int($0) - Int(chordRoot)) }) {
@@ -2428,7 +2440,7 @@ struct AmbientLeadGenerator {
 
         // Minor peaks (KolnArc, about a third of songs): a quick run up, then a shorter, softer
         // climax in the middle register, the motif at its head half the time. They peak around
-        // velocity 68 against the climax's 88, and stay under its register.
+        // velocity 68 against the climax's 83, and stay under its register.
         for pb in arc.peakBars where pb >= 2 && pb < totalBars - 4 {
             let runLen = 5 + rng.nextInt(upperBound: 3)
             let runTop = Swift.min(midNotes.count - 1, midNotes.count * 2 / 3)
@@ -2661,7 +2673,7 @@ struct AmbientLeadGenerator {
             }
         }
 
-        // Aftershock — 1-2 hard chord stabs reminiscent of the climax (vel 68-85),
+        // Aftershock — 1-2 hard chord stabs reminiscent of the climax (vel 52-69),
         // spread between withdrawal and closing. 45% chance of a second hit per stab,
         // tight (2-4 steps) or slightly spaced (5-8 steps).
         let aftershockBase = withdrawBar + 2
@@ -2677,7 +2689,7 @@ struct AmbientLeadGenerator {
                 guard ss < totalSteps - 6 else { break }
                 let rootIdx = rng.nextInt(upperBound: Swift.max(1, shockPool.count / 2))
                 let sRoot   = shockPool[rootIdx]
-                let sVel    = UInt8(56 + rng.nextInt(upperBound: 18))
+                let sVel    = UInt8(52 + rng.nextInt(upperBound: 18))
                 let sDur    = Swift.min(6 + rng.nextInt(upperBound: 5), totalSteps - ss)
                 guard sDur >= 4 else { break }
                 events.append(MIDIEvent(stepIndex: ss, note: sRoot, velocity: sVel, durationSteps: sDur))
@@ -3170,7 +3182,7 @@ struct AmbientLeadGenerator {
                 guard !scale.contains(pc), padSafe(pc), [1, 2].contains(abs(Int(next.note) - alt)),
                       !rubs(UInt8(alt), at: e.stepIndex, len: e.durationSteps, skip: { $0 == i }) else { continue }
                 ev[i] = MIDIEvent(stepIndex: e.stepIndex, note: UInt8(alt),
-                                  velocity: UInt8(Swift.min(90, Int(e.velocity) + 4)), durationSteps: e.durationSteps)
+                                  velocity: UInt8(Swift.min(85, Int(e.velocity) + 4)), durationSteps: e.durationSteps)
                 usedSteps.append(e.stepIndex); tensions -= 1; chromaticLeft -= 1
                 break
             }

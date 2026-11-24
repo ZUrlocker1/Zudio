@@ -120,13 +120,8 @@ final class PlaybackEngine: ObservableObject {
     // this, applyMuteState() would restore the level on every song load and the chip would
     // decide nothing.
     private var reverbEnabled          = Array(repeating: false,      count: kTrackCount)
-    // Per-track reverb presets for offline export — set by each style method to match original intent.
-    // Live playback uses shared buses; export uses these presets for per-track reverb nodes.
-    // Read only by offline export, where it currently has no effect: AVAudioUnitReverb
-    // ignores loadFactoryPreset on an unprepared unit, so exported tracks render in the
-    // default room. Kept because it records the intended per-track rooms and because the
-    // amount of reverb, which does carry across, is snapshotted alongside it.
-    // See the note in OfflineExport.swift before attempting to make this take effect.
+    // Per-track reverb presets recorded by each style method to match original intent. No longer read
+    // by the export (2026-11-24): it takes the room from the track's bus, as live playback does.
     private var perTrackReverbPresets  = Array(repeating: AVAudioUnitReverbPreset.mediumHall, count: kTrackCount)
     private var busLargePreset: AVAudioUnitReverbPreset = .cathedral
     private var busSmallPreset: AVAudioUnitReverbPreset = .mediumHall
@@ -216,7 +211,6 @@ final class PlaybackEngine: ObservableObject {
     /// a tide out (slowly darkening, then back). Only meaningful with `globalSweepIsTide`.
     private var globalSweepIsTideIn = false
     private var slowTotalTicks = 400        // length of the slow effect now running
-    private static let tideFloorHz: Float = 600
     private var preGlobalSweepEnabled: [Bool] = Array(repeating: false, count: kTrackCount)
 
     // Canvas-wide flash for filter-sweep gesture — set when sweep triggers, read by VisualizerView Canvas.
@@ -712,7 +706,7 @@ final class PlaybackEngine: ObservableObject {
             boosts[kTrackBass].outputVolume = 0.0
             boosts[kTrackPads].outputVolume = 0.0
             engine.mainMixerNode.outputVolume = 0.0
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + StartGuard.introHoldSeconds) { [weak self] in
                 guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
                 let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
                 self.scheduler = sched
@@ -723,7 +717,7 @@ final class PlaybackEngine: ObservableObject {
         } else if (motorikStyle || chillFade) && currentStep == 0 && state.structure.introSection != nil {
             // Same pop-prevention as Kosmic: zero master before first note fires.
             engine.mainMixerNode.outputVolume = 0.0
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + StartGuard.introHoldSeconds) { [weak self] in
                 guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
                 let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
                 self.scheduler = sched
@@ -1014,66 +1008,17 @@ final class PlaybackEngine: ObservableObject {
             // Velocity: native Machine Kit kick/snare/hat fire at 88% to tame harshness. Remapped
             // toms keep their original velocity — they were already moderate and scaling makes them
             // inaudible (e.g. an intro pickup tom at vel 78 → kick at vel 68 disappears entirely).
+            // The drum kits' note and velocity mapping (808 and Machine Kit toms, Machine Kit 88%,
+            // Drift and Buddha Pulse snares) lives in MixAutomation.drumFire, which the export uses too.
             let fireNote: UInt8
-            let wasRemapped: Bool
-            if trackIndex == kTrackDrums && cachedDrumProgram == 25 {
-                switch ev.note {
-                case 41, 43, 45: fireNote = GMDrum.kick.rawValue;  wasRemapped = true
-                case 48:         fireNote = GMDrum.snare.rawValue;  wasRemapped = true
-                case 50:         fireNote = GMDrum.openHat.rawValue; wasRemapped = true
-                // Magnetic Gallop's quarter-note agogo (KOS-DRUM-010) clonks on this kit; Space plays
-                // it as a pedal hat (Zack, 2026-11-14, Rendez-Vous a Axiome).
-                case 67 where cachedIsKosmicSpace:
-                                 fireNote = GMDrum.pedalHat.rawValue; wasRemapped = true
-                default:         fireNote = ev.note;                 wasRemapped = false
-                }
-            } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 && !cachedIsKosmicSpace {
-                // Kosmic Space keeps the Machine Kit's own synth toms: the space-age bloops and beeps
-                // are wanted in its fills (about 25% of Space songs draw the kit).
-                switch ev.note {
-                case 41, 43, 45: fireNote = GMDrum.snare.rawValue;   wasRemapped = true
-                case 48:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
-                case 50:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
-                case 40:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
-                case 49:         fireNote = GMDrum.ride.rawValue;    wasRemapped = true
-                default:         fireNote = ev.note;                  wasRemapped = false
-                }
-            } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 && cachedIsKosmicSpace
-                        && (ev.note == GMDrum.snare2.rawValue || ev.note == GMDrum.highAgogo.rawValue) {
-                // Kosmic Space on Machine Kit (Zack, 2026-11-07, Empyrion-Axolotl): the electric snare
-                // slot (40) that Magnetic Gallop uses sounds harsh and mechanical, so it plays the
-                // plain snare. Its quarter-note agogo clonks, so it plays a pedal hat (Zack,
-                // 2026-11-14, Rendez-Vous a Axiome). The toms, ride and everything else stay native.
-                fireNote = ev.note == GMDrum.snare2.rawValue ? GMDrum.snare.rawValue : GMDrum.pedalHat.rawValue
-                wasRemapped = true
-            } else if trackIndex == kTrackDrums && cachedDrumProgram == 26 && cachedIsKosmicSpace
-                        && ev.note == GMDrum.highAgogo.rawValue {
-                // Kosmic Space on Dance Drums (Zack, 2026-11-15, Aetheron-Laserharp): Magnetic Gallop's
-                // quarter-note agogo clonks here as on the other kits, so it plays a pedal hat. The
-                // toms stay native: the bleeps are wanted in the fills.
-                fireNote = GMDrum.pedalHat.rawValue
-                wasRemapped = true
-            } else {
-                fireNote = ev.note; wasRemapped = false
-            }
-            // Machine Kit native notes fire at 88% to tame harshness at high velocity.
-            // Remapped tom notes keep their original velocity — they're already moderate.
             let fireVelocity: UInt8
-            if trackIndex == kTrackDrums && cachedDrumProgram == 24 && !wasRemapped {
-                fireVelocity = UInt8(max(1, Int(ev.velocity) * 88 / 100))
-            } else if trackIndex == kTrackDrums && cachedDrumProgram == 0
-                   && cachedIsKosmicDrift
-                   && (fireNote == GMDrum.snare.rawValue || fireNote == GMDrum.snare2.rawValue) {
-                // Standard Kit in Kosmic Drift: snare runs loud — reduce to 55% to sit in the mix
-                fireVelocity = UInt8(max(1, Int(ev.velocity) * 65 / 100))
-            } else if trackIndex == kTrackDrums && cachedDrumProgram == 25 && cachedIsBuddhaPulse
-                   && fireNote == GMDrum.snare2.rawValue {
-                // 808 Kit under Electric Buddha Pulse (Zack, 2026-11-11, Sputnique-Part-2): the Space
-                // version's snare is the electric snare (40), the 808/909 kit's TR-909 snare at 0 dB,
-                // which thumps out on 2 and 4. Base Kosmic's version plays the 808 snare (38), untouched.
-                fireVelocity = UInt8(max(1, Int(ev.velocity) * 75 / 100))
+            if trackIndex == kTrackDrums {
+                (fireNote, fireVelocity) = MixAutomation.drumFire(
+                    note: ev.note, velocity: ev.velocity, program: cachedDrumProgram,
+                    kosmicSpace: cachedIsKosmicSpace, kosmicDrift: cachedIsKosmicDrift,
+                    buddhaPulse: cachedIsBuddhaPulse)
             } else {
-                fireVelocity = ev.velocity
+                fireNote = ev.note; fireVelocity = ev.velocity
             }
             func fire() {
                 if trackLoading[trackIndex] { return }   // patch loading on this track; see loadPatch
@@ -1697,7 +1642,9 @@ final class PlaybackEngine: ObservableObject {
                 // so the lift goes through the boost node, about +2.3 dB.
                 // Synth Lead lifted from 1.3 to 1.85 and then to 2.6 (about +3 dB each time) on Motorik
                 // Lead 1, base and every substyle (Zack, 2026-11-15).
-                let mult: Float = (program == 61001) ? 8.0
+                // Stereo Piano 8.0 to 10.0 (+2 dB) on Ambient Piano Lead 1: soft passages sat under Zen
+                // (Zack, 2026-11-24). Chill's piano is on the Rhythm track and is untouched.
+                let mult: Float = (program == 61001) ? 10.0
                                 : (motorikStyle && program == 87) ? 2.6
                                 : (motorikStyle && (program == 11100 || program == 90)) ? 1.3 : 1.0
                 boostBaseMultiplier[kTrackLead1] = mult
@@ -1790,11 +1737,13 @@ final class PlaybackEngine: ObservableObject {
         var lowShelfBypassed: Bool
         var airEnabled: Bool
         var hpfEnabled: Bool
+        var hpfFrequency: Float
         // Sweep LFO — simulated per-block in offline export
         var sweepEnabled: Bool
         var sweepFloor: Float       // LP cutoff floor in Hz (filter fully closed)
         var sweepHalfRange: Float   // half the total cutoff range in Hz
         var sweepHz: Float          // LFO rate in Hz
+        var sweepPhaseOffset: Double = 0   // where the sweep starts in its cycle (Ambient staggers its tracks)
         // Tremolo LFO — simulated per-block in offline export
         var tremoloEnabled: Bool
         var tremoloHz: Float        // LFO rate in Hz
@@ -1844,7 +1793,8 @@ final class PlaybackEngine: ObservableObject {
             return TrackEffectSnapshot(
                 volume:             volume,
                 pan:                trackStaticPan[i],
-                reverbPreset:       perTrackReverbPresets[i],
+                // The room the track really hears live: its bus's room, not the per-track table.
+                reverbPreset:       sendOnLargeBus[i] ? busLargePreset : busSmallPreset,
                 reverbWetDryMix:    perTrackReverbWet[i],
                 reverbBypassed:     reverbSendMixers[i].outputVolume == 0,
                 delayTime:          delays[i].delayTime,
@@ -1859,10 +1809,12 @@ final class PlaybackEngine: ObservableObject {
                 lowShelfBypassed:   lowEQs[i].auAudioUnit.shouldBypassEffect,
                 airEnabled:         airEnabled[i],
                 hpfEnabled:        !lowEQs[i].bands[1].bypass,
+                hpfFrequency:      lowEQs[i].bands[1].frequency,
                 sweepEnabled:       sweepEnabled[i],
                 sweepFloor:         sweepEnabled[i] ? sFloor     : 0,
                 sweepHalfRange:     sweepEnabled[i] ? sHalfRange : 0,
                 sweepHz:            sweepEnabled[i] ? sweepHz    : 0,
+                sweepPhaseOffset:   sweepEnabled[i] && ambientMode ? ambientSweepOffset[i] : 0,
                 tremoloEnabled:     tremEnabled[i],
                 tremoloHz:          tremEnabled[i]  ? tremoloHz  : 0,
                 tremoloDepth:       tremEnabled[i]  ? tremDepth[i]: 0,
@@ -2041,6 +1993,7 @@ final class PlaybackEngine: ObservableObject {
                                                      : [kTrackLead1, kTrackLead2, kTrackTexture]
         for i in 0..<lowEQs.count {
             lowEQs[i].bands[1].bypass = !hpfTracks.contains(i)
+            lowEQs[i].bands[1].frequency = Self.highPassFrequency(pianoLead: cachedIsAmbientPiano && i == kTrackLead1)
         }
         applyStaticPans()
         // AMB-PNO: center the piano — solo piano should not be panned.
@@ -2049,6 +2002,11 @@ final class PlaybackEngine: ObservableObject {
             boosts[kTrackLead1].pan     = 0.0
         }
     }
+
+    /// High-pass corner on Ambient's Lead and Texture tracks. 250 Hz keeps reverb mud out, but it
+    /// strips the body from low piano notes (they sounded synthetic, beta tester, 2026-11-24), so
+    /// the Ambient Piano's Lead 1 keeps only a 60 Hz rumble guard. Live and export share this.
+    nonisolated static func highPassFrequency(pianoLead: Bool) -> Float { pianoLead ? 60 : 250 }
 
     /// Base Ambient's space (Zack, 2026-11-22: more spacey and grand). Pads, both leads, Rhythm and
     /// Texture share a Cathedral on the large bus, with the lows cut from what feeds it so the
@@ -2518,20 +2476,13 @@ final class PlaybackEngine: ObservableObject {
                 // brightness comes back slowly over the last 70%. Resonance stays at the static
                 // 3 dB; the fast sweep's wah boost would ring in Ambient's long echoes.
                 let p = 1.0 - Double(globalSweepTicksRemaining) / Double(slowTotalTicks)
-                let ramp: Double
-                if globalSweepIsTideIn {
-                    ramp = p < 0.1 ? p / 0.1 : (p > 0.3 ? (1.0 - p) / 0.7 : 1.0)
-                } else {
-                    ramp = p < 0.4 ? p / 0.4 : (p > 0.6 ? (1.0 - p) / 0.4 : 1.0)
-                }
-                let closed = ramp * ramp * (3.0 - 2.0 * ramp)
-                let cutoff = 6000 * Float(pow(Double(Self.tideFloorHz / 6000), closed))
+                let cutoff = MixAutomation.tideCutoff(progress: p, tideIn: globalSweepIsTideIn)
                 for i in 0..<kTrackCount where i != kTrackDrums {
                     AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
                 }
             } else {
                 globalSweepPhase += 0.052   // ~0.33 Hz → full open-close cycle in ~6 seconds
-                let cutoff = Float(300 + 5700 * (1.0 + sin(globalSweepPhase)) / 2.0)
+                let cutoff = MixAutomation.fastSweepCutoff(phase: globalSweepPhase)
                 for i in 0..<kTrackCount where i != kTrackDrums {
                     AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
                 }

@@ -6,10 +6,29 @@
 // too, and the offline export applies the same numbers to its rendered audio.
 //
 // Live:   PlaybackEngine.play() holds the master at 0 for gapSeconds, then startPopGuardRamp().
-// Export: OfflineExport writes gapSeconds of silence, then multiplies by StartGuard.gain(atSecond:).
+// Export: OfflineExport writes gapSeconds of silence, then multiplies by StartGuard.gain(atSecond:);
+//         songs that open with the intro hold get introHoldSeconds and no ramp, as live.
 enum StartGuard {
     /// Silence before the first note when a song starts from step 0 and has no intro fade.
     static let gapSeconds: Double = 0.200
+    /// Silence before the first note for the songs that open another way: Kosmic, and Motorik and
+    /// Chill with an intro fade. Master is held at 0 for this long, then the song's own fade (or
+    /// Kosmic's per-track fades) takes over with no StartGuard ramp.
+    static let introHoldSeconds: Double = 0.050
+
+    /// True when live playback opens `state` with the short intro hold and no ramp, as in
+    /// PlaybackEngine.play(): Kosmic, Motorik with an intro, Chill with an already-playing intro.
+    static func opensWithIntroHold(_ state: SongState) -> Bool {
+        switch state.style {
+        case .kosmic: return true
+        case .motorik: return state.structure.introSection != nil
+        case .chill:
+            guard case .alreadyPlaying = state.structure.introStyle else { return false }
+            return state.structure.introSection != nil
+        case .ambient: return false
+        }
+    }
+
     /// Master level at the first ramp tick.
     static let rampFloor: Float = 0.15
     static let rampSteps = 5

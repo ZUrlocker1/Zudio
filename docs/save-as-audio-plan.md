@@ -201,16 +201,25 @@ Phase 2 = 50–100% of the progress bar.
   space (< 500 MB) shows an alert with Cancel / Export Anyway options; on completion a
   `UIActivityViewController` share sheet appears so the file can be saved to Files or shared.
 
-### Known approximations
+### Playback and export must match
 
-Because the LFO-driven sweep filter and Chill Pads dynamic volume cannot be reproduced in a
-static offline pass, these are approximated:
+Zack's rule (2026-11-24): a song must not sound different exported than played. Three things keep that true.
 
-- Sweep filter: replaced with a static LP at the midpoint of the LFO range (1700 Hz for
-  non-ambient tracks; per-track midpoint for ambient).
-- Swept track volume: scaled by 0.75 to compensate for the always-open filter.
-- Chill Pads dynamic boost: uses the `boostEffectEnabled` flag (user toggle) rather than the
-  animated `outputVolume` so the export volume is stable.
+- **Effect settings** are copied from the live engine (`effectSnapshots()`), so a changed default reaches export on its own.
+- **One chain.** `OfflineExport.ExportTrackChain` builds a track's nodes and applies its automation; the mix and every stem use it.
+- **Timed changes are shared.** `MixAutomation` (Sources/Zudio/Playback/MixAutomation.swift) holds the curves as pure functions of the song and a time: filter tides and sweeps with their schedule, the master fades, Kosmic's drone fades, the Zen pad cutoff, the Ambient swell rule and the drum note mapping. PlaybackEngine's timers and the export's render loop both read them. The Ambient and Chill Pads per-note fade is replayed from the note list (`PadEnvelope`). Tests: MixAutomationTests and EffectChainParityTests.
+
+When you add a timed change to playback, add its curve to MixAutomation and have both sides call it.
+
+### Known differences
+
+- **Reverb rooms.** Export renders every track in the default room (the offline reverb ignores factory presets; see ReverbPresetOfflineTests). Only the amount of reverb carries over.
+- **Large-bus low cut.** Base Ambient, Zen and Piano pads feed the live Cathedral through a low cut; export has none.
+- **Gestures.** A tap-empty sweep is not in the song, so not in export. Evolve's pass-boundary sweeps are matched (2026-11-24): export renders the loaded song, which in Evolve is the extended song (body plus the passes so far), and `AppState.evolveBoundarySweepSteps` hands the same steps to `MixAutomation.filterSweeps`.
+- **Evolve instrument switches: the export is not instrument accurate (decided 2026-11-24, not planned).** Live Evolve switches instruments at pass boundaries (`switchEvolveInstruments`: Lead 1, Lead 2, Pads and Rhythm). The export renders the song with the one instrument each track has loaded when you export, which is the instrument from the last Evolve phase reached (phase 1 or phase 2). So an evolved song exports with those last instruments from bar 1, and the main section, and phase 1 if you went on to phase 2, do not use the instruments that were heard live. Ambient Piano is unaffected because its Lead 1 is the Stereo Piano throughout. Every other style can export a different Lead 1, Lead 2, pad or rhythm sound in the early sections than the one you heard. Matching it would need an instrument history, one sampler render per segment and a per-segment effect snapshot (levels and trims differ per instrument); about 150 to 250 lines and a real risk of level mismatches, so it was skipped. Songs reloaded from a .zudio file have no Evolve history at all.
+- **Intro start.** Matched 2026-11-24: Kosmic, Motorik with an intro and Chill with an already-playing intro start after the 50 ms `StartGuard.introHoldSeconds` with no ramp, as live; every other song keeps the 200 ms gap and ramp.
+- **Reverb rooms.** Matched 2026-11-24: each export track takes its bus's room (the room live uses) through `OfflineExport.applyRoom`, which sets the unit's `auAudioUnit.currentPreset`; the tail after the song is sized to the longest room (3 to 9 s) with a 1.5 s fade at the very end. Still open: the large-bus low cut (live cuts below 300 Hz going into the large reverb only; export has an insert reverb and cannot), and the Ambient and Chill texture track, whose export reverb is fixed at its own settings.
+- **Texture.** Plays outside the master fade, as in playback.
 
 ### Files
 
