@@ -21,7 +21,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**v3.5 (build 139, 2026-11-24) is the release candidate, expected on the App Store December 1, with a new substyle.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient and Zen also answer a tap on empty space with a slow filter tide. 
+**v3.5 (build 139, 2026-11-24) is the release candidate, expected on the App Store December 1, with a new substyle.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient and Zen also answer a tap on empty space with a slow filter tide. Also new swipe navigation on Mac tracks view and many bug fixes.
 There are also numerous improvements to regular Ambient and Ambient Piano to make them more melodic. 
 Details in the [change log](docs/change-log.md).
 

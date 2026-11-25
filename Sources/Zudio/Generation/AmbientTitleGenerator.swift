@@ -35,13 +35,13 @@ struct AmbientTitleGenerator {
         "a Locked Conference Room", "the Queue at Boots",
         "Browsing IKEA on a Sunday", "a Cancelled Train",
         "the Tyre Centre Queue",
-        "the Bus that Was Full", "Supermarket Self-Checkout",
+        "the Bus That Was Full", "Supermarket Self-Checkout",
         "an Uneventful Tuesday", "a Too Long Meeting",
         "the Unused Changing Room", "a Business Park in January",
         "the Post-Lunch Deadzone", "a Bad Gear Review",
         "the NCP Car Park at Dusk", "a Mildly Warm Office",
-        "a Distribution Centre", "the Holdmusic",
-        "a Slowly Loading Web Page", "an Unattended Printer",
+        "a Data Centre", "the Hold Music",
+        "a Slow Loading Web Page", "a Broken Printer",
         "the Petrol Station", "Reconsidering Life Choices",
         "Returning Without Receipt"
     ]
