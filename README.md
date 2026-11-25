@@ -21,7 +21,9 @@ This repository contains the macOS app source, implementation notes, and support
 
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**v3.5 (build 139, 2026-11-24) is the release candidate, expected on the App Store December 1, with a new substyle.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient and Zen also answer a tap on empty space with a slow filter tide. Details in the [change log](docs/change-log.md).
+**v3.5 (build 139, 2026-11-24) is the release candidate, expected on the App Store December 1, with a new substyle.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient and Zen also answer a tap on empty space with a slow filter tide. 
+There are also numerous improvements to regular Ambient and Ambient Piano to make them more melodic. 
+Details in the [change log](docs/change-log.md).
 
 **Zudio 3.0 is a major release, with many improvements across all four styles.** Build 138 was submitted to the App Store on 2026-11-15. Highlights: Chill has new jazz leads, second-soloist answers and chords that move; Kosmic gains the Jean-Michel Jarre-style Space substyle; Motorik Noir and Europe get new leads transcribed from real tracks; Chill Soho brings back the St Germain beat; playback is smoother with a lighter visualizer; and iPhone audio recovers better from a stuck output. The sections below list the details.
 
