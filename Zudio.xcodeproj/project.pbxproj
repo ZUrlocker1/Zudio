@@ -65,6 +65,7 @@
 		AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */; };
 		AA000000000000000000051 /* AmbientStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000051 /* AmbientStructureGenerator.swift */; };
 		AA000000000000000000052 /* AmbientLoopTiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000052 /* AmbientLoopTiler.swift */; };
+		AA000000000000000000901 /* AmbientPianoRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000901 /* AmbientPianoRule.swift */; };
 		AA000000000000000000053 /* AmbientPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000053 /* AmbientPadsGenerator.swift */; };
 		AA000000000000000000054 /* AmbientBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000054 /* AmbientBassGenerator.swift */; };
 		AA000000000000000000055 /* AmbientDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000055 /* AmbientDrumGenerator.swift */; };
@@ -170,6 +171,7 @@
 		IS000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */; };
 		IS000000000000000000051 /* AmbientStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000051 /* AmbientStructureGenerator.swift */; };
 		IS000000000000000000052 /* AmbientLoopTiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000052 /* AmbientLoopTiler.swift */; };
+		IS000000000000000000901 /* AmbientPianoRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000901 /* AmbientPianoRule.swift */; };
 		IS000000000000000000053 /* AmbientPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000053 /* AmbientPadsGenerator.swift */; };
 		IS000000000000000000054 /* AmbientBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000054 /* AmbientBassGenerator.swift */; };
 		IS000000000000000000055 /* AmbientDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000055 /* AmbientDrumGenerator.swift */; };
@@ -322,6 +324,7 @@
 		BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientMusicalFrameGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000051 /* AmbientStructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientStructureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000052 /* AmbientLoopTiler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLoopTiler.swift; sourceTree = "<group>"; };
+		BB000000000000000000901 /* AmbientPianoRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientPianoRule.swift; sourceTree = "<group>"; };
 		BB000000000000000000053 /* AmbientPadsGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientPadsGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000054 /* AmbientBassGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBassGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000055 /* AmbientDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientDrumGenerator.swift; sourceTree = "<group>"; };
@@ -612,6 +615,7 @@
 				BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */,
 				BB000000000000000000051 /* AmbientStructureGenerator.swift */,
 				BB000000000000000000052 /* AmbientLoopTiler.swift */,
+				BB000000000000000000901 /* AmbientPianoRule.swift */,
 				BB000000000000000000053 /* AmbientPadsGenerator.swift */,
 				BB000000000000000000054 /* AmbientBassGenerator.swift */,
 				BB000000000000000000055 /* AmbientDrumGenerator.swift */,
@@ -987,6 +991,7 @@
 				AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
 				AA000000000000000000051 /* AmbientStructureGenerator.swift in Sources */,
 				AA000000000000000000052 /* AmbientLoopTiler.swift in Sources */,
+				AA000000000000000000901 /* AmbientPianoRule.swift in Sources */,
 				AA000000000000000000053 /* AmbientPadsGenerator.swift in Sources */,
 				AA000000000000000000054 /* AmbientBassGenerator.swift in Sources */,
 				AA000000000000000000055 /* AmbientDrumGenerator.swift in Sources */,
@@ -1099,6 +1104,7 @@
 				IS000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
 				IS000000000000000000051 /* AmbientStructureGenerator.swift in Sources */,
 				IS000000000000000000052 /* AmbientLoopTiler.swift in Sources */,
+				IS000000000000000000901 /* AmbientPianoRule.swift in Sources */,
 				IS000000000000000000053 /* AmbientPadsGenerator.swift in Sources */,
 				IS000000000000000000054 /* AmbientBassGenerator.swift in Sources */,
 				IS000000000000000000055 /* AmbientDrumGenerator.swift in Sources */,
