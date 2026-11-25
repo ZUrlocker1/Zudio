@@ -222,9 +222,9 @@ struct AmbientPadsGenerator {
         // AMB-PNO-003: 50% warm sustain, 50% halo shimmer
         let chosen: String
         switch pianoRule {
-        case "AMB-PNO-001":
+        case AmbientPianoRule.buds.rawValue:
             chosen = roll < 0.20 ? "AMB-PADS-007" : roll < 0.50 ? "AMB-PADS-010" : roll < 0.75 ? "AMB-PADS-009" : "AMB-PADS-008"
-        case "AMB-PNO-003":
+        case AmbientPianoRule.koln.rawValue:
             chosen = roll < 0.50 ? "AMB-PADS-009" : "AMB-PADS-010"
         default:
             chosen = roll < 0.40 ? "AMB-PADS-008" : roll < 0.70 ? "AMB-PADS-010" : roll < 0.90 ? "AMB-PADS-009" : "AMB-PADS-007"

@@ -232,7 +232,7 @@ struct AmbientLeadGenerator {
             let note    = notes[rng.nextInt(upperBound: notes.count)]
             let dur     = Swift.min(8 + rng.nextInt(upperBound: 17), loopSteps - cursor)  // 8–24 steps
             guard dur >= 4 else { break }
-            let vel     = UInt8(35 + rng.nextInt(upperBound: 28))  // 35–62, softer than Lead 1
+            let vel     = pnoVel(35 + rng.nextInt(upperBound: 28))  // 35–62, softer than Lead 1
             events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
             cursor += dur + dur + rng.nextInt(upperBound: Swift.max(1, loopSteps / 4))
         }
@@ -273,7 +273,7 @@ struct AmbientLeadGenerator {
             let dur  = Swift.min(holdSteps, loopSteps - cursor)
             guard dur >= 4 else { break }
             let baseVel = Swift.max(22, 38 - i * 3)   // 38 at top, fades to ~26 at bottom
-            let vel = UInt8(baseVel + rng.nextInt(upperBound: 8))
+            let vel = pnoVel(baseVel + rng.nextInt(upperBound: 8))
             events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
             cursor += holdSteps + gapSteps
         }
@@ -302,7 +302,7 @@ struct AmbientLeadGenerator {
             let dur     = 8 + rng.nextInt(upperBound: 17)   // 8–24 steps
             let safeDur = Swift.min(dur, loopSteps - cursor)
             if safeDur >= 4 {
-                let vel = UInt8(50 + rng.nextInt(upperBound: 30))  // 50–79
+                let vel = pnoVel(50 + rng.nextInt(upperBound: 30))  // 50–79
                 events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: safeDur))
             }
             // AMB-RULE-02: rest ≥ 2× note duration
@@ -329,7 +329,7 @@ struct AmbientLeadGenerator {
                 let safeDur = Swift.min(dur, loopSteps - cursor)
                 let baseVel = 65 - i * 12
                 if safeDur >= 2 {
-                    let vel = UInt8(Swift.max(20, baseVel + rng.nextInt(upperBound: 10)))
+                    let vel = pnoVel(Swift.max(20, baseVel + rng.nextInt(upperBound: 10)))
                     events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: safeDur))
                 }
                 cursor += safeDur + gap
@@ -355,7 +355,7 @@ struct AmbientLeadGenerator {
                 let step = cursor + i * 3
                 guard step < loopSteps else { break }
                 let idx  = Swift.min(startIdx + i, notes.count - 1)
-                let vel  = UInt8(Swift.min(80, 40 + i * 8 + rng.nextInt(upperBound: 10)))
+                let vel  = pnoVel(Swift.min(80, 40 + i * 8 + rng.nextInt(upperBound: 10)))
                 events.append(MIDIEvent(stepIndex: step, note: notes[idx], velocity: vel, durationSteps: 2))
             }
             // AMB-RULE-02: long rest after shimmer
@@ -393,7 +393,7 @@ struct AmbientLeadGenerator {
         var events: [MIDIEvent] = []
         var cursor = offset
         for (i, note) in phrase.enumerated() {
-            let vel = UInt8(Swift.min(100, baseVels[i] + rng.nextInt(upperBound: 8)))
+            let vel = pnoVel(Swift.min(100, baseVels[i] + rng.nextInt(upperBound: 8)))
             let dur = Swift.min(holdSteps, loopSteps - cursor)
             if dur >= 4 {
                 events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
@@ -439,7 +439,7 @@ struct AmbientLeadGenerator {
                 guard step < loopSteps else { break }
                 let dur = Swift.min(noteDur, loopSteps - step)
                 guard dur >= 2 else { break }
-                let vel = UInt8(Swift.max(25, Swift.min(100, baseVel + velBoost + rng.nextInt(upperBound: 8) - 4)))
+                let vel = pnoVel(Swift.max(25, Swift.min(100, baseVel + velBoost + rng.nextInt(upperBound: 8) - 4)))
                 evts.append(MIDIEvent(stepIndex: step, note: notes[noteIdx],
                                       velocity: vel, durationSteps: dur))
             }
@@ -539,7 +539,7 @@ struct AmbientLeadGenerator {
                     let note = pool[rng.nextInt(upperBound: pool.count)]
                     let dur  = Swift.min(4 + rng.nextInt(upperBound: 5), 16 - step)  // 4–8 steps
                     guard dur >= 2 else { continue }
-                    let vel  = UInt8(38 + rng.nextInt(upperBound: 31))  // 38–68
+                    let vel  = pnoVel(38 + rng.nextInt(upperBound: 31))  // 38–68
 
                     events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                             velocity: vel, durationSteps: dur))
@@ -627,7 +627,7 @@ struct AmbientLeadGenerator {
                     for j in 1...descentLen {
                         guard step < 15 else { break }
                         let idx  = Swift.max(0, topIdx - j)
-                        let vel  = UInt8(12 + rng.nextInt(upperBound: 16))  // 12–27
+                        let vel  = pnoVel(12 + rng.nextInt(upperBound: 16))  // 12–27
                         events.append(MIDIEvent(stepIndex: barStart + step, note: allNotes[idx],
                                                 velocity: vel, durationSteps: 2))
                         step += 2
@@ -639,14 +639,6 @@ struct AmbientLeadGenerator {
     }
 
     // MARK: - Ambient Piano Lead (full-song, no loop tiler)
-
-    /// Measurement hook for tests: when non-nil, the piano rules append each melody phrase here
-    /// (label + its events). Nil in the app. Never touches the RNG, so output is unchanged.
-    struct PianoProbePhrase { let label: String; let events: [MIDIEvent] }
-    nonisolated(unsafe) static var pianoProbe: [PianoProbePhrase]? = nil
-    private static func probe(_ label: String, _ ev: [MIDIEvent]) {
-        if pianoProbe != nil, !ev.isEmpty { pianoProbe!.append(PianoProbePhrase(label: label, events: ev)) }
-    }
 
     static func generateAmbientPianoLead(
         pianoRule: String,
@@ -661,14 +653,19 @@ struct AmbientLeadGenerator {
     ) -> [MIDIEvent] {
         usedRuleIDs.insert(pianoRule)
         let events: [MIDIEvent]
-        switch pianoRule {
-        case "AMB-PNO-001": events = floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
-        case "AMB-PNO-003": events = dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng,
+        switch AmbientPianoRule(id: pianoRule) {
+        case .buds: events = floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
+        case .koln: events = dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng,
                                                        usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass,
                                                        arcVariation: arcVariation, reachLog: reachLog)
-        default:            events = pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
+        case .satin: events = pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
         }
         return events.map { capPianoSustain($0) }
+    }
+
+    /// Swaps a rule's parent ID for the variant that was drawn (the log tags it under the parent).
+    private static func logVariant(_ variant: String, of parent: AmbientPianoRule, in ids: inout Set<String>) {
+        ids.remove(parent.rawValue); ids.insert(variant)
     }
 
     /// The longest a piano note is written: one bar. A piano does not sustain much past that, so a
@@ -676,9 +673,41 @@ struct AmbientLeadGenerator {
     /// Zack 2026-11-24) read in the piano roll as a hold the sound never had. Applied to the rules'
     /// finished notes, so no random draw changes.
     static let pianoMaxSustainSteps = 16
+    /// A velocity from any Int formula, clamped to 1-127, so a drifting formula can't trap on the cast.
+    private static func pnoVel(_ v: Int) -> UInt8 { UInt8(Swift.max(1, Swift.min(127, v))) }
+    /// The left hand's bass register (E2 to F#3) in Satin and Koln.
+    static let pnoBassLow = 40, pnoBassHigh = 54
+    /// Half-step, tritone or major 7th apart (octaves ignored): the rubs the piano rules keep out.
+    static func pnoRubs(_ a: Int, _ b: Int) -> Bool { [1, 6, 11].contains(abs(a - b) % 12) }
+    /// Below this a major 2nd is a real close second (a 9th over a low root or drone is colour).
+    static let pnoCloseSecondCeiling: UInt8 = 55
+    /// What the trimmers treat as a clash: a rub, or a close second low down. A 9th over a low root
+    /// or drone is colour, and treating it as a clash dropped Satie's suspended-2nd endings.
+    static func pnoClash(_ a: UInt8, _ b: UInt8) -> Bool {
+        pnoRubs(Int(a), Int(b)) || (abs(Int(a) - Int(b)) == 2 && Swift.min(a, b) < pnoCloseSecondCeiling)
+    }
+
+    /// A block-chord stab: `root`, the m3 or M3 above it and the 5th above it, all from `pool`; the
+    /// upper notes a little softer.
+    private static func chordHit(at step: Int, root: UInt8, pool: [UInt8], vel: UInt8, dur: Int) -> [MIDIEvent] {
+        var out = [MIDIEvent(stepIndex: step, note: root, velocity: vel, durationSteps: dur)]
+        if let third = pool.first(where: { [3, 4].contains(Int($0) - Int(root)) }) {
+            out.append(MIDIEvent(stepIndex: step, note: third, velocity: vel > 4 ? vel - 4 : vel, durationSteps: dur))
+        }
+        if let fifth = pool.first(where: { Int($0) - Int(root) == 7 }) {
+            out.append(MIDIEvent(stepIndex: step, note: fifth, velocity: vel > 7 ? vel - 7 : vel, durationSteps: dur))
+        }
+        return out
+    }
+
+    /// The tonic triad's third in the scale: the major 3rd if the scale has it, else the minor 3rd.
+    private static func pnoThirdPC(of root: Int, in scale: some Collection<Int>) -> Int? {
+        let major = (root + 4) % 12, minor = (root + 3) % 12
+        return scale.contains(major) ? major : (scale.contains(minor) ? minor : nil)
+    }
+
     private static func capPianoSustain(_ e: MIDIEvent) -> MIDIEvent {
-        e.durationSteps <= pianoMaxSustainSteps ? e
-            : MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity, durationSteps: pianoMaxSustainSteps)
+        e.durationSteps <= pianoMaxSustainSteps ? e : e.with(durationSteps: pianoMaxSustainSteps)
     }
 
     // MARK: AMB-PNO-001 — Floating Buds (Harold Budd)
@@ -689,14 +718,14 @@ struct AmbientLeadGenerator {
     ) -> [MIDIEvent] {
         let r = rng.nextDouble()
         if r < 0.40 {
-            usedRuleIDs.remove("AMB-PNO-001"); usedRuleIDs.insert("AMB-PNO-001-BT")
+            logVariant(AmbientPianoRule.Variant.budsSparse, of: .buds, in: &usedRuleIDs)
             return floatingTonesMode1(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
         }
         if r < 0.75 {
-            usedRuleIDs.remove("AMB-PNO-001"); usedRuleIDs.insert("AMB-PNO-001-CW")
+            logVariant(AmbientPianoRule.Variant.budsChordWash, of: .buds, in: &usedRuleIDs)
             return floatingTonesMode2(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
         }
-        usedRuleIDs.remove("AMB-PNO-001"); usedRuleIDs.insert("AMB-PNO-001-PD")
+        logVariant(AmbientPianoRule.Variant.budsPendulum, of: .buds, in: &usedRuleIDs)
         return floatingTonesMode3(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
     }
 
@@ -747,7 +776,7 @@ struct AmbientLeadGenerator {
                 let dur = Swift.min(8 + rng.nextInt(upperBound: 9), totalSteps - cursor)
                 if dur >= 4 {
                     events.append(MIDIEvent(stepIndex: cursor, note: evtNotes[idx],
-                                            velocity: UInt8(24 + rng.nextInt(upperBound: 18)),
+                                            velocity: pnoVel(24 + rng.nextInt(upperBound: 18)),
                                             durationSteps: dur))
                 }
 
@@ -760,14 +789,14 @@ struct AmbientLeadGenerator {
                          ?? evtNotes.first(where: { abs(Int($0) - Int(note1)) == 5 })
                 let dur1 = Swift.min(10 + rng.nextInt(upperBound: 7), totalSteps - cursor)
                 if dur1 >= 6 {
-                    let vel = UInt8(26 + rng.nextInt(upperBound: 16))
+                    let vel = pnoVel(26 + rng.nextInt(upperBound: 16))
                     events.append(MIDIEvent(stepIndex: cursor, note: note1, velocity: vel, durationSteps: dur1))
                     if let n2 = note2 {
                         let offset = 2 + rng.nextInt(upperBound: 3)
                         let dur2 = Swift.min(dur1 - offset, totalSteps - cursor - offset)
                         if dur2 >= 4 {
                             events.append(MIDIEvent(stepIndex: cursor + offset, note: n2,
-                                                    velocity: UInt8(Swift.max(18, Int(vel) - 6)),
+                                                    velocity: pnoVel(Swift.max(18, Int(vel) - 6)),
                                                     durationSteps: dur2))
                         }
                     }
@@ -792,7 +821,7 @@ struct AmbientLeadGenerator {
                                        :  2 + rng.nextInt(upperBound: 4)
                     let dur    = Swift.min(raw, totalSteps - s - 1)
                     guard dur >= 2 else { break }
-                    let vel = UInt8(Swift.max(18, 40 - fi * 4 + rng.nextInt(upperBound: 7)))
+                    let vel = pnoVel(Swift.max(18, 40 - fi * 4 + rng.nextInt(upperBound: 7)))
                     if isLast { noteIdx = snapConst(noteIdx) }   // come to rest on a bell
                     events.append(MIDIEvent(stepIndex: s, note: evtNotes[noteIdx],
                                             velocity: vel, durationSteps: dur))
@@ -823,8 +852,8 @@ struct AmbientLeadGenerator {
                                        :  2 + rng.nextInt(upperBound: 4)
                     let dur    = Swift.min(raw, totalSteps - s - 1)
                     guard dur >= 2 else { break }
-                    let vel = isLast ? UInt8(30 + rng.nextInt(upperBound: 14))
-                                    : UInt8(22 + rng.nextInt(upperBound: 10))
+                    let vel = isLast ? pnoVel(30 + rng.nextInt(upperBound: 14))
+                                    : pnoVel(22 + rng.nextInt(upperBound: 10))
                     if isLast { noteIdx = snapConst(noteIdx) }   // come to rest on a bell
                     events.append(MIDIEvent(stepIndex: s, note: evtNotes[noteIdx],
                                             velocity: vel, durationSteps: dur))
@@ -850,14 +879,14 @@ struct AmbientLeadGenerator {
                 let d0 = Swift.min(3 + rng.nextInt(upperBound: 3), totalSteps - s - 6)
                 if d0 >= 2 {
                     events.append(MIDIEvent(stepIndex: s, note: low,
-                                            velocity: UInt8(24 + rng.nextInt(upperBound: 8)),
+                                            velocity: pnoVel(24 + rng.nextInt(upperBound: 8)),
                                             durationSteps: d0))
                     s += d0 + 1; lastIdx = lowIdx
                 }
                 let d1 = Swift.min(4 + rng.nextInt(upperBound: 5), totalSteps - s - 4)
                 if d1 >= 2 && s < totalSteps {
                     events.append(MIDIEvent(stepIndex: s, note: leap,
-                                            velocity: UInt8(32 + rng.nextInt(upperBound: 14)),
+                                            velocity: pnoVel(32 + rng.nextInt(upperBound: 14)),
                                             durationSteps: d1))
                     s += d1 + 1; lastIdx = leapIdx
                 }
@@ -870,7 +899,7 @@ struct AmbientLeadGenerator {
                 let d2 = Swift.min(d2raw, totalSteps - s)
                 if d2 >= 4 && s < totalSteps {
                     events.append(MIDIEvent(stepIndex: s, note: evtNotes[resolveIdx],
-                                            velocity: UInt8(22 + rng.nextInt(upperBound: 10)),
+                                            velocity: pnoVel(22 + rng.nextInt(upperBound: 10)),
                                             durationSteps: d2))
                     lastIdx = resolveIdx
                 }
@@ -891,14 +920,14 @@ struct AmbientLeadGenerator {
                    let color = evtNotes.first(where: { [10, 11, 12].contains(Int($0) - Int(chordRoot)) }) {
                     washNotes.append(color)
                 }
-                let washVel = UInt8(52 + rng.nextInt(upperBound: 18))
+                let washVel = pnoVel(52 + rng.nextInt(upperBound: 18))
                 var s = cursor
                 for (ci, note) in washNotes.enumerated() {
                     guard s < totalSteps - 4 else { break }
                     let dur = Swift.min(12 + rng.nextInt(upperBound: 9), totalSteps - s)
                     if dur >= 4 {
                         events.append(MIDIEvent(stepIndex: s, note: note,
-                                                velocity: UInt8(Swift.max(28, Int(washVel) - ci * 5)),
+                                                velocity: pnoVel(Swift.max(28, Int(washVel) - ci * 5)),
                                                 durationSteps: dur))
                     }
                     s += 2 + rng.nextInt(upperBound: 2)
@@ -934,13 +963,13 @@ struct AmbientLeadGenerator {
             if let oct = evtNotes.first(where: { Int($0) - Int(aRoot) == 12 }) {
                 aChord.append(oct)
             }
-            let aVel = UInt8(42 + rng.nextInt(upperBound: 12))
+            let aVel = pnoVel(42 + rng.nextInt(upperBound: 12))
             for (ci, note) in aChord.enumerated() {
                 let step = anchorStep + ci * 2
                 let dur  = Swift.min(14 + rng.nextInt(upperBound: 6), totalSteps - step)
                 if dur >= 4 && step < totalSteps {
                     events.append(MIDIEvent(stepIndex: step, note: note,
-                                            velocity: UInt8(Swift.max(26, Int(aVel) - ci * 5)),
+                                            velocity: pnoVel(Swift.max(26, Int(aVel) - ci * 5)),
                                             durationSteps: dur))
                 }
             }
@@ -958,7 +987,7 @@ struct AmbientLeadGenerator {
         //      the incoming phrase's register, making it a 2-note bridge figure.
         let sorted = events.sorted { $0.stepIndex < $1.stepIndex }
         var connectors: [MIDIEvent] = []
-        for i in 0..<sorted.count - 1 {
+        for i in sorted.indices.dropLast() {
             let ev       = sorted[i]
             let next     = sorted[i + 1]
             // Idea 1: shorten effective end of very soft sustains for perceived-gap purposes
@@ -970,7 +999,7 @@ struct AmbientLeadGenerator {
             guard rng.nextDouble() < 0.75 else { continue } // idea 2: higher probability
             guard let lastEIdx = evtNotes.firstIndex(of: ev.note) else { continue }
 
-            let connVel  = UInt8(22 + rng.nextInt(upperBound: 9))
+            let connVel  = pnoVel(22 + rng.nextInt(upperBound: 9))
             let delta    = rng.nextDouble() < 0.50 ? 1 : -1
             let nbIdx    = Swift.max(0, Swift.min(evtNotes.count - 1, lastEIdx + delta))
 
@@ -989,7 +1018,7 @@ struct AmbientLeadGenerator {
                     let lateDur      = Swift.min(12 + rng.nextInt(upperBound: 9), next.stepIndex - lateStep - 2)
                     if lateDur >= 6 && lateStep < next.stepIndex - 4 {
                         connectors.append(MIDIEvent(stepIndex: lateStep, note: evtNotes[nb2Idx],
-                                                    velocity: UInt8(Swift.max(20, Int(connVel) - 3)),
+                                                    velocity: pnoVel(Swift.max(20, Int(connVel) - 3)),
                                                     durationSteps: lateDur))
                     }
                 }
@@ -1084,6 +1113,7 @@ struct AmbientLeadGenerator {
             }
             return true
         }
+        guard !voicingPool.isEmpty else { return [] }   // an unusual scale can filter every voicing out
 
         let baseChordVel = 22 + rng.nextInt(upperBound: 14)   // 22-35: chords sit behind the melody (Idea 3)
         let scaleHigh    = notesInRegister(pitchClasses: Set(frame.scalePCs), low: 62, high: 85)
@@ -1119,9 +1149,9 @@ struct AmbientLeadGenerator {
             let songPos  = Double(startStep) / Double(totalSteps)
             let arcFade  = songPos < 0.15 ? Int(songPos / 0.15 * 6) :
                            songPos > 0.80 ? Int((1.0 - songPos) / 0.20 * 6) : 6
-            let chordVel = UInt8(Swift.max(18, Swift.min(38, baseChordVel - 3 + arcFade + rng.nextInt(upperBound: 7))))
+            let chordVel = pnoVel(Swift.max(18, Swift.min(38, baseChordVel - 3 + arcFade + rng.nextInt(upperBound: 7))))
             // Melody notes sit noticeably above the chord wash (Idea 3)
-            let melVel   = UInt8(Swift.max(32, Swift.min(58, Int(chordVel) + 14 + rng.nextInt(upperBound: 12))))
+            let melVel   = pnoVel(Swift.max(32, Swift.min(58, Int(chordVel) + 14 + rng.nextInt(upperBound: 12))))
 
             var dur = 0
             if rng.nextDouble() < 0.15 && i > 0 {
@@ -1185,14 +1215,14 @@ struct AmbientLeadGenerator {
                                 let e2dur  = Swift.min(5 + rng.nextInt(upperBound: 9), totalSteps - e2start)
                                 if e2dur >= 2 && nb2 != nb1 {
                                     events.append(MIDIEvent(stepIndex: e2start, note: nb2,
-                                                            velocity: UInt8(Swift.max(22, Int(slot.melVel) - 8)),
+                                                            velocity: pnoVel(Swift.max(22, Int(slot.melVel) - 8)),
                                                             durationSteps: e2dur))
                                     if rng.nextDouble() < 0.60 {
                                         let e3start = e2start + e2dur + 2
                                         let e3dur   = Swift.min(4 + rng.nextInt(upperBound: 8), totalSteps - e3start)
                                         if e3start < totalSteps && e3dur >= 2 {
                                             events.append(MIDIEvent(stepIndex: e3start, note: nb1,
-                                                                    velocity: UInt8(Swift.max(18, Int(slot.melVel) - 14)),
+                                                                    velocity: pnoVel(Swift.max(18, Int(slot.melVel) - 14)),
                                                                     durationSteps: e3dur))
                                         }
                                     }
@@ -1217,7 +1247,7 @@ struct AmbientLeadGenerator {
                     guard s + 6 < gapEnd else { break }
                     let noteDur = Swift.min(8 + rng.nextInt(upperBound: 7), gapEnd - s)
                     events.append(MIDIEvent(stepIndex: s, note: note,
-                                            velocity: UInt8(Swift.max(18, Int(gVel) - 8)),
+                                            velocity: pnoVel(Swift.max(18, Int(gVel) - 8)),
                                             durationSteps: noteDur))
                     s += 4 + rng.nextInt(upperBound: 5)
                 }
@@ -1237,7 +1267,7 @@ struct AmbientLeadGenerator {
                         : Swift.min(3 + rng.nextInt(upperBound: 3), gapEnd - s)
                     guard noteDur >= 2 else { break }
                     events.append(MIDIEvent(stepIndex: s, note: scaleHigh[noteIdx],
-                                            velocity: UInt8(Swift.max(18, Int(gVel) - n * 4)),
+                                            velocity: pnoVel(Swift.max(18, Int(gVel) - n * 4)),
                                             durationSteps: noteDur))
                     s += noteDur + 2 + rng.nextInt(upperBound: 4)
                     let step = rng.nextDouble() < 0.25 ? 2 : 1
@@ -1262,7 +1292,7 @@ struct AmbientLeadGenerator {
                         : Swift.min(3 + rng.nextInt(upperBound: 4), gapEnd - s)
                     guard noteDur >= 2 else { break }
                     events.append(MIDIEvent(stepIndex: s, note: scaleHigh[idx],
-                                            velocity: UInt8(Swift.max(20, Int(gVel) - n * 6)),
+                                            velocity: pnoVel(Swift.max(20, Int(gVel) - n * 6)),
                                             durationSteps: noteDur))
                     s += noteDur + 3 + rng.nextInt(upperBound: 5)
                 }
@@ -1276,7 +1306,7 @@ struct AmbientLeadGenerator {
             let closingStep = totalSteps - (9 + rng.nextInt(upperBound: 2)) * 16
             let closingDur  = Swift.min(totalSteps - closingStep - 4, 2 * 16)
             if closingStep > lastStep + 16 && closingDur >= 16 {
-                let closingVel = UInt8(Swift.max(32, Swift.min(52, baseChordVel + 12)))
+                let closingVel = pnoVel(Swift.max(32, Swift.min(52, baseChordVel + 12)))
                 for note in voicingPool[0] {
                     events.append(MIDIEvent(stepIndex: closingStep, note: note,
                                             velocity: closingVel,
@@ -1347,7 +1377,7 @@ struct AmbientLeadGenerator {
                                     : 3 + rng.nextInt(upperBound: 4)   // 16th → dotted-quarter
                 let dur    = Swift.min(raw, openEnd - s - 2)
                 if dur >= 2 && note >= 21 && note <= 108 {
-                    let vel = UInt8(Swift.max(20, Swift.min(56, velBase + rng.nextInt(upperBound: 10) - 4)))
+                    let vel = pnoVel(Swift.max(20, Swift.min(56, velBase + rng.nextInt(upperBound: 10) - 4)))
                     events.append(MIDIEvent(stepIndex: s, note: note, velocity: vel, durationSteps: dur))
                 }
                 let mv = rng.nextDouble()
@@ -1362,7 +1392,7 @@ struct AmbientLeadGenerator {
             let fragEnd   = Swift.min(s + fragBars * 16, openEnd)
             let fragCount = 1 + Int(progress * 3.5) + rng.nextInt(upperBound: 2)
             var fs = s + 2 + rng.nextInt(upperBound: 6)
-            let fragVel   = UInt8(Swift.max(20, velBase - 10))
+            let fragVel   = pnoVel(Swift.max(20, velBase - 10))
             for _ in 0..<fragCount {
                 guard fs + 3 < fragEnd else { break }
                 let fNote = oFlip ? a0 : a1
@@ -1391,12 +1421,12 @@ struct AmbientLeadGenerator {
             // Produces 2-3 dynamic swells so the section breathes rather than sitting uniformly loud.
             let t = Double(step - pendStart * 16) / Double(pendTotalSteps)
             let breathBoost = Int(sin(t * .pi * 2.5) * 10.0)
-            let clVel = UInt8(Swift.max(22, Swift.min(54, baseVel3 + breathBoost + rng.nextInt(upperBound: 9) - 4)))
+            let clVel = pnoVel(Swift.max(22, Swift.min(54, baseVel3 + breathBoost + rng.nextInt(upperBound: 9) - 4)))
             guard primaryNote >= 21 && primaryNote <= 108 else { useA.toggle(); step += 4; continue }
             events.append(MIDIEvent(stepIndex: step, note: UInt8(primaryNote), velocity: clVel, durationSteps: dur))
             if rng.nextDouble() < 0.35 && harmNote != primaryNote && harmNote >= 21 && harmNote <= 108 {
                 events.append(MIDIEvent(stepIndex: step, note: UInt8(harmNote),
-                                        velocity: UInt8(clVel > 8 ? clVel - 8 : clVel), durationSteps: dur))
+                                        velocity: clVel > 8 ? clVel - 8 : clVel, durationSteps: dur))
             }
             // Primary bass every 2 bars (full velocity, octave doubled).
             // Secondary lighter hit at every 1-bar mark (40% chance) fills sparse stretches like bars 29-33.
@@ -1404,7 +1434,7 @@ struct AmbientLeadGenerator {
                 let bassIdx = (step / 32) % bassSeq.count
                 let br = Int(bassSeq[bassIdx])
                 let bd = Swift.min(28 + rng.nextInt(upperBound: 5), totalSteps - step)
-                let bVel = UInt8(Swift.max(36, Swift.min(65, baseVel3 + rng.nextInt(upperBound: 11) - 5)))
+                let bVel = pnoVel(Swift.max(36, Swift.min(65, baseVel3 + rng.nextInt(upperBound: 11) - 5)))
                 if bd >= 4 && br >= 21 && br <= 108 {
                     events.append(MIDIEvent(stepIndex: step, note: UInt8(br), velocity: bVel, durationSteps: bd))
                     let br2 = br + 12
@@ -1414,7 +1444,7 @@ struct AmbientLeadGenerator {
                 let bassIdx = (step / 32) % bassSeq.count
                 let br = Int(bassSeq[bassIdx])
                 let bd = Swift.min(14 + rng.nextInt(upperBound: 7), totalSteps - step)
-                let bVel = UInt8(Swift.max(26, Swift.min(48, baseVel3 - 12 + rng.nextInt(upperBound: 9) - 4)))
+                let bVel = pnoVel(Swift.max(26, Swift.min(48, baseVel3 - 12 + rng.nextInt(upperBound: 9) - 4)))
                 if bd >= 4 && br >= 21 && br <= 108 {
                     events.append(MIDIEvent(stepIndex: step, note: UInt8(br), velocity: bVel, durationSteps: bd))
                 }
@@ -1439,7 +1469,7 @@ struct AmbientLeadGenerator {
                                       : 3 + rng.nextInt(upperBound: 4)   // 16th → dotted-quarter
                 let mDur    = Swift.min(mRaw, pendEnd * 16 - ms - 2)
                 if mDur >= 2 && mNote >= 21 && mNote <= 108 {
-                    let mVel = UInt8(Swift.max(28, Swift.min(58, Int(baseVel3) - 6 + rng.nextInt(upperBound: 10))))
+                    let mVel = pnoVel(Swift.max(28, Swift.min(58, Int(baseVel3) - 6 + rng.nextInt(upperBound: 10))))
                     events.append(MIDIEvent(stepIndex: ms, note: mNote, velocity: mVel, durationSteps: mDur))
                 }
                 let mm = rng.nextDouble()
@@ -1475,7 +1505,7 @@ struct AmbientLeadGenerator {
                 let raw    = isLast ? 6 + rng.nextInt(upperBound: 5) : 3 + rng.nextInt(upperBound: 4)
                 let dur    = Swift.min(raw, totalSteps - s - 2)
                 if dur >= 2 && note >= 21 && note <= 108 {
-                    let vel = UInt8(Swift.max(16, Swift.min(54, velBase + rng.nextInt(upperBound: 10) - 4)))
+                    let vel = pnoVel(Swift.max(16, Swift.min(54, velBase + rng.nextInt(upperBound: 10) - 4)))
                     events.append(MIDIEvent(stepIndex: s, note: note, velocity: vel, durationSteps: dur))
                 }
                 let mv = rng.nextDouble()
@@ -1490,7 +1520,7 @@ struct AmbientLeadGenerator {
             let fragEnd   = Swift.min(s + fragBars * 16, totalSteps)
             let fragCount = 1 + Int(progress * 3.5) + rng.nextInt(upperBound: 2)
             var fs = s + 2 + rng.nextInt(upperBound: 6)
-            let fragVel   = UInt8(Swift.max(20, velBase - 10))
+            let fragVel   = pnoVel(Swift.max(20, velBase - 10))
             for _ in 0..<fragCount {
                 guard fs + 3 < fragEnd else { break }
                 let fNote = cFlip ? a0 : a1
@@ -1559,10 +1589,10 @@ struct AmbientLeadGenerator {
         let useNearLight = rng.nextDouble() < 0.30
 
         // Phrase windows — 4 phrases spaced through song; phrase 1 enters at bar 1-2
-        let w1 = Swift.min(1 + rng.nextInt(upperBound: 2), totalBars - 8) * 16
-        let w2 = Swift.min(totalBars * 27 / 100, totalBars - 8) * 16
-        let w3 = Swift.min(totalBars * 52 / 100, totalBars - 8) * 16
-        let w4 = Swift.min(totalBars * 76 / 100, totalBars - 8) * 16
+        let w1 = Swift.max(0, Swift.min(1 + rng.nextInt(upperBound: 2), totalBars - 8)) * 16
+        let w2 = Swift.max(0, Swift.min(totalBars * 27 / 100, totalBars - 8)) * 16
+        let w3 = Swift.max(0, Swift.min(totalBars * 52 / 100, totalBars - 8)) * 16
+        let w4 = Swift.max(0, Swift.min(totalBars * 76 / 100, totalBars - 8)) * 16
         let wLen = 5 * 16
 
         // Oscillation rhythm (once per song): even, dotted, long-short-short, lilting or slow-quick.
@@ -1598,10 +1628,10 @@ struct AmbientLeadGenerator {
         } else if rng.nextDouble() < 0.65 {
             let ev = jarrettSparseOpening(startStep: w1 + p1off, upper: upper, lower: lower,
                                           totalSteps: totalSteps, rng: &rng)
-            probe("p1-opening", ev.filter { $0.note >= 64 }); events += ev
+            events += ev
         } else {
             let ev = pnoReplay(motif, at: w1 + p1off, velCap: 40, totalSteps: totalSteps)
-            probe("p1", ev); events += ev
+            events += ev
             motifAtP1 = true
         }
 
@@ -1613,12 +1643,12 @@ struct AmbientLeadGenerator {
             p2src = pnoMoveAlongScale(p2src, by: 1 + rng.nextInt(upperBound: 2), scale: scaleAll)
         }
         let p2ev = pnoReplay(p2src, at: w2 + p2off, velCap: 46, totalSteps: totalSteps)
-        probe("p2", p2ev); events += p2ev
+        events += p2ev
 
         // Phrase 3 — the full statement returns at home (motif after an answer, answer after a motif)
         let p3off = rng.nextInt(upperBound: Swift.max(1, wLen / 2))
         let p3ev  = pnoReplay(motifAtP1 ? motif : answer, at: w3 + p3off, velCap: 60, totalSteps: totalSteps)
-        probe("p3", p3ev); events += p3ev
+        events += p3ev
         // Echoes 1-2, each 2-4 bars after the last: the answer, the motif's head, or the motif moved a step
         let p3echoes = 1 + (rng.nextDouble() < 0.60 ? 1 : 0)
         var p3cursor = phraseEnd(p3ev)
@@ -1631,7 +1661,7 @@ struct AmbientLeadGenerator {
             else             { src = pnoMoveAlongScale(motif, by: rng.nextDouble() < 0.50 ? 1 : -1, scale: scaleAll) }
             guard p3cursor + phraseEnd(src) < w4 else { break }
             let eev = pnoReplay(src, at: p3cursor, velCap: 56, totalSteps: totalSteps)
-            probe("p3-echo", eev); events += eev
+            events += eev
             p3cursor = phraseEnd(eev)
         }
 
@@ -1645,7 +1675,7 @@ struct AmbientLeadGenerator {
                                pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
                                upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng,
                                velCap: 36, rhythm: rhythm, ending: .home, frame: frame)
-            probe("p4", p4ev); events += p4ev
+            events += p4ev
             // Phrase 5 — sparse final exhale for long songs (>90 bars), very soft cadence
             if totalBars > 90 {
                 let w5 = Swift.min(totalBars * 90 / 100, totalBars - 4) * 16
@@ -1654,7 +1684,7 @@ struct AmbientLeadGenerator {
                                             pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
                                             upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng,
                                             velCap: 24, rhythm: rhythm, ending: .home, frame: frame)
-                    probe("p5", p5ev); events += p5ev
+                    events += p5ev
                 }
             }
         }
@@ -1674,12 +1704,12 @@ struct AmbientLeadGenerator {
                 // Give way to the melody: the other note if this one rubs (half-step, tritone, major
                 // 7th) against anything sounding, else no note this time
                 let under = events.filter { $0.stepIndex < qs + dur && $0.stepIndex + $0.durationSteps > qs }
-                func rubs(_ n: UInt8) -> Bool { under.contains { [1, 6, 11].contains(abs(Int($0.note) - Int(n)) % 12) } }
+                func rubs(_ n: UInt8) -> Bool { under.contains { pnoRubs(Int($0.note), Int(n)) } }
                 if rubs(note) { note = note == qNote1 ? qNote2 : qNote1 }
                 if rubs(note) { qb += 7 + rng.nextInt(upperBound: 4); continue }
                 // Scale velocity with song position — softer at edges, slightly warmer in middle
                 let qVelBase = qb < totalBars / 4 ? 12 : (qb > 3 * totalBars / 4 ? 10 : 18)
-                if dur >= 4 { events.append(MIDIEvent(stepIndex: qs, note: note, velocity: UInt8(qVelBase + rng.nextInt(upperBound: 8)), durationSteps: dur)) }
+                if dur >= 4 { events.append(MIDIEvent(stepIndex: qs, note: note, velocity: pnoVel(qVelBase + rng.nextInt(upperBound: 8)), durationSteps: dur)) }
                 qb += 7 + rng.nextInt(upperBound: 4)
             }
         }
@@ -1689,7 +1719,7 @@ struct AmbientLeadGenerator {
         // own triad, kept under the melody: at least 3 semitones below any melody note sounding over
         // it and never a half-step, tritone or major 7th from one — so it never has to be trimmed
         // out of the melody's way. Where nothing fits under a low melody note, the hand rests.
-        let lhBass  = notesInRegister(pitchClasses: scalePCs, low: 40, high: 54)
+        let lhBass  = notesInRegister(pitchClasses: scalePCs, low: pnoBassLow, high: pnoBassHigh)
         if !lhBass.isEmpty {
             let melodyNow = events
             let rootPC5   = frame.keySemitoneValue % 12
@@ -1716,13 +1746,13 @@ struct AmbientLeadGenerator {
                 // A bass that rubs (half-step, tritone, major 7th) against the melody over it gives way
                 // to the next of root, 5th, 4th that doesn't
                 let overBass = melodyNow.filter { $0.stepIndex < barStep + 12 && $0.stepIndex + $0.durationSteps > barStep }
-                func rubs(_ b: UInt8) -> Bool { overBass.contains { [1, 6, 11].contains(abs(Int($0.note) - Int(b)) % 12) } }
+                func rubs(_ b: UInt8) -> Bool { overBass.contains { pnoRubs(Int($0.note), Int(b)) } }
                 if rubs(bassNote), let alt = [bassRoot, bassFifth, bassFour].first(where: { !rubs($0) }) { bassNote = alt }
                 // Taper bass velocity gradually through the closing section
                 let bassBase = inClosing
                     ? Swift.max(18, 30 - (bar - closingBar) * 30 / Swift.max(1, totalBars - closingBar))
                     : 30
-                let bassVel  = UInt8(bassBase + rng.nextInt(upperBound: 6))
+                let bassVel  = pnoVel(bassBase + rng.nextInt(upperBound: 6))
                 // Jarrett/Satie: bass held for a half note (12 steps) — pedal, not a click
                 events.append(MIDIEvent(stepIndex: barStep, note: bassNote, velocity: bassVel, durationSteps: 12))
                 // Beat 2 (step 8): the bass note's 3rd and 5th — omitted in the closing section
@@ -1730,7 +1760,7 @@ struct AmbientLeadGenerator {
                     let tones = lhTones(bass: bassNote, scalePCs: scalePCs, low: 52, high: 66, target: 60,
                                         prefer: [1, 2, 0], count: 2, melody: melodyNow,
                                         start: barStep + 8, end: barStep + 15)
-                    let cv = UInt8(22 + rng.nextInt(upperBound: 8))
+                    let cv = pnoVel(22 + rng.nextInt(upperBound: 8))
                     for (k, t) in tones.enumerated() {
                         events.append(MIDIEvent(stepIndex: barStep + 8, note: t, velocity: k == 0 ? cv : cv - 3, durationSteps: 7))
                     }
@@ -1742,7 +1772,7 @@ struct AmbientLeadGenerator {
                                    prefer: [2, 0], count: 1, melody: melodyNow,
                                    start: barStep + 12, end: barStep + 17).first {
                     events.append(MIDIEvent(stepIndex: barStep + 12, note: t,
-                                            velocity: UInt8(16 + rng.nextInt(upperBound: 6)), durationSteps: 5))
+                                            velocity: pnoVel(16 + rng.nextInt(upperBound: 6)), durationSteps: 5))
                 }
             }
         }
@@ -1775,7 +1805,7 @@ struct AmbientLeadGenerator {
             let ms = bs + 8
             if ms < totalSteps {
                 events.append(MIDIEvent(stepIndex: ms, note: melNote,
-                                        velocity: UInt8(Swift.min(55 + rng.nextInt(upperBound: 11), 65)), durationSteps: 4))
+                                        velocity: pnoVel(Swift.min(55 + rng.nextInt(upperBound: 11), 65)), durationSteps: 4))
             }
             // Chord root: move 4th or 5th within scale tones
             let interval = rng.nextDouble() < 0.50 ? 5 : 7
@@ -1819,7 +1849,7 @@ struct AmbientLeadGenerator {
             guard dur >= 1 else { break }
             events.append(MIDIEvent(stepIndex: cur,
                                     note: upper[Swift.max(0, Swift.min(idx, upper.count - 1))],
-                                    velocity: UInt8(24 + rng.nextInt(upperBound: 14)),
+                                    velocity: pnoVel(24 + rng.nextInt(upperBound: 14)),
                                     durationSteps: dur))
             if !isLast { cur += 8 + rng.nextInt(upperBound: 5) }   // half–dotted-half between notes
         }
@@ -1829,7 +1859,7 @@ struct AmbientLeadGenerator {
             if bd >= 8 {
                 events.append(MIDIEvent(stepIndex: cur,
                                         note: lower[rng.nextInt(upperBound: lower.count)],
-                                        velocity: UInt8(26 + rng.nextInt(upperBound: 10)),
+                                        velocity: pnoVel(26 + rng.nextInt(upperBound: 10)),
                                         durationSteps: bd))
             }
         }
@@ -1844,8 +1874,7 @@ struct AmbientLeadGenerator {
     private static func pnoChordPCs(_ frame: GlobalMusicalFrame) -> [Int] {
         let scale = frame.scalePCs
         let root  = frame.keySemitoneValue % 12
-        let third = scale.contains((root + 4) % 12) ? (root + 4) % 12 : (root + 3) % 12
-        return [root, third, (root + 7) % 12].filter { scale.contains($0) }
+        return [root, pnoThirdPC(of: root, in: scale), (root + 7) % 12].compactMap { $0 }.filter { scale.contains($0) }
     }
 
     /// Pitch classes a phrase may end on, all in the song's scale.
@@ -1877,8 +1906,7 @@ struct AmbientLeadGenerator {
     private static func lhTones(bass: UInt8, scalePCs: Set<Int>, low: Int, high: Int, target: Int,
                                 prefer: [Int], count: Int, melody: [MIDIEvent], start: Int, end: Int) -> [UInt8] {
         let b = Int(bass) % 12
-        let third: Int? = scalePCs.contains((b + 4) % 12) ? (b + 4) % 12
-                        : (scalePCs.contains((b + 3) % 12) ? (b + 3) % 12 : nil)
+        let third = pnoThirdPC(of: b, in: scalePCs)
         let fifth: Int? = scalePCs.contains((b + 7) % 12) ? (b + 7) % 12 : nil
         let triad: [Int?] = [b, third, fifth]
         let sounding = melody.filter { $0.stepIndex < end && $0.stepIndex + $0.durationSteps > start }
@@ -1888,7 +1916,7 @@ struct AmbientLeadGenerator {
         for slot in prefer where out.count < count {
             guard slot < triad.count, let pc = triad[slot] else { continue }
             let cands = (low...ceiling).filter { $0 % 12 == pc }
-                .filter { n in !sounding.contains { [1, 6, 11].contains(abs(Int($0.note) - n) % 12) } }
+                .filter { n in !sounding.contains { pnoRubs(Int($0.note), n) } }
             if let n = cands.min(by: { abs($0 - target) < abs($1 - target) }) { out.append(UInt8(n)) }
         }
         return out
@@ -1903,7 +1931,7 @@ struct AmbientLeadGenerator {
             let s = start + e.stepIndex
             guard s < totalSteps else { return nil }
             let v = Swift.max(14, Swift.min(127, Int((Double(e.velocity) * velScale).rounded())))
-            return MIDIEvent(stepIndex: s, note: e.note, velocity: UInt8(v),
+            return MIDIEvent(stepIndex: s, note: e.note, velocity: pnoVel(v),
                              durationSteps: Swift.max(1, Swift.min(e.durationSteps, totalSteps - s)))
         }
     }
@@ -1913,7 +1941,7 @@ struct AmbientLeadGenerator {
         phrase.map { e in
             guard let i = scale.firstIndex(of: e.note) else { return e }
             let n = scale[Swift.max(0, Swift.min(scale.count - 1, i + k))]
-            return MIDIEvent(stepIndex: e.stepIndex, note: n, velocity: e.velocity, durationSteps: e.durationSteps)
+            return e.with(note: n)
         }
     }
 
@@ -1924,15 +1952,14 @@ struct AmbientLeadGenerator {
         let root = frame.keySemitoneValue % 12
         let home = pnoNearest(lower, to: Int(last.note), pcs: [root]) ?? last.note
         var out = motif
-        out[lastIdx] = MIDIEvent(stepIndex: last.stepIndex, note: home, velocity: last.velocity,
-                                 durationSteps: last.durationSteps + 4)
+        out[lastIdx] = last.with(note: home, durationSteps: last.durationSteps + 4)
         // If the note before is already that root, move it to another chord tone so the root lands fresh
         if let prevIdx = motif.indices.filter({ motif[$0].stepIndex < last.stepIndex })
                                       .max(by: { motif[$0].stepIndex < motif[$1].stepIndex }),
            motif[prevIdx].note == home,
            let alt = pnoNearest(lower.filter { $0 != home }, to: Int(home), pcs: pnoChordPCs(frame).filter { $0 != root }) {
             let pv = motif[prevIdx]
-            out[prevIdx] = MIDIEvent(stepIndex: pv.stepIndex, note: alt, velocity: pv.velocity, durationSteps: pv.durationSteps)
+            out[prevIdx] = pv.with(note: alt)
         }
         return out
     }
@@ -1945,8 +1972,7 @@ struct AmbientLeadGenerator {
         var head = Array(sorted.prefix(keep))
         guard let last = head.last else { return head }
         let tone = pnoNearest(pool, to: Int(last.note), pcs: pnoChordPCs(frame)) ?? last.note
-        head[head.count - 1] = MIDIEvent(stepIndex: last.stepIndex, note: tone, velocity: last.velocity,
-                                         durationSteps: Swift.max(12, last.durationSteps))
+        head[head.count - 1] = last.with(note: tone, durationSteps: Swift.max(12, last.durationSteps))
         return head
     }
 
@@ -1959,7 +1985,7 @@ struct AmbientLeadGenerator {
         guard startStep < totalSteps else { return [] }
         var events: [MIDIEvent] = []
         var cur = startStep
-        let cap: (Int) -> UInt8 = { UInt8(Swift.min($0, velCap)) }
+        let cap: (Int) -> UInt8 = { pnoVel(Swift.min($0, velCap)) }
         let chord = pnoChordPCs(frame)
         let scale = frame.scalePCs
         let allNotes = (lower + upper).sorted()
@@ -2122,7 +2148,7 @@ struct AmbientLeadGenerator {
         let scalePCs   = frame.scalePCs
         let midNotes   = notesInRegister(pitchClasses: scalePCs, low: 60, high: 79)  // wider: C4-G5
         let highNotes  = notesInRegister(pitchClasses: scalePCs, low: 69, high: 89)
-        let lowNotesAll   = notesInRegister(pitchClasses: scalePCs, low: 40, high: 54)
+        let lowNotesAll   = notesInRegister(pitchClasses: scalePCs, low: pnoBassLow, high: pnoBassHigh)
         let lowNotesClean = lowNotesAll.filter { n in
             let pc = Int(n) % 12
             return !scalePCs.contains((pc + 6) % 12) && !scalePCs.contains((pc + 1) % 12)
@@ -2253,7 +2279,7 @@ struct AmbientLeadGenerator {
                     ? (peakNote == 0 ? 1.0 : Double(i) / Double(peakNote))
                     : 1.0 - 0.5 * Double(i - peakNote) / Double(Swift.max(1, idxs.count - 1 - peakNote))
                 let base = Double(velMin) + Double(velMax - velMin) * (0.35 + 0.65 * t)
-                let vel  = UInt8(Swift.max(1, Swift.min(127, Int(base.rounded()) + rng.nextInt(upperBound: 5) - 2)))
+                let vel  = pnoVel(Swift.max(1, Swift.min(127, Int(base.rounded()) + rng.nextInt(upperBound: 5) - 2)))
                 ev.append(MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: dur))
                 // Chord accents: phrase launch and phrase peak — Jarrett/Winston style
                 let isPeak = i == peakNote && i > 0
@@ -2263,7 +2289,7 @@ struct AmbientLeadGenerator {
                                  ?? pool.first(where: { Int($0) - Int(note) == 3 })  // m3 above
                     if let cn = chordNote {
                         ev.append(MIDIEvent(stepIndex: step, note: cn,
-                                            velocity: UInt8(vel > 5 ? vel - 5 : vel), durationSteps: dur))
+                                            velocity: vel > 5 ? vel - 5 : vel, durationSteps: dur))
                     }
                     // Jarrett touch: add a 3rd chord note at phrase peak (fuller chord stab)
                     if isPeak {
@@ -2271,7 +2297,7 @@ struct AmbientLeadGenerator {
                                ?? pool.first(where: { Int($0) - Int(note) == 4 })     // M3 above
                         if let t = third, t != chordNote ?? 0 {
                             ev.append(MIDIEvent(stepIndex: step, note: t,
-                                                velocity: UInt8(vel > 8 ? vel - 8 : vel), durationSteps: dur))
+                                                velocity: vel > 8 ? vel - 8 : vel, durationSteps: dur))
                         }
                     }
                 }
@@ -2286,14 +2312,12 @@ struct AmbientLeadGenerator {
                                  velMin: 28, velMax: 42, ioi: 2, holdDur: 12,
                                  head: motifMoves, ending: .open)
         events += p1Result.events; burstEndIdx = p1Result.endIdx
-        probe("p1", p1Result.events)
 
         // Pre-climax phrase in 4-phrase form
         if preclimaxBar > 0 {
             let pcResult = emitBurst(bar: preclimaxBar, pool: midNotes, count: 8 + rng.nextInt(upperBound: 4),
                                      velMin: 38, velMax: 55, ioi: 2, holdDur: 10)
             events += pcResult.events; burstEndIdx = pcResult.endIdx
-            probe("preclimax", pcResult.events)
         }
 
         // Pre-climax ostinato (25%)
@@ -2303,7 +2327,7 @@ struct AmbientLeadGenerator {
             var os    = ob * 16
             for _ in 0..<(3 + rng.nextInt(upperBound: 2)) {
                 guard os < totalSteps else { break }
-                events.append(MIDIEvent(stepIndex: os, note: oNote, velocity: UInt8(36 + rng.nextInt(upperBound: 13)), durationSteps: Swift.min(6, totalSteps - os)))
+                events.append(MIDIEvent(stepIndex: os, note: oNote, velocity: pnoVel(36 + rng.nextInt(upperBound: 13)), durationSteps: Swift.min(6, totalSteps - os)))
                 os += 8
             }
         }
@@ -2323,12 +2347,11 @@ struct AmbientLeadGenerator {
             let rising   = rng.nextDouble() < 0.50
             let repeats  = 2 + (rng.nextDouble() < 0.50 ? 1 : 0)
             var qs = urgentBar * 16 + rng.nextInt(upperBound: 4)
-            let urgentStart = events.count
             for r in 0..<repeats {
                 for n in 0..<fragLen {
                     guard qs < totalSteps else { break }
                     let idx = Swift.max(0, Swift.min(fragBase + fragIdx[n] + (rising ? r : 0), fragArr.count - 1))
-                    let vel = UInt8(Swift.min(64, 42 + r * 10 + rng.nextInt(upperBound: 8)))
+                    let vel = pnoVel(Swift.min(64, 42 + r * 10 + rng.nextInt(upperBound: 8)))
                     let dur = Swift.min(2, totalSteps - qs)
                     guard dur >= 1 else { break }
                     events.append(MIDIEvent(stepIndex: qs, note: fragArr[idx], velocity: vel, durationSteps: dur))
@@ -2336,12 +2359,11 @@ struct AmbientLeadGenerator {
                 }
                 qs += 4
             }
-            probe("urgent", Array(events[urgentStart...]))
             // Foreshadow chord: bold 2-3 note stab after the repeats, previewing the climax register.
             let foreshadowLimit = (climaxBar - 2) * 16 - 4
             if qs < foreshadowLimit && !fragArr.isEmpty {
                 let fNote = fragArr[Swift.max(0, Swift.min(fragArr.count - 1, fragBase + fragLen))]
-                let fVel  = UInt8(58 + rng.nextInt(upperBound: 12))
+                let fVel  = pnoVel(58 + rng.nextInt(upperBound: 12))
                 let fDur  = Swift.min(6 + rng.nextInt(upperBound: 5), foreshadowLimit - qs)
                 if fDur >= 4 {
                     events.append(MIDIEvent(stepIndex: qs, note: fNote, velocity: fVel, durationSteps: fDur))
@@ -2369,7 +2391,7 @@ struct AmbientLeadGenerator {
                 let idx = ascending
                     ? Swift.min(startIdx + i, midNotes.count - 1)
                     : Swift.max(0, startIdx - i)
-                let vel = UInt8(Swift.min(75, baseVel + i * 2))
+                let vel = pnoVel(Swift.min(75, baseVel + i * 2))
                 let dur = Swift.min(2, totalSteps - rs)
                 guard dur >= 1 else { break }
                 events.append(MIDIEvent(stepIndex: rs, note: midNotes[idx], velocity: vel, durationSteps: dur))
@@ -2389,14 +2411,12 @@ struct AmbientLeadGenerator {
             let respResult = emitBurst(bar: climaxBar + 2, pool: midNotes, count: 7 + rng.nextInt(upperBound: 3),
                                        velMin: 45, velMax: 68, ioi: 2, holdDur: 10)
             events += callResult.events + respResult.events
-            probe("climax-call", callResult.events); probe("climax-resp", respResult.events)
             highestNote = (callResult.events + respResult.events).max(by: { $0.note < $1.note })?.note ?? 0
         } else {
             let cResult = emitBurst(bar: climaxBar, pool: highNotes, count: 9 + rng.nextInt(upperBound: 4),
                                     velMin: 58, velMax: 83, ioi: 2, holdDur: 16, head: climaxHead,
                                     climb: climaxClimb)
             events += cResult.events
-            probe("climax", cResult.events)
             highestNote = cResult.events.max(by: { $0.note < $1.note })?.note ?? 0
         }
 
@@ -2406,15 +2426,9 @@ struct AmbientLeadGenerator {
         if chordStep < totalSteps - 8, !highNotes.isEmpty {
             let rootIdx   = rng.nextInt(upperBound: Swift.max(1, highNotes.count / 2))
             let chordRoot = highNotes[rootIdx]
-            let chordVel  = UInt8(73 + rng.nextInt(upperBound: 12))
+            let chordVel  = pnoVel(73 + rng.nextInt(upperBound: 12))
             let chordDur  = Swift.min(8 + rng.nextInt(upperBound: 5), totalSteps - chordStep)
-            events.append(MIDIEvent(stepIndex: chordStep, note: chordRoot, velocity: chordVel, durationSteps: chordDur))
-            if let third = highNotes.first(where: { [3, 4].contains(Int($0) - Int(chordRoot)) }) {
-                events.append(MIDIEvent(stepIndex: chordStep, note: third, velocity: chordVel - 4, durationSteps: chordDur))
-            }
-            if let fifth = highNotes.first(where: { Int($0) - Int(chordRoot) == 7 }) {
-                events.append(MIDIEvent(stepIndex: chordStep, note: fifth, velocity: chordVel - 7, durationSteps: chordDur))
-            }
+            events += chordHit(at: chordStep, root: chordRoot, pool: highNotes, vel: chordVel, dur: chordDur)
             if rng.nextDouble() < 0.50,
                let top = highNotes.first(where: { Int($0) - Int(chordRoot) == 12 }) {
                 events.append(MIDIEvent(stepIndex: chordStep, note: top, velocity: chordVel - 12, durationSteps: chordDur))
@@ -2424,16 +2438,10 @@ struct AmbientLeadGenerator {
                 let gap2  = rng.nextDouble() < 0.50 ? 2 + rng.nextInt(upperBound: 3)
                                                     : 6 + rng.nextInt(upperBound: 5)
                 let step2 = chordStep + gap2
-                let vel2  = UInt8(Swift.max(60, Int(chordVel) - 8 - rng.nextInt(upperBound: 8)))
+                let vel2  = pnoVel(Swift.max(60, Int(chordVel) - 8 - rng.nextInt(upperBound: 8)))
                 let dur2  = Swift.min(6 + rng.nextInt(upperBound: 5), totalSteps - step2)
                 if step2 < totalSteps - 4, dur2 >= 2 {
-                    events.append(MIDIEvent(stepIndex: step2, note: chordRoot, velocity: vel2, durationSteps: dur2))
-                    if let third = highNotes.first(where: { [3, 4].contains(Int($0) - Int(chordRoot)) }) {
-                        events.append(MIDIEvent(stepIndex: step2, note: third, velocity: vel2 > 4 ? vel2 - 4 : vel2, durationSteps: dur2))
-                    }
-                    if let fifth = highNotes.first(where: { Int($0) - Int(chordRoot) == 7 }) {
-                        events.append(MIDIEvent(stepIndex: step2, note: fifth, velocity: vel2 > 7 ? vel2 - 7 : vel2, durationSteps: dur2))
-                    }
+                    events += chordHit(at: step2, root: chordRoot, pool: highNotes, vel: vel2, dur: dur2)
                 }
             }
         }
@@ -2448,7 +2456,7 @@ struct AmbientLeadGenerator {
             var runEv: [MIDIEvent] = []
             for i in 0..<runLen where runTop - runLen + 1 + i >= 0 {
                 runEv.append(MIDIEvent(stepIndex: rs, note: midNotes[runTop - runLen + 1 + i],
-                                       velocity: UInt8(44 + i * 3 + rng.nextInt(upperBound: 4)), durationSteps: 1))
+                                       velocity: pnoVel(44 + i * 3 + rng.nextInt(upperBound: 4)), durationSteps: 1))
                 rs += 1
             }
             let peakResult = emitBurst(bar: pb, pool: midNotes, count: 6 + rng.nextInt(upperBound: 3),
@@ -2457,7 +2465,6 @@ struct AmbientLeadGenerator {
                                        head: rng.nextDouble() < 0.50 ? motifMoves : nil,
                                        endBy: (pb + 6) * 16)
             events += runEv + peakResult.events
-            probe("minor-peak", runEv + peakResult.events)
         }
 
         // Post-climax descending run (50%)
@@ -2469,7 +2476,7 @@ struct AmbientLeadGenerator {
                 for i in 0..<(6 + rng.nextInt(upperBound: 5)) {
                     guard rs < totalSteps else { break }
                     let idx = Swift.max(0, top - i)
-                    let vel = UInt8(Swift.max(20, 55 - i * 5))
+                    let vel = pnoVel(Swift.max(20, 55 - i * 5))
                     events.append(MIDIEvent(stepIndex: rs, note: midNotes[idx], velocity: vel, durationSteps: Swift.min(4, totalSteps - rs)))
                     rs += 8
                 }
@@ -2482,7 +2489,7 @@ struct AmbientLeadGenerator {
             let echoEv = emitBurst(bar: echoBar, pool: midNotes,
                                    count: 6 + rng.nextInt(upperBound: 3),
                                    velMin: 35, velMax: 52, ioi: 2, holdDur: 14).events
-            probe("echo", echoEv); events += echoEv
+            events += echoEv
         }
 
 
@@ -2502,7 +2509,6 @@ struct AmbientLeadGenerator {
             }
         }
         events += wEvts
-        probe("withdrawal", wEvts)
 
         // Soft pool (≤70): used by closing phrase and connective phrases — computed once
         let cPool = midNotes.filter { $0 <= 70 }.isEmpty ? midNotes : midNotes.filter { $0 <= 70 }
@@ -2512,7 +2518,7 @@ struct AmbientLeadGenerator {
             let closeEv = emitBurst(bar: closingBar, pool: cPool, count: 4 + rng.nextInt(upperBound: 3),
                                     velMin: 20, velMax: 35, ioi: 3, holdDur: 24,
                                     head: motifMoves, ending: .home).events
-            probe("closing", closeEv); events += closeEv
+            events += closeEv
         }
 
         // Building arc — geometric spacing (early phrases far apart, compressing toward climax).
@@ -2552,7 +2558,6 @@ struct AmbientLeadGenerator {
                                           startNear: startIdx, accents: false,
                                           endBy: buildEndBy).events
                 events += buildEv
-                probe("build", buildEv)
                 let gap    = Swift.max(2, Int(g * pow(ratio, Double(p))))
                 let jitter = rng.nextInt(upperBound: Swift.max(1, gap / 3))
                 pBar += gap + jitter
@@ -2574,7 +2579,7 @@ struct AmbientLeadGenerator {
                     ? Swift.min(12 + rng.nextInt(upperBound: 9), totalSteps - arpStep)
                     : Swift.min(3, totalSteps - arpStep)
                 guard dur >= 1 else { break }
-                let vel = UInt8(Swift.min(50, 24 + n * 6 + rng.nextInt(upperBound: 8)))
+                let vel = pnoVel(Swift.min(50, 24 + n * 6 + rng.nextInt(upperBound: 8)))
                 events.append(MIDIEvent(stepIndex: arpStep, note: arpTarget[n], velocity: vel, durationSteps: dur))
                 arpStep += dur + (isLast ? 0 : 1)
             }
@@ -2590,7 +2595,7 @@ struct AmbientLeadGenerator {
             let osc1Note  = midNotes[Swift.min(pedalIdx + 2, midNotes.count - 1)]
             let osc2Note  = midNotes[Swift.min(pedalIdx + 4, midNotes.count - 1)]
             let cycleCount = 3 + rng.nextInt(upperBound: 3)
-            let pedalVel  = UInt8(26 + rng.nextInt(upperBound: 12))
+            let pedalVel  = pnoVel(26 + rng.nextInt(upperBound: 12))
             var pedalStep = pedalBar * 16
             for _ in 0..<cycleCount {
                 guard pedalStep + 4 < totalSteps else { break }
@@ -2603,7 +2608,7 @@ struct AmbientLeadGenerator {
                 let oscDur  = Swift.min(4 + rng.nextInt(upperBound: 4), totalSteps - pedalStep)
                 guard oscDur >= 2 else { break }
                 events.append(MIDIEvent(stepIndex: pedalStep, note: oscNote,
-                                        velocity: UInt8(Swift.max(18, Int(pedalVel) - 4 + rng.nextInt(upperBound: 8))),
+                                        velocity: pnoVel(Swift.max(18, Int(pedalVel) - 4 + rng.nextInt(upperBound: 8))),
                                         durationSteps: oscDur))
                 pedalStep += oscDur
             }
@@ -2624,7 +2629,7 @@ struct AmbientLeadGenerator {
                 let rDur = Swift.min(12 + rng.nextInt(upperBound: 9), totalSteps - rs)
                 guard rDur >= 8 else { break }
                 let rNote = reachPool[rng.nextInt(upperBound: reachPool.count)]
-                let rVel  = UInt8(50 + rng.nextInt(upperBound: 18))
+                let rVel  = pnoVel(50 + rng.nextInt(upperBound: 18))
                 events.append(MIDIEvent(stepIndex: rs, note: rNote, velocity: rVel, durationSteps: rDur))
                 reachLog?.steps.append(rs)
                 // Reach echoes (Zack, 2026-11-24): one roll, a third each: the reach stands alone,
@@ -2644,7 +2649,7 @@ struct AmbientLeadGenerator {
                     let eNote = (near.isEmpty || echoRng.nextDouble() < 0.40) ? rNote
                               : near[echoRng.nextInt(upperBound: near.count)]
                     events.append(MIDIEvent(stepIndex: echoStep, note: eNote,
-                                            velocity: UInt8(Swift.max(30, Int(rVel) - 8 - 4 * k)), durationSteps: eDur))
+                                            velocity: pnoVel(Swift.max(30, Int(rVel) - 8 - 4 * k)), durationSteps: eDur))
                     echoStep += eDur
                 }
             }
@@ -2662,14 +2667,14 @@ struct AmbientLeadGenerator {
                                  count: 7 + rng.nextInt(upperBound: 4),
                                  velMin: 22, velMax: 38, ioi: 3, holdDur: 18, startNear: wStartIdx,
                                  endBy: Swift.min(conn2Bar, closingBar) * 16).events
-            if !nearPeak(conn1Bar) && !nearPeak(conn1Bar + 3) { probe("connective", c1Ev); events += c1Ev }
+            if !nearPeak(conn1Bar) && !nearPeak(conn1Bar + 3) { events += c1Ev }
             // Second connective phrase — later two-thirds, fading further
             if conn2Bar < closingBar - 1 && !nearPeak(conn2Bar) && !nearPeak(conn2Bar + 3) {
                 let c2Ev = emitBurst(bar: conn2Bar, pool: softPool,
                                      count: 5 + rng.nextInt(upperBound: 3),
                                      velMin: 20, velMax: 34, ioi: 3, holdDur: 20, startNear: wStartIdx,
                                      endBy: closingBar * 16).events
-                probe("connective", c2Ev); events += c2Ev
+                events += c2Ev
             }
         }
 
@@ -2689,31 +2694,19 @@ struct AmbientLeadGenerator {
                 guard ss < totalSteps - 6 else { break }
                 let rootIdx = rng.nextInt(upperBound: Swift.max(1, shockPool.count / 2))
                 let sRoot   = shockPool[rootIdx]
-                let sVel    = UInt8(52 + rng.nextInt(upperBound: 18))
+                let sVel    = pnoVel(52 + rng.nextInt(upperBound: 18))
                 let sDur    = Swift.min(6 + rng.nextInt(upperBound: 5), totalSteps - ss)
                 guard sDur >= 4 else { break }
-                events.append(MIDIEvent(stepIndex: ss, note: sRoot, velocity: sVel, durationSteps: sDur))
-                if let third = shockPool.first(where: { [3, 4].contains(Int($0) - Int(sRoot)) }) {
-                    events.append(MIDIEvent(stepIndex: ss, note: third, velocity: sVel - 4, durationSteps: sDur))
-                }
-                if let fifth = shockPool.first(where: { Int($0) - Int(sRoot) == 7 }) {
-                    events.append(MIDIEvent(stepIndex: ss, note: fifth, velocity: sVel - 7, durationSteps: sDur))
-                }
+                events += chordHit(at: ss, root: sRoot, pool: shockPool, vel: sVel, dur: sDur)
                 // Second hit per stab — 45% chance
                 if rng.nextDouble() < 0.45 {
                     let gap2  = rng.nextDouble() < 0.50 ? 2 + rng.nextInt(upperBound: 3)
                                                         : 5 + rng.nextInt(upperBound: 4)
                     let ss2   = ss + gap2
-                    let sVel2 = UInt8(Swift.max(38, Int(sVel) - 8 - rng.nextInt(upperBound: 8)))
+                    let sVel2 = pnoVel(Swift.max(38, Int(sVel) - 8 - rng.nextInt(upperBound: 8)))
                     let sDur2 = Swift.min(4 + rng.nextInt(upperBound: 4), totalSteps - ss2)
                     if ss2 < totalSteps - 4, sDur2 >= 2 {
-                        events.append(MIDIEvent(stepIndex: ss2, note: sRoot, velocity: sVel2, durationSteps: sDur2))
-                        if let third = shockPool.first(where: { [3, 4].contains(Int($0) - Int(sRoot)) }) {
-                            events.append(MIDIEvent(stepIndex: ss2, note: third, velocity: sVel2 > 4 ? sVel2 - 4 : sVel2, durationSteps: sDur2))
-                        }
-                        if let fifth = shockPool.first(where: { Int($0) - Int(sRoot) == 7 }) {
-                            events.append(MIDIEvent(stepIndex: ss2, note: fifth, velocity: sVel2 > 7 ? sVel2 - 7 : sVel2, durationSteps: sDur2))
-                        }
+                        events += chordHit(at: ss2, root: sRoot, pool: shockPool, vel: sVel2, dur: sDur2)
                     }
                 }
             }
@@ -2743,7 +2736,6 @@ struct AmbientLeadGenerator {
                                            head: rng.nextDouble() < 0.33 ? motifMoves : nil,
                                            accents: false, endBy: s1 - 1).events
                         events += ph
-                        probe("vamp", ph)
                         if let f = ph.first {
                             riffOffset = f.stepIndex % 16
                             lastRiff = ph.map { MIDIEvent(stepIndex: $0.stepIndex - f.stepIndex, note: $0.note,
@@ -2772,13 +2764,13 @@ struct AmbientLeadGenerator {
                 let bd    = Swift.min(Swift.min(16 + rng.nextInt(upperBound: 33), 48), totalSteps - bBar * 16)
                 // A low note that doesn't rub (half-step, tritone, major 7th) with the melody over it
                 let over  = events.filter { $0.stepIndex < bBar * 16 + bd && $0.stepIndex + $0.durationSteps > bBar * 16 }
-                let clean = lowNotes.filter { n in !over.contains { [1, 6, 11].contains(abs(Int($0.note) - Int(n)) % 12) } }
+                let clean = lowNotes.filter { n in !over.contains { pnoRubs(Int($0.note), Int(n)) } }
                 let pick  = rng.nextInt(upperBound: lowNotes.count)
                 guard !clean.isEmpty else { continue }
                 let bn = clean[pick % clean.count]
                 if bd >= 4 {
                     events.append(MIDIEvent(stepIndex: bBar * 16, note: bn,
-                                            velocity: UInt8(28 + rng.nextInt(upperBound: 18)), durationSteps: bd))
+                                            velocity: pnoVel(28 + rng.nextInt(upperBound: 18)), durationSteps: bd))
                 }
             }
         }
@@ -2788,12 +2780,8 @@ struct AmbientLeadGenerator {
         // Bass changes every 2 bars for variety; mid indices cycle independently per bar.
         // Exclude bass notes whose tritone partner is also in the scale (e.g. B and F in
         // Mixolydian/Dorian) — they cause cross-register tritone clashes with the melody.
-        let lhBassAll   = notesInRegister(pitchClasses: scalePCs, low: 40, high: 54)
-        let lhBassClean = lhBassAll.filter { n in
-            let pc = Int(n) % 12
-            return !scalePCs.contains((pc + 6) % 12) && !scalePCs.contains((pc + 1) % 12)
-        }
-        let lhBass      = lhBassClean.isEmpty ? lhBassAll : lhBassClean
+        let lhBassAll = lowNotesAll   // the same low register and clean-of-tritone filter as the bass punctuation
+        let lhBass    = lowNotes
         let lhMid  = notesInRegister(pitchClasses: scalePCs, low: 61, high: 72)
         if !lhBass.isEmpty, !lhMid.isEmpty {
             let rootPC    = frame.keySemitoneValue % 12
@@ -2854,7 +2842,7 @@ struct AmbientLeadGenerator {
                 }
                 let bNote = lhBass[bIdx]
                 prevBassNote = bNote
-                let bVel  = UInt8(38 + rng.nextInt(upperBound: 12))
+                let bVel  = pnoVel(38 + rng.nextInt(upperBound: 12))
                 // Beat 1 (step 0): bass alone — arrives first like Winston/Jarrett LH
                 events.append(MIDIEvent(stepIndex: barStep, note: bNote, velocity: bVel, durationSteps: 7))
                 // Inner voices are the bass note's own triad, kept under the melody (lhTones): 3rd and
@@ -2864,7 +2852,7 @@ struct AmbientLeadGenerator {
                 // for Jarrett-style breathing space (just bass + optional beat 4).
                 let skipInner = rng.nextDouble() < 0.20
                 if !skipInner && barStep + 4 < totalSteps {
-                    let cv    = UInt8(30 + rng.nextInt(upperBound: 10))
+                    let cv    = pnoVel(30 + rng.nextInt(upperBound: 10))
                     let tones = lhTones(bass: bNote, scalePCs: scalePCs, low: 52, high: 67, target: 60,
                                         prefer: [1, 2, 0], count: 2, melody: melodySnap,
                                         start: barStep + 4, end: barStep + 10)
@@ -2874,7 +2862,7 @@ struct AmbientLeadGenerator {
                 }
                 // Beat 3 (step 8): inner-voice repeat — 65% of bars.
                 if !skipInner && barStep + 8 < totalSteps && rng.nextDouble() < 0.65 {
-                    let cv2   = UInt8(26 + rng.nextInt(upperBound: 10))
+                    let cv2   = pnoVel(26 + rng.nextInt(upperBound: 10))
                     let tones = lhTones(bass: bNote, scalePCs: scalePCs, low: 52, high: 67, target: 61,
                                         prefer: [2, 0, 1], count: 2, melody: melodySnap,
                                         start: barStep + 8, end: barStep + 13)
@@ -2888,7 +2876,7 @@ struct AmbientLeadGenerator {
                                    prefer: [1, 2], count: 1, melody: melodySnap,
                                    start: barStep + 12, end: barStep + 16).first {
                     events.append(MIDIEvent(stepIndex: barStep + 12, note: t,
-                                            velocity: UInt8(22 + rng.nextInt(upperBound: 8)), durationSteps: 4))
+                                            velocity: pnoVel(22 + rng.nextInt(upperBound: 8)), durationSteps: 4))
                 }
             }
 
@@ -2924,7 +2912,7 @@ struct AmbientLeadGenerator {
                     ? Swift.min(8 + rng.nextInt(upperBound: 9), buildCutoff - fs)
                     : Swift.min(2 + rng.nextInt(upperBound: 3), buildCutoff - fs)
                 guard dur >= 2 else { break }
-                let vel = UInt8(Swift.max(20, Int(trigger.velocity) - 6 - n * 4))
+                let vel = pnoVel(Swift.max(20, Int(trigger.velocity) - 6 - n * 4))
                 events.append(MIDIEvent(stepIndex: fs, note: highNotes[hIdx], velocity: vel, durationSteps: dur))
                 fs += dur + (isLast ? 0 : 1 + rng.nextInt(upperBound: 2))
                 let step = 1 + (rng.nextDouble() < 0.30 ? 1 : 0)
@@ -2940,7 +2928,7 @@ struct AmbientLeadGenerator {
             events = events.filter { $0.stepIndex < resStep }
             let rootPC  = frame.keySemitoneValue % 12
             let fifthPC = (rootPC + 7) % 12
-            let thirdPC = scalePCs.contains((rootPC + 4) % 12) ? (rootPC + 4) % 12 : (rootPC + 3) % 12
+            let thirdPC = pnoThirdPC(of: rootPC, in: scalePCs) ?? (rootPC + 3) % 12
             let ninthPC = (rootPC + 2) % 12
             let allSorted = (midNotes + highNotes).sorted()
             let bassRoot  = lhBassAll.first { Int($0) % 12 == rootPC }
@@ -2953,7 +2941,7 @@ struct AmbientLeadGenerator {
             let highNinth = allSorted.first { Int($0) % 12 == ninthPC && $0 > (highRoot  ?? 72) }
             let resDur = Swift.min(40, totalSteps - resStep - 1)
             if resDur >= 8 {
-                let bVel    = UInt8(50 + rng.nextInt(upperBound: 8))
+                let bVel    = pnoVel(50 + rng.nextInt(upperBound: 8))
                 let variant = rng.nextInt(upperBound: 3)
                 if let bn = bassRoot {
                     events.append(MIDIEvent(stepIndex: resStep, note: bn,
@@ -3012,14 +3000,18 @@ struct AmbientLeadGenerator {
         }
 
         let trimmed = trimDissonances(events, totalSteps: totalSteps)
-        // The vamp logs as "Koln Winter Arc - vamp" under AMB-PNO-003 (no separate rule).
-        if arc.vampBars != nil { usedRuleIDs.remove("AMB-PNO-003"); usedRuleIDs.insert("AMB-PNO-003-VP") }
-        // Live wire (Koln's live take): drawn last, so a song without it is note for note what it was.
-        // Logged as "AMB-PNO-003 Koln Winter Arc - jazzy improv" (Zack, 2026-11-24).
-        guard !isEvolvePass, totalBars >= 40, rng.nextDouble() < 0.45 else { return trimmed }   // 45% of Koln songs (Zack, 2026-11-24)
-        usedRuleIDs.remove("AMB-PNO-003"); usedRuleIDs.remove("AMB-PNO-003-VP")
-        usedRuleIDs.insert(arc.vampBars != nil ? "AMB-PNO-003-VL" : "AMB-PNO-003-LW")
-        return kolnLiveTake(trimmed, frame: frame, arc: arc, totalBars: totalBars, rng: &rng)
+        // Log variant, settled once: "vamp" when the arc has the vamp, "jazzy improv" when the live
+        // wire plays. The live wire is drawn last, so a song without it is note for note what it was
+        // (Zack, 2026-11-24): 45% of Koln songs, 40+ bars, never an evolve pass.
+        let hasVamp = arc.vampBars != nil
+        let hasLive = !isEvolvePass && totalBars >= 40 && rng.nextDouble() < 0.45
+        switch (hasVamp, hasLive) {
+        case (true, true):   logVariant(AmbientPianoRule.Variant.kolnVampLive, of: .koln, in: &usedRuleIDs)
+        case (true, false):  logVariant(AmbientPianoRule.Variant.kolnVamp, of: .koln, in: &usedRuleIDs)
+        case (false, true):  logVariant(AmbientPianoRule.Variant.kolnLive, of: .koln, in: &usedRuleIDs)
+        case (false, false): break
+        }
+        return hasLive ? kolnLiveTake(trimmed, frame: frame, arc: arc, totalBars: totalBars, rng: &rng) : trimmed
     }
 
     // MARK: AMB-PNO-003 vamp — Koln Part IIa
@@ -3047,7 +3039,7 @@ struct AmbientLeadGenerator {
         }()
         func rubs(_ n: Int, _ s: Int, _ e: Int) -> Bool {
             melody.contains { $0.stepIndex < e && $0.stepIndex + $0.durationSteps > s
-                              && [1, 6, 11].contains(abs(Int($0.note) - n) % 12) }
+                              && pnoRubs(Int($0.note), n) }
         }
         var ev: [MIDIEvent] = []
         var pedal: UInt8? = nil
@@ -3065,8 +3057,8 @@ struct AmbientLeadGenerator {
                     let pv = 40 + Int(lift * 10)
                     // Held a dotted half, the low octave a half note and softer: a piano bass note
                     // doesn't ring for 2 bars, and a 2-bar hold sat heavy (Zack, 2026-11-24).
-                    ev.append(MIDIEvent(stepIndex: bs, note: p, velocity: UInt8(pv), durationSteps: Swift.min(12, pd)))
-                    if p >= 40 { ev.append(MIDIEvent(stepIndex: bs, note: p - 12, velocity: UInt8(pv - 12), durationSteps: Swift.min(8, pd))) }
+                    ev.append(MIDIEvent(stepIndex: bs, note: p, velocity: pnoVel(pv), durationSteps: Swift.min(12, pd)))
+                    if p >= 40 { ev.append(MIDIEvent(stepIndex: bs, note: p - 12, velocity: pnoVel(pv - 12), durationSteps: Swift.min(8, pd))) }
                 }
             }
             for (h, (s, d, nbrHit)) in hits.enumerated() {
@@ -3075,11 +3067,11 @@ struct AmbientLeadGenerator {
                 guard st + d <= totalSteps else { continue }
                 let tones = lhTones(bass: useNbr ? nbrBass : homeBass, scalePCs: scalePCs, low: 52, high: 67,
                                     target: 59, prefer: [1, 2, 0], count: 3, melody: melody, start: st, end: st + d)
-                    .filter { t in pedal.map { ![1, 6, 11].contains(abs(Int(t) - Int($0)) % 12) } ?? true }
+                    .filter { t in pedal.map { !pnoRubs(Int(t), Int($0)) } ?? true }
                 let accent = (pattern == 1 && (h == 1 || h == 3)) ? -6 : (s == 0 ? 4 : 0)
                 let cv = 32 + Int(lift * 18) + accent + rng.nextInt(upperBound: 5)
                 for (i, t) in tones.enumerated() {
-                    ev.append(MIDIEvent(stepIndex: st, note: t, velocity: UInt8(Swift.max(20, cv - i * 3)), durationSteps: d))
+                    ev.append(MIDIEvent(stepIndex: st, note: t, velocity: pnoVel(Swift.max(20, cv - i * 3)), durationSteps: d))
                 }
             }
         }
@@ -3131,8 +3123,7 @@ struct AmbientLeadGenerator {
         }
         func clip(at a: Int) {
             for i in ev.indices where isRinging(ev[i], a) {
-                ev[i] = MIDIEvent(stepIndex: ev[i].stepIndex, note: ev[i].note, velocity: ev[i].velocity,
-                                  durationSteps: Swift.max(1, a - ev[i].stepIndex))
+                ev[i] = ev[i].with(durationSteps: Swift.max(1, a - ev[i].stepIndex))
             }
         }
         func onsetsFree(_ a: Int, _ b: Int) -> Bool {
@@ -3182,7 +3173,7 @@ struct AmbientLeadGenerator {
                 guard !scale.contains(pc), padSafe(pc), [1, 2].contains(abs(Int(next.note) - alt)),
                       !rubs(UInt8(alt), at: e.stepIndex, len: e.durationSteps, skip: { $0 == i }) else { continue }
                 ev[i] = MIDIEvent(stepIndex: e.stepIndex, note: UInt8(alt),
-                                  velocity: UInt8(Swift.min(85, Int(e.velocity) + 4)), durationSteps: e.durationSteps)
+                                  velocity: pnoVel(Swift.min(85, Int(e.velocity) + 4)), durationSteps: e.durationSteps)
                 usedSteps.append(e.stepIndex); tensions -= 1; chromaticLeft -= 1
                 break
             }
@@ -3232,13 +3223,13 @@ struct AmbientLeadGenerator {
                 if k == chromAt {
                     let c = UInt8((Int(line[k - 1]) + Int(line[k])) / 2)
                     if !rubs(c, at: step, len: 1, skip: { isRinging(ev[$0], start) }) && !scale.contains(Int(c) % 12) {
-                        run.append(MIDIEvent(stepIndex: step, note: c, velocity: UInt8(50 - k), durationSteps: 1))
+                        run.append(MIDIEvent(stepIndex: step, note: c, velocity: pnoVel(50 - k), durationSteps: 1))
                         step += 1; chromaticLeft -= 1
                     }
                 }
                 let isLast = k == line.count - 1
                 let v = isLast ? 46 : (falling ? 56 - k * 2 : 42 + k * 2)
-                run.append(MIDIEvent(stepIndex: step, note: line[k], velocity: UInt8(Swift.max(24, v)),
+                run.append(MIDIEvent(stepIndex: step, note: line[k], velocity: pnoVel(Swift.max(24, v)),
                                      durationSteps: isLast ? 4 + rng.nextInt(upperBound: 3) : 1))
                 step += 1
             }
@@ -3317,12 +3308,6 @@ struct AmbientLeadGenerator {
     /// clash and are checked against the drone when written (the live wire take).
     static func trimLeadAgainstPads(_ lead: [MIDIEvent], pads: [MIDIEvent], totalSteps: Int,
                                     keepGraces: Bool = false) -> [MIDIEvent] {
-        func isDissonant(_ a: UInt8, _ b: UInt8) -> Bool {
-            // A major 2nd only clashes as a real close second low down; a 9th over a low root or
-            // drone is colour, and treating it as a clash dropped Satie's suspended-2nd endings.
-            let ivl = abs(Int(a) - Int(b)) % 12
-            return ivl == 1 || ivl == 6 || ivl == 11 || (abs(Int(a) - Int(b)) == 2 && Swift.min(a, b) < 55)
-        }
         guard !pads.isEmpty else { return lead }
         var result = lead.sorted { $0.stepIndex < $1.stepIndex }
         var dropIndices = Set<Int>()
@@ -3332,7 +3317,7 @@ struct AmbientLeadGenerator {
                 let overlapEnd   = min(result[i].stepIndex + result[i].durationSteps,
                                        pad.stepIndex      + pad.durationSteps)
                 guard overlapEnd > overlapStart else { continue }
-                guard isDissonant(result[i].note, pad.note) else { continue }
+                guard pnoClash(result[i].note, pad.note) else { continue }
                 if pad.stepIndex > result[i].stepIndex {
                     let trimmedDur = pad.stepIndex - result[i].stepIndex - 1
                     if trimmedDur >= 4 {
@@ -3351,19 +3336,14 @@ struct AmbientLeadGenerator {
     /// Trims or drops notes that form dissonant intervals when sustained simultaneously.
     /// Catches: minor 2nd (1), tritone (6), major 7th (11), bass major 2nd (2 when both < 57).
     private static func trimDissonances(_ events: [MIDIEvent], totalSteps: Int) -> [MIDIEvent] {
-        func isDissonant(_ a: UInt8, _ b: UInt8) -> Bool {
-            // A major 2nd only clashes as a real close second low down; a 9th over a low root or
-            // drone is colour, and treating it as a clash dropped Satie's suspended-2nd endings.
-            let ivl = abs(Int(a) - Int(b)) % 12
-            return ivl == 1 || ivl == 6 || ivl == 11 || (abs(Int(a) - Int(b)) == 2 && Swift.min(a, b) < 55)
-        }
-        var trimmed = events.filter { $0.stepIndex < totalSteps }.sorted { $0.stepIndex < $1.stepIndex }
+        // Cap first: the trim should judge notes as they will sound, not as the rule wrote them
+        var trimmed = events.filter { $0.stepIndex < totalSteps }.map(capPianoSustain).sorted { $0.stepIndex < $1.stepIndex }
         var dropIndices = Set<Int>()
         for i in 0..<trimmed.count where !dropIndices.contains(i) {
             for j in (i + 1)..<trimmed.count where !dropIndices.contains(j) {
                 let b = trimmed[j]
                 guard b.stepIndex < trimmed[i].stepIndex + trimmed[i].durationSteps else { break }
-                if isDissonant(trimmed[i].note, b.note) {
+                if pnoClash(trimmed[i].note, b.note) {
                     if b.stepIndex == trimmed[i].stepIndex {
                         // Same start step — drop the quieter note
                         dropIndices.insert(trimmed[i].velocity >= b.velocity ? j : i)
@@ -3393,6 +3373,14 @@ struct AmbientLeadGenerator {
         return trimmed.indices.filter { !dropIndices.contains($0) }.map { trimmed[$0] }
     }
 
+}
+
+private extension MIDIEvent {
+    /// A copy with the given fields changed (the step stays; an event is moved by rebuilding it).
+    func with(note: UInt8? = nil, velocity: UInt8? = nil, durationSteps: Int? = nil) -> MIDIEvent {
+        MIDIEvent(stepIndex: stepIndex, note: note ?? self.note, velocity: velocity ?? self.velocity,
+                  durationSteps: durationSteps ?? self.durationSteps)
+    }
 }
 
 private extension Array {

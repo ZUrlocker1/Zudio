@@ -980,7 +980,7 @@ struct SongGenerator {
     /// Winter Arc. A new song draws it from the seed; a regenerated Lead 1 draws it afresh from its
     /// own seed, so every regeneration can land on any of the three.
     static func ambientPianoRule(roll: Double) -> String {
-        roll < 0.35 ? "AMB-PNO-001" : (roll < 0.65 ? "AMB-PNO-002" : "AMB-PNO-003")
+        roll < 0.35 ? AmbientPianoRule.buds.rawValue : (roll < 0.65 ? AmbientPianoRule.satin.rawValue : AmbientPianoRule.koln.rawValue)
     }
     /// Base Ambient's colour stream (7th chords, Airports 2/1); no other style uses index 140.
     static let ambientColourIndex = 140
@@ -1206,7 +1206,7 @@ struct SongGenerator {
             // Discard any override above 92 BPM — it was almost certainly leaked from a non-Ambient
             // style (e.g. Chill Blues at 106 BPM loaded before switching to Ambient Piano).
             if let t = tempoOverride, t <= 92 { return t }
-            return pianoRule == "AMB-PNO-003"
+            return AmbientPianoRule(id: pianoRule) == .koln
                 ? AmbientMusicalFrameGenerator.pickAmbientPianoTempoMid(rng: &rng)
                 : AmbientMusicalFrameGenerator.pickAmbientPianoTempoSlow(rng: &rng)
         }()
@@ -1280,9 +1280,9 @@ struct SongGenerator {
             var padRules: Set<String> = []
             let padChance: Double
             switch pianoRule {
-            case "AMB-PNO-001": padChance = 1.00
-            case "AMB-PNO-003": padChance = 0.0    // never (Zack, 2026-11-25; was 0.15)
-            default:            padChance = 0.50
+            case AmbientPianoRule.buds.rawValue: padChance = 1.00
+            case AmbientPianoRule.koln.rawValue: padChance = 0.0    // never (Zack, 2026-11-25; was 0.15)
+            default:                             padChance = 0.50
             }
             if padsRNG.nextDouble() < padChance {
                 trackEvents[kTrackPads] = AmbientPadsGenerator.generateAmbientPianoPads(
@@ -1290,7 +1290,7 @@ struct SongGenerator {
                     totalBars: frame.totalBars, rng: &padsRNG, usedRuleIDs: &padRules)
                 trackEvents[kTrackLead1] = AmbientLeadGenerator.trimLeadAgainstPads(
                     trackEvents[kTrackLead1], pads: trackEvents[kTrackPads], totalSteps: frame.totalBars * 16,
-                    keepGraces: pianoRule == "AMB-PNO-003")
+                    keepGraces: AmbientPianoRule(id: pianoRule) == .koln)
             }
 
             let title = AmbientTitleGenerator.generate(rng: &rng)
@@ -2182,7 +2182,7 @@ struct SongGenerator {
                 events = scratch[kTrackBass]
             }
         case kTrackPads:
-            if isAmbPiano && songState.ambientPianoRule == "AMB-PNO-003" {
+            if isAmbPiano && songState.ambientPianoRule == AmbientPianoRule.koln.rawValue {
                 events = []   // Koln Winter never has pads
             } else if isAmbPiano {
                 events = AmbientPadsGenerator.generateAmbientPianoPads(
@@ -4220,14 +4220,14 @@ struct SongGenerator {
     static func ambientPianoArcLines(rule: String, frame: GlobalMusicalFrame, variation: UInt64 = 0) -> [(Int, String)] {
         var out: [(Int, String)] = []
         let bars = frame.totalBars
-        if rule == "AMB-PNO-003" {
+        if rule == AmbientPianoRule.koln.rawValue {
             let arc = KolnArc.draw(frame: frame, totalBars: bars, variation: variation)
             for pb in arc.peakBars { out.append((pb, "Smaller peak")) }
             if let v = arc.vampBars { out.append((v.lowerBound, "Two-chord vamp - \(v.count) bars")) }
             if arc.climaxBar - 4 > 5 { out.append((arc.climaxBar - 4, "Building tension")) }
             out.append((arc.climaxBar, "Climax"))
             if arc.withdrawBar + 2 < arc.closingBar - 2 { out.append((arc.withdrawBar + 2, "Aftershock")) }
-        } else if rule == "AMB-PNO-002" {
+        } else if rule == AmbientPianoRule.satin.rawValue {
             if bars * 38 / 100 > 3 { out.append((bars * 38 / 100, "Building tension")) }
             out.append((bars * 52 / 100, "Climax"))
             out.append((bars * 76 / 100, "Denouement"))
@@ -4244,15 +4244,15 @@ struct SongGenerator {
     private static func ambientRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         // Ambient Piano — Lead
-        case "AMB-PNO-001":    return "Floating Buds"
-        case "AMB-PNO-001-BT": return "Floating Buds — Sparse"
-        case "AMB-PNO-001-CW": return "Floating Buds — Chord Wash"
-        case "AMB-PNO-001-PD": return "Floating Buds — Pendulum"
-        case "AMB-PNO-002":  return "Satin Melody"
-        case "AMB-PNO-003":  return "Koln Winter Arc"
-        case "AMB-PNO-003-LW": return "Koln Winter Arc - jazzy improv"
-        case "AMB-PNO-003-VP": return "Koln Winter Arc - vamp"
-        case "AMB-PNO-003-VL": return "Koln Winter Arc - vamp, jazzy improv"
+        case AmbientPianoRule.buds.rawValue: return "Floating Buds"
+        case AmbientPianoRule.Variant.budsSparse:    return "Floating Buds — Sparse"
+        case AmbientPianoRule.Variant.budsChordWash: return "Floating Buds — Chord Wash"
+        case AmbientPianoRule.Variant.budsPendulum:  return "Floating Buds — Pendulum"
+        case AmbientPianoRule.satin.rawValue: return "Satin Melody"
+        case AmbientPianoRule.koln.rawValue: return "Koln Winter Arc"
+        case AmbientPianoRule.Variant.kolnLive:     return "Koln Winter Arc - jazzy improv"
+        case AmbientPianoRule.Variant.kolnVamp:     return "Koln Winter Arc - vamp"
+        case AmbientPianoRule.Variant.kolnVampLive: return "Koln Winter Arc - vamp, jazzy improv"
         // Ambient Piano — Pads
         case "AMB-PADS-007": return "Sparse drone"
         case "AMB-PADS-008": return "Staggered strings"
