@@ -24,7 +24,7 @@ extension AmbientLeadGenerator {
         return floatingTonesMode3(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
     }
 
-    /// Mode 1 — Sparse floating: chord wash + 4-7 sparse events.
+    /// Mode 1 — Sparse floating: a chord wash, then sparse figures that keep returning to a colour constellation.
     static func floatingTonesMode1(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
@@ -613,7 +613,7 @@ extension AmbientLeadGenerator {
         return trimDissonances(events, totalSteps: totalSteps)
     }
 
-    /// Mode 3 — Chromatic pendulum: metronomic A↔B cluster oscillation every beat.
+    /// Mode 3 — Pendulum: metronomic A↔B oscillation every beat between two clusters of scale thirds, over a slow bass line.
     static func floatingTonesMode3(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {

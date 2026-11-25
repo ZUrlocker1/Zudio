@@ -15,6 +15,10 @@ Each Ambient Piano song is shaped by one of three **lead rules** for Lead 1, cho
 
 ---
 
+## Code layout (2026-11-25)
+
+The piano code lives in Sources/Zudio/Generation/Ambient/ as extensions of AmbientLeadGenerator: AmbientPianoShared.swift (entry point `generateAmbientPianoLead`, `PianoParams`, helpers, `trimDissonances`, `trimLeadAgainstPads`), AmbientPianoBuds.swift (AMB-PNO-001), AmbientPianoSatin.swift (AMB-PNO-002), AmbientPianoKoln.swift (AMB-PNO-003, including the vamp and the live take) and AmbientPianoRule.swift (the rule enum). AmbientLeadGenerator.swift holds only Lead 1 and Lead 2.
+
 ## Melody round, 2026-11-24 (as built, unheard)
 
 The code had drifted from this plan before this round (four Satin phrase windows at 27, 52 and 76% of the song, a Jarrett-style opening option, a left-hand accompaniment in both AMB-PNO-002 and AMB-PNO-003). The sections below this one describe the original design; this section records what changed and why.

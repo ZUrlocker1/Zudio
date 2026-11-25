@@ -974,7 +974,7 @@ extension AmbientLeadGenerator {
         func farFromUsed(_ step: Int) -> Bool { usedSteps.allSatisfy { abs($0 - step) >= 32 } }
         /// A glaring rub for `n` over steps step..<step+len, against every note sounding then
         /// except those `skip` says will be cut or replaced.
-        func rubs(_ n: UInt8, at step: Int, len: Int, skip: (Int) -> Bool = { _ in false }) -> Bool {
+        func glaringRub(_ n: UInt8, at step: Int, len: Int, skip: (Int) -> Bool = { _ in false }) -> Bool {
             for i in ev.indices where !skip(i) {
                 let e = ev[i]
                 guard e.stepIndex < step + len, e.stepIndex + e.durationSteps > step else { continue }
@@ -1021,7 +1021,7 @@ extension AmbientLeadGenerator {
             let t = ev[i], s = t.stepIndex
             let g = t.note - 1
             guard farFromUsed(s), onsetsFree(s - 1, s),
-                  !rubs(g, at: s - 1, len: 1, skip: { isRinging(ev[$0], s - 1) }) else { continue }
+                  !glaringRub(g, at: s - 1, len: 1, skip: { isRinging(ev[$0], s - 1) }) else { continue }
             clip(at: s - 1)
             newNotes.append(MIDIEvent(stepIndex: s - 1, note: g, velocity: soft(t.velocity, 14), durationSteps: 1))
             usedSteps.append(s); graces -= 1; chromaticLeft -= 1
@@ -1039,7 +1039,7 @@ extension AmbientLeadGenerator {
             for alt in [Int(e.note) + 1, Int(e.note) - 1].seededShuffle(&rng) {
                 let pc = alt % 12
                 guard !scale.contains(pc), padSafe(pc), [1, 2].contains(abs(Int(next.note) - alt)),
-                      !rubs(UInt8(alt), at: e.stepIndex, len: e.durationSteps, skip: { $0 == i }) else { continue }
+                      !glaringRub(UInt8(alt), at: e.stepIndex, len: e.durationSteps, skip: { $0 == i }) else { continue }
                 ev[i] = MIDIEvent(stepIndex: e.stepIndex, note: UInt8(alt),
                                   velocity: pnoVel(Swift.min(85, Int(e.velocity) + 4)), durationSteps: e.durationSteps)
                 usedSteps.append(e.stepIndex); tensions -= 1; chromaticLeft -= 1
@@ -1090,7 +1090,7 @@ extension AmbientLeadGenerator {
             for k in 0..<line.count {
                 if k == chromAt {
                     let c = UInt8((Int(line[k - 1]) + Int(line[k])) / 2)
-                    if !rubs(c, at: step, len: 1, skip: { isRinging(ev[$0], start) }) && !scale.contains(Int(c) % 12) {
+                    if !glaringRub(c, at: step, len: 1, skip: { isRinging(ev[$0], start) }) && !scale.contains(Int(c) % 12) {
                         run.append(MIDIEvent(stepIndex: step, note: c, velocity: pnoVel(50 - k), durationSteps: 1))
                         step += 1; chromaticLeft -= 1
                     }
@@ -1119,7 +1119,7 @@ extension AmbientLeadGenerator {
                   ev.allSatisfy({ !isMelody($0) || $0.stepIndex <= s || $0.stepIndex >= s + 4 }) else { continue }
             let trill = rng.nextDouble() < 0.50
             let figure: [UInt8] = trill ? [e.note, up, e.note, up] : [up, e.note, low, e.note]
-            guard !figure.contains(where: { $0 != e.note && rubs($0, at: s, len: 4, skip: { $0 == i }) }) else { continue }
+            guard !figure.contains(where: { $0 != e.note && glaringRub($0, at: s, len: 4, skip: { $0 == i }) }) else { continue }
             ev[i] = MIDIEvent(stepIndex: s + 4, note: e.note, velocity: soft(e.velocity, 6), durationSteps: e.durationSteps - 4)
             for (k, n) in figure.enumerated() {
                 ev.append(MIDIEvent(stepIndex: s + k, note: n, velocity: soft(e.velocity, k == 0 ? 0 : 8), durationSteps: 1))
@@ -1139,8 +1139,8 @@ extension AmbientLeadGenerator {
             let t = ev[i], s = t.stepIndex
             guard farFromUsed(s), onsetsFree(s - 2, s), let up = scaleNeighbour(t.note, up: true) else { continue }
             let below = t.note - 1
-            guard !rubs(up, at: s - 2, len: 1, skip: { isRinging(ev[$0], s - 2) }),
-                  !rubs(below, at: s - 1, len: 1, skip: { isRinging(ev[$0], s - 2) }) else { continue }
+            guard !glaringRub(up, at: s - 2, len: 1, skip: { isRinging(ev[$0], s - 2) }),
+                  !glaringRub(below, at: s - 1, len: 1, skip: { isRinging(ev[$0], s - 2) }) else { continue }
             clip(at: s - 2)
             ev.append(MIDIEvent(stepIndex: s - 2, note: up, velocity: soft(t.velocity, 10), durationSteps: 1))
             ev.append(MIDIEvent(stepIndex: s - 1, note: below, velocity: soft(t.velocity, 12), durationSteps: 1))
@@ -1156,7 +1156,7 @@ extension AmbientLeadGenerator {
                 guard notes.count >= 3, let lowN = notes.min(by: { $0.note < $1.note }) else { continue }
                 let add = [2, 5, 9].map { Int(lowN.note) + $0 }.first { c in
                     scale.contains(c % 12) && !notes.contains { $0.note == UInt8(c) }
-                        && !rubs(UInt8(c), at: hit, len: lowN.durationSteps)
+                        && !glaringRub(UInt8(c), at: hit, len: lowN.durationSteps)
                 }
                 if let c = add {
                     ev.append(MIDIEvent(stepIndex: hit, note: UInt8(c), velocity: soft(lowN.velocity, 10),
