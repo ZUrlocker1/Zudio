@@ -1274,6 +1274,7 @@ struct SongGenerator {
             // Where Evolve hands over to pass 1: the start of the closing, worked out from the bars
             // the rule was written for (before the trim below changes the count). Koln: its closing
             // phrase; Satin: the end of its last phrase, where the bass-only taper begins.
+            let preTrimFrame = frame
             let pianoCloseBar: Int? = {
                 switch AmbientPianoRule(id: pianoRule) {
                 case .koln:  return KolnArc.draw(frame: frame, totalBars: frame.totalBars).closingBar
@@ -1317,7 +1318,9 @@ struct SongGenerator {
             var stepAnnotations = buildStepAnnotations(
                 structure: structure, trackEvents: trackEvents,
                 frame: frame, isAmbient: true, includeDrumFills: false)
-            for (bar, desc) in ambientPianoArcLines(rule: pianoRule, frame: frame) {
+            // The arc was written for the bar count before the trim, so the log reads it from that
+            // frame; a trimmed song's Climax and Aftershock lines were a few bars off.
+            for (bar, desc) in ambientPianoArcLines(rule: pianoRule, frame: preTrimFrame) where bar < frame.totalBars {
                 stepAnnotations[bar * 16, default: []].append(
                     GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
             }
