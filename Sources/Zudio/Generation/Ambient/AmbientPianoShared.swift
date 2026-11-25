@@ -7,17 +7,28 @@ extension AmbientLeadGenerator {
 
     // MARK: - Ambient Piano Lead (full-song, no loop tiler)
 
+    /// The per-call options of `generateAmbientPianoLead`. Each rule reads only the ones it uses.
+    struct PianoParams {
+        /// Satin keeps its left hand out of the intro.
+        var introEndBar = 0
+        /// An Evolve pass: shorter, no fresh opening.
+        var isEvolvePass = false
+        /// Koln's vamp is redrawn from this per regen; 0 is the original song.
+        var arcVariation: UInt64 = 0
+        /// Koln records its high-note reach steps here for the log.
+        var reachLog: ReachLog? = nil
+    }
+
     static func generateAmbientPianoLead(
         pianoRule: String,
         frame: GlobalMusicalFrame,
         totalBars: Int,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        introEndBar: Int = 0,
-        isEvolvePass: Bool = false,
-        arcVariation: UInt64 = 0,
-        reachLog: ReachLog? = nil
+        params: PianoParams = PianoParams()
     ) -> [MIDIEvent] {
+        let (introEndBar, isEvolvePass, arcVariation, reachLog) =
+            (params.introEndBar, params.isEvolvePass, params.arcVariation, params.reachLog)
         usedRuleIDs.insert(pianoRule)
         let events: [MIDIEvent]
         switch AmbientPianoRule(id: pianoRule) {

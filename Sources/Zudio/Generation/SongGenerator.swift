@@ -1261,7 +1261,7 @@ struct SongGenerator {
             trackEvents[kTrackLead1] = AmbientLeadGenerator.generateAmbientPianoLead(
                 pianoRule: pianoRule, frame: frame, totalBars: frame.totalBars,
                 rng: &lead1RNG, usedRuleIDs: &lead1Rules,
-                introEndBar: pianoIntroEndBar, reachLog: reachLog)
+                params: .init(introEndBar: pianoIntroEndBar, reachLog: reachLog))
 
             // Trim song to where melodic content ends — avoids bass-only or silent tails.
             // Uses only notes above MIDI 57 (A3) so LH bass doesn't extend the trim point.
@@ -2246,8 +2246,8 @@ struct SongGenerator {
                     pianoRule: regenRule,
                     frame: songState.frame, totalBars: songState.frame.totalBars,
                     rng: &rng, usedRuleIDs: &usedRules,
-                    introEndBar: songState.structure.introSection?.endBar ?? 0,
-                    arcVariation: variation, reachLog: regenReach)
+                    params: .init(introEndBar: songState.structure.introSection?.endBar ?? 0,
+                                  arcVariation: variation, reachLog: regenReach))
                 ambientPianoArcRegen = ambientPianoArcLines(rule: regenRule, frame: songState.frame, variation: variation)
                     + regenReach.steps.prefix(1).map { ($0 / 16, "High-note reach") }
             } else if isAmbient {

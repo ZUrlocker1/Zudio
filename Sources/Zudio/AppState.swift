@@ -2414,7 +2414,8 @@ final class AppState: ObservableObject {
         var padRules:   Set<String> = []
         let lead1Events = AmbientLeadGenerator.generateAmbientPianoLead(
             pianoRule: anchor.ambientPianoRule, frame: shiftedFrame, totalBars: passBars,
-            rng: &rng1, usedRuleIDs: &lead1Rules, isEvolvePass: true)
+            rng: &rng1, usedRuleIDs: &lead1Rules,
+            params: .init(isEvolvePass: true))
 
         var events = Array(repeating: [MIDIEvent](), count: kTrackCount)
         events[kTrackLead1] = lead1Events
