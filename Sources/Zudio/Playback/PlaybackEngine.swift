@@ -254,6 +254,10 @@ final class PlaybackEngine: ObservableObject {
     var onApproachingEnd:   (() -> Void)? = nil
     var onSongEndNaturally: (() -> Void)? = nil
     var onOutroStart:       (() -> Void)? = nil
+    /// Evolve on a song with no Outro (Ambient Piano): the bar where pass 1 takes over, so the
+    /// hand-off fires there instead of when the song ends. Nil everywhere else. AppState sets it
+    /// when Evolve starts and clears it when pass 1 begins.
+    var evolveHandoverBar: Int? = nil
 
     // Audio health callbacks — set by AppState.init(); called on main actor.
     // onAudioEngineRestarted: fired at the end of restartAudio() so AppState can re-apply
@@ -1168,7 +1172,7 @@ final class PlaybackEngine: ObservableObject {
             }
             // Evolve: fire once when playhead first reaches the Outro section start.
             if let cb = self.onOutroStart, !self.outroStartFired,
-               let outroBar = self.songState?.structure.outroSection?.startBar,
+               let outroBar = self.songState?.structure.outroSection?.startBar ?? self.evolveHandoverBar,
                bar >= outroBar {
                 self.outroStartFired = true
                 cb()

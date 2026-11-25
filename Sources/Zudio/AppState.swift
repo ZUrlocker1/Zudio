@@ -1635,7 +1635,7 @@ final class AppState: ObservableObject {
     private func evolveBoundarySweepSteps() -> [Int] {
         guard playMode == .evolve, let anchor = evolveAnchorState,
               anchor.style == .kosmic, !anchor.isKosmicDrift, !anchor.isKosmicSpace else { return [] }
-        let pass1Start = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars)
+        let pass1Start = AppState.evolveJoinBar(anchor)
         switch evolvePhase {
         case .pass1:           return [pass1Start * 16]
         case .pass2, .outro:   return [pass1Start * 16, (pass1Start + evolvePass1Bars) * 16]
@@ -2010,7 +2010,7 @@ final class AppState: ObservableObject {
         let evolveBodyEndStep: Int?
         if playMode == .evolve, let anchor = evolveAnchorState {
             sourceState       = anchor
-            evolveBodyEndStep = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars) * 16
+            evolveBodyEndStep = AppState.evolveJoinBar(anchor) * 16
         } else {
             sourceState       = current
             evolveBodyEndStep = nil     // non-evolve: replace entire track as before
@@ -3283,9 +3283,12 @@ final class AppState: ObservableObject {
         evolveMoodAnchor   = moodOverride
         evolveTempoAnchor  = song.frame.tempo
         evolvePhase        = .original
+        playback.evolveHandoverBar = nil
         if song.isAmbientPiano {
             evolvePass1Bars = 16
             evolvePass2Bars = 8
+            let join = AppState.evolveJoinBar(song)
+            if join < song.frame.totalBars { playback.evolveHandoverBar = join }
         } else {
             let aBars       = aSectionBars(of: song)
             evolvePass1Bars = min(40, max(32, aBars / 2))
@@ -3457,6 +3460,18 @@ final class AppState: ObservableObject {
         return cycles.first { p in (0..<p).allSatisfy { chord($0) == chord($0 + p) } }
     }
 
+    /// The bar where Evolve's first pass starts: the anchor's Outro, else its end. An Ambient Piano
+    /// song with nothing sounding in its last bar (its closing chord has died away) hands over one
+    /// bar early, so the join doesn't leave a pause that sounds like the song ending (Zack,
+    /// 2026-11-25, Koln: the generator keeps three bars after the last melodic note).
+    nonisolated static func evolveJoinBar(_ anchor: SongState) -> Int {
+        if let outro = anchor.structure.outroSection?.startBar { return outro }
+        let total = anchor.frame.totalBars
+        guard anchor.isAmbientPiano, total > 8 else { return total }
+        let lastEnd = anchor.trackEvents.lazy.flatMap { $0 }.map { $0.stepIndex + $0.durationSteps }.max() ?? 0
+        return lastEnd <= (total - 1) * 16 ? total - 1 : total
+    }
+
     // Builds an extended SongState by appending pass events (and optionally the original Outro)
     // after the anchor body. pass1Events and pass2Events are 0-indexed within their own pass lengths;
     // they are shifted into the correct absolute position in the extended timeline.
@@ -3537,7 +3552,7 @@ final class AppState: ObservableObject {
     // Used to detect bass/drum tracks that are absent so evolve passes can add them.
     private func absentBodyTracks(_ anchor: SongState, candidates: [Int]) -> [Int] {
         let bodyStartStep  = (anchor.structure.introSection?.endBar  ?? 0) * 16
-        let outroStartStep = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars) * 16
+        let outroStartStep = AppState.evolveJoinBar(anchor) * 16
         return candidates.filter { idx in
             !anchor.trackEvents[idx].contains {
                 $0.stepIndex >= bodyStartStep && $0.stepIndex < outroStartStep
@@ -3584,7 +3599,7 @@ final class AppState: ObservableObject {
                     // Pass-2 only: update display immediately (12-bar early look-ahead)
                     if pass == 2, self.evolvePhase == .pass1,
                        let pass1 = self.evolvePass1State {
-                        let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+                        let outroStartBar = AppState.evolveJoinBar(anchor)
                         let extended = Self.buildExtendedState(
                             anchor: anchor, outroStartBar: outroStartBar,
                             pass1Events: pass1.trackEvents, pass1Bars: self.evolvePass1Bars,
@@ -3632,7 +3647,7 @@ final class AppState: ObservableObject {
                 // Pass-2 only: update display immediately (12-bar early look-ahead)
                 if pass == 2, self.evolvePhase == .pass1,
                    let pass1 = self.evolvePass1State {
-                    let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+                    let outroStartBar = AppState.evolveJoinBar(anchor)
                     let extended = Self.buildExtendedState(
                         anchor: anchor, outroStartBar: outroStartBar,
                         pass1Events: pass1.trackEvents, pass1Bars: self.evolvePass1Bars,
@@ -3704,13 +3719,14 @@ final class AppState: ObservableObject {
     }
 
     private func doSwitchToEvolvePass1(_ pass1: SongState) {
+        playback.evolveHandoverBar = nil
         guard let anchor = evolveAnchorState else { return }
         evolvePhase       = .pass1
         evolvePhaseToken += 1
         // Keep evolvePass1State for building extendedState2 later
         evolvePass1State = pass1
 
-        let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+        let outroStartBar = AppState.evolveJoinBar(anchor)
         let extended = Self.buildExtendedState(anchor: anchor, outroStartBar: outroStartBar,
                                                pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars)
         songState        = extended
@@ -3739,7 +3755,7 @@ final class AppState: ObservableObject {
         // Keep evolvePass2State for building extendedStateWithOutro later
         evolvePass2State = pass2
 
-        let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+        let outroStartBar = AppState.evolveJoinBar(anchor)
         let extended = Self.buildExtendedState(anchor: anchor, outroStartBar: outroStartBar,
                                                pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars,
                                                pass2Events: pass2.trackEvents, pass2Bars: evolvePass2Bars,
@@ -3767,7 +3783,7 @@ final class AppState: ObservableObject {
             // 12 bars before Outro: if pass1 is ready, show the extended bars now and log (once only)
             guard let pass1 = evolvePass1State, let anchor = evolveAnchorState,
                   (songState?.frame.totalBars ?? 0) <= anchor.frame.totalBars else { break }
-            let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+            let outroStartBar = AppState.evolveJoinBar(anchor)
             let extended = Self.buildExtendedState(anchor: anchor, outroStartBar: outroStartBar,
                                                    pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars)
             songState = extended
