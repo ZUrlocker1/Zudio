@@ -1281,7 +1281,7 @@ struct SongGenerator {
             let padChance: Double
             switch pianoRule {
             case "AMB-PNO-001": padChance = 1.00
-            case "AMB-PNO-003": padChance = 0.15   // rare (Zack, 2026-11-24; was 0.30)
+            case "AMB-PNO-003": padChance = 0.0    // never (Zack, 2026-11-25; was 0.15)
             default:            padChance = 0.50
             }
             if padsRNG.nextDouble() < padChance {
@@ -2182,7 +2182,9 @@ struct SongGenerator {
                 events = scratch[kTrackBass]
             }
         case kTrackPads:
-            if isAmbPiano {
+            if isAmbPiano && songState.ambientPianoRule == "AMB-PNO-003" {
+                events = []   // Koln Winter never has pads
+            } else if isAmbPiano {
                 events = AmbientPadsGenerator.generateAmbientPianoPads(
                     pianoRule: songState.ambientPianoRule,
                     frame: songState.frame, tonalMap: songState.tonalMap,

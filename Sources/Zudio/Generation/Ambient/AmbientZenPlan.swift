@@ -12,9 +12,9 @@
 
 import Foundation
 
-/// The echo dial's character: the usual echo, or an occasional deep or dry one (Zack, 2026-11-21).
+/// The echo dial's character: the usual echo, or an occasional deep one (Zack, 2026-11-21; dry removed 2026-11-24).
 enum ZenEchoCharacter: Sendable, Equatable {
-    case usual, deep, dry
+    case usual, deep
 }
 
 /// The harmony plan (Zack, 2026-11-21): AMB-1's drift, or the Big Ship cycle with breathing pads
@@ -55,11 +55,11 @@ struct AmbientZenDials: Sendable, Equatable {
     /// AMB-1's bell octave at -1: all three bell loops an octave lower (never higher).
     /// 12 percent of songs (Zack, 2026-11-21).
     let bellsLow: Bool
-    /// The echo's character (Zack, 2026-11-21): usual 75 percent; deep 15 (feedback 79 to 80
-    /// percent and the bells 15 points wetter, after AMB-1's Shoreline); dry 10 (feedback 66 to 70
-    /// and the bells 15 points drier). One dial, so a song is never extreme both ways.
+    /// The echo's character: deep 15 percent (feedback 40 to 44 percent, bells 4 points wetter, after
+    /// AMB-1's Shoreline), otherwise usual, which is light 35, medium 30 or long 20 percent of songs
+    /// (feedback 16 to 29). Dry was removed 2026-11-24 (it sounded almost the same as light).
     let echoCharacter: ZenEchoCharacter
-    /// 0 to 1: where the feedback sits inside a deep or dry echo's range.
+    /// 0 to 1: where the feedback sits inside a deep echo's range.
     let echoAmount: Double
     /// The Big Ship cycle (AMB-PADS-015): 30 percent of songs while testing, split evenly between
     /// breathing pads and block chords; likely 20 at release (Zack, 2026-11-21).
@@ -107,7 +107,7 @@ struct AmbientZenDials: Sendable, Equatable {
         let bellsLow = rng.nextDouble() < 0.12
         // The echo character (2026-11-21), last.
         let echoRoll = rng.nextDouble()
-        let echoCharacter: ZenEchoCharacter = echoRoll < 0.15 ? .deep : echoRoll < 0.25 ? .dry : .usual
+        let echoCharacter: ZenEchoCharacter = echoRoll < 0.15 ? .deep : .usual
         let echoAmount = rng.nextDouble()
         // The Big Ship cycle (2026-11-21), last, testing share.
         let cycleRoll = rng.nextDouble()
@@ -130,12 +130,25 @@ struct AmbientZenDials: Sendable, Equatable {
                                homeSixNine: homeSixNine, padColourSeed: padColourSeed)
     }
 
-    /// Points added to the bells' echo wet mix (Lead 1, Lead 2, Rhythm): +15 deep, -15 dry.
+    /// The usual echo's three steps (Zack, 2026-11-24): light below 0.8118 echo size (35 percent of songs), medium to 0.8647 (30), long above (20); deep is the other 15.
+    /// `position` is 0 to 1 within the step.
+    private var usualStep: (name: String, position: Double) {
+        if echoSize < 0.8118 { return ("light", (echoSize - 0.75) / 0.0618) }
+        if echoSize < 0.8647 { return ("medium", (echoSize - 0.8118) / 0.0529) }
+        return ("long", min(1, (echoSize - 0.8647) / 0.0353))
+    }
+
+    /// Points added to the bells' echo wet mix (Lead 1, Lead 2, Rhythm; base 14, faint like AMB-1):
+    /// light -4, medium -3, long -2, deep +4.
     var bellEchoWetShift: Float {
         switch echoCharacter {
-        case .usual: return 0
-        case .deep:  return 15
-        case .dry:   return -15
+        case .usual:
+            switch usualStep.name {
+            case "light":  return -4
+            case "medium": return -3
+            default:       return -2
+            }
+        case .deep: return 4
         }
     }
 
@@ -144,13 +157,16 @@ struct AmbientZenDials: Sendable, Equatable {
     /// How far the bass sits below MIDI 36 + root: 12 when the bass is low.
     var bassShift: Int { bassLow ? -12 : 0 }
 
-    /// Echo feedback in AVAudioUnitDelay's percent: 0.5 + 0.32 x echo size, 74 to 79; a deep echo
-    /// 79 to 80, a dry one 66 to 70.
+    /// Echo feedback in AVAudioUnitDelay's percent, in steps about 7 points apart so each is audible:
+    /// light 16 to 19, medium 21 to 24, long 26 to 29, deep 40 to 44. AMB-1's tape
+    /// filters each pass hard, so the same repeats die sooner here than its 76 percent suggests.
     var echoFeedbackPercent: Float {
         switch echoCharacter {
-        case .usual: return Float((0.5 + 0.32 * echoSize) * 100)
-        case .deep:  return Float(79 + 1 * echoAmount)
-        case .dry:   return Float(66 + 4 * echoAmount)
+        case .usual:
+            let step = usualStep
+            let base: Double = step.name == "light" ? 16 : step.name == "medium" ? 21 : 26
+            return Float(base + 3 * step.position)
+        case .deep: return Float(40 + 4 * echoAmount)
         }
     }
 
@@ -159,12 +175,11 @@ struct AmbientZenDials: Sendable, Equatable {
     var plainWords: String {
         // The pad colour isn't named: the Instruments line already shows the pads (Zack, 2026-11-21).
         let breath = breathLength < 53 ? "short" : breathLength < 62 ? "medium" : "long"
-        // "deep" and "dry" name the occasional extremes; the usual echo reads light, medium or long.
+        // "deep" names the occasional extreme; the usual echo reads light, medium or long.
         let echo: String
         switch echoCharacter {
         case .deep:  echo = "deep"
-        case .dry:   echo = "dry"
-        case .usual: echo = echoSize < 0.80 ? "light" : echoSize < 0.85 ? "medium" : "long"
+        case .usual: echo = usualStep.name
         }
         let bells  = bellDensity <= 30 ? "sparse" : bellDensity <= 45 ? "medium" : "full"
         // Drift is the restlessness dial: how much the bell loops change each pass and how often

@@ -82,14 +82,14 @@ Zudio normally rolls each track's rule on its own. Zen works only if every track
 5. **Pad colour:** retired. The draw is still taken so no later dial moves, but the pads now come from one weighted pool (section 9).
 6. **Restlessness ("Drift" in the log):** 0.25 to 0.45. How much the bell loops change from pass to pass, and how often the bass sits out. It's kept low because the Eno records repeat literally.
 7. **Bell density:** sparse 30, medium 45 or full 60.
-8. **Echo size:** 0.75 to 0.90, which sets the echo feedback.
+8. **Echo size:** 0.75 to 0.90, which sets the echo feedback (16 to 29 percent in three steps).
 9. **Pulse:** on in 10 percent of songs: AMB-DRUM-005 Garden Pulse (section 8).
 10. **Outro length:** 6 to 12 bars, uniform.
 11. **End offsets:** the order the pads, Texture and bass stop in (section 7).
 12. **Lead 2 lock:** in 25 percent of songs Lead 2 plays on Lead 1's instrument, as AMB-1 plays every bell loop on one voice.
 13. **Bass low:** AMB-1's bass octave at -1, in 12 percent of songs (Zack, 2026-11-21). Never higher.
 14. **Bells low:** AMB-1's bell octave at -1, all three bell loops an octave down, 12 percent of songs (Zack, 2026-11-21). Never higher.
-15. **Echo character:** usual 75 percent; deep 15 (feedback 79 to 80 percent, bells 15 points wetter, after AMB-1's Shoreline); dry 10 (feedback 66 to 70, bells 15 points drier). One dial, so a song is never extreme both ways. The echo time doesn't change.
+15. **Echo character:** deep 15 (feedback 40 to 44 percent, bells 4 points wetter, after AMB-1's Shoreline); otherwise usual, which is light 35, medium 30 or long 20 percent of songs (feedback 16 to 19, 21 to 24 and 26 to 29). Dry was removed 2026-11-24, since it sounded almost the same as light. One dial, so a song is never extreme both ways. The echo time doesn't change.
 16. **Big Ship cycle:** breathing pads 15 percent, block chords 15 percent; otherwise the journey (section 5).
 17. **Texture rule:** Low Tide 40 percent, Pearl Pedal 60.
 18. **Shell Voices:** drawn in 47 percent of songs and ignored under Big Ship block chords, so about 40 percent of all Zen songs (section 7).
@@ -302,7 +302,7 @@ Zen's sounds are appended to the Ambient pools, so base Ambient and Ambient Pian
 
 All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAudio).
 - **Reverb.** The large bus switches to .cathedral, with a 300 Hz low cut on what feeds it (live playback only): Pads 75, Lead 1 68, Lead 2 68, Rhythm 70, Texture 55. Bass 10 and Drums 35 go to the small .mediumHall bus, so the bass stays almost dry and centred, as in AMB-1. perTrackReverbPresets matches, for export.
-- **Echo.** Feedback 0.5 + 0.32 × echo size (74 to 79 percent), or 79 to 80 for a deep echo and 66 to 70 for a dry one. Lead 1 echoes every 2 beats and Lead 2 every 1.5 (AMB-1's two tape heads), Rhythm every 1.5, Texture every 2; capped at 2.0 s. Wet: Lead 1 45, Lead 2 50, Rhythm 48 (each 15 more in a deep echo, 15 less in a dry one), Pads 15, Texture 10, Bass none. The low-pass is 2600 Hz on the bells and 1800 Hz on Pads, so each repeat comes back darker.
+- **Echo (faint, 2026-11-24).** AMB-1's echo is a very quiet, dark smear inside its reverb: the bells feed the tape at about 17 percent, the first repeat is about 18 dB under the dry bell, each pass is filtered, and the echo feeds the plate. Zen matches that by level, not by structure. Feedback by step, about 5 points apart for the usual three: light 16 to 19, medium 21 to 24, long 26 to 29, deep 40 to 44 percent. Light takes 35 percent of songs, medium 30, long 20 and deep 15. Lead 1 and Lead 2 echo every 2 beats (one echo, not two), Rhythm every 1.5, Texture every 2; capped at 2.0 s. Wet: Lead 1 14, Lead 2 14, Rhythm 14 (light 10, medium 11, long 12, deep 18; the steps sit close together, skewed toward light, 2026-11-24), Pads 15, Texture 10, Bass none. The low-pass is 1800 Hz on every echoing track, so each repeat comes back darker. Before 2026-11-24 the bells were 45 to 50 wet at 74 to 79 percent feedback, about three times AMB-1's level, and Lead 2 echoed at 1.5 beats against Lead 1's 2, so two echoes smeared together. The values were tuned by ear on 2026-11-24 (Zack: "sounds pretty good"): a deep song first sounded like two or three strong repeats, so deep's feedback came down from 64 to 67 to 40 to 44; medium and long were then lowered to skew toward light; and the dry echo was dropped because it sounded almost the same as light. The delay sits before the reverb send in each track's chain, so every repeat already feeds the cathedral. What is still different from AMB-1, if the echo ever needs more wash: it smears each note through a 160 ms fed-back Echoplex before the tape, and its tape has wow and head slide, so repeats come back slightly out of tune. Neither is built.
 - **High-pass.** Base Ambient's 250 Hz high-pass stays on the leads but is off Texture, whose fundamental is 131 to 370 Hz.
 - **Pads.** Tremolo 0.06 Hz (a 17 s cycle) at depth 0.30. The filter follows the song's swell curve: about 1 kHz at a swell of -0.5, 4.5 kHz at 0.9 (zenPadCutoff, held to 800 to 5000 Hz). A hidden auto-pan drifts them ±0.6 across the room, one sweep about every 30 s.
 - **Bass.** Tremolo 0.08 Hz at depth 0.15, and a hidden low shelf of +3 dB at 80 Hz for floor under the bed. The sweep, if switched on, is an ordinary LFO.
@@ -316,7 +316,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 - **Title:** Zen has its own titles (AmbientZenTitleGenerator, in AmbientTitleGenerator.swift), gentle jokes on Eno with extra airport humour, at most 19 characters: "Music for Layovers" (30 percent), Eno spoofs such as "Thursday Nap" or "Neroli Ravioli" (35), place plus fraction such as "United Delay 2/1" or "1/1 (Decaf)", a quarter of them an odd number such as "Gate 42/634" or "Lounge 1.31459" (20), and Oblique Strategies twists such as "Honor Thy Nap" (15). The title is the last draw, so no note depends on it.
 - **Style:** "Ambient Zen – 72 bpm, 9 bar outro". There is no Form line, since every song is A and an outro.
 - **Chords:** key and mode, for example "G Dorian 7th chord drift", then any pad colours: ", pads with 9ths and triads" or ", pads with 6/9 home". The pace and the way home are left out.
-- **Zen:** "Breaths:long Bells:sparse Drift:calm Swell:deep". A dial at its middle setting (medium) isn't named, and a song with every dial at medium reads "Breaths, Echo, Bells, Drift, Swell: medium". Echo reads light or long, or deep or dry for the extremes. A low octave shows as "Bells:sparse,low" ("Bells:low" at medium density) and "Bass:low". The pad colour isn't named, because the Instruments line shows the pads.
+- **Zen:** "Breaths:long Bells:sparse Drift:calm Swell:deep". A dial at its middle setting (medium) isn't named, and a song with every dial at medium reads "Breaths, Echo, Bells, Drift, Swell: medium". Echo reads light or long, or deep for the extreme. A low octave shows as "Bells:sparse,low" ("Bells:low" at medium density) and "Bass:low". The pad colour isn't named, because the Instruments line shows the pads.
 - **Rules,** in track order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums. Drums logs AMB-DRUM-005 Garden Pulse or AMB-DRUM-000 No percussion. Zen's lead rules use LD1 and LD2, because each belongs to one lead.
 - No line per chord change; no style logs one.
 - No Ambient rule carries the "* " testing star: the style is new, so all its rules are (Zack, 2026-11-21).
@@ -336,7 +336,7 @@ All through existing settings, in PlaybackEngine's Zen branch (applyAmbientZenAu
 ## 13. Variety
 
 - AMB-DRUM-005 Garden Pulse (section 8) and the bass and bells octave dials (section 4).
-- The deep and dry echo (section 4).
+- The deep echo (section 4).
 - AMB-PADS-015 Big Ship Cycle (section 5), with breathing pads or block chords.
 - AMB-TEXT-011 Low Tide, a lighter Texture rule in 40 percent of songs (section 7).
 - AMB-PADS-016 Shell Voices and AMB-BASS-009 Slow Glide (section 7).

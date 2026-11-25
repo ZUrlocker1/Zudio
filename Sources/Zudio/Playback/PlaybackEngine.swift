@@ -154,11 +154,14 @@ final class PlaybackEngine: ObservableObject {
     // Feedback is the song's echo-size dial (74 to 79 percent), set in setAmbientMode. The time is
     // 2 beats (Lead 2 at 0.75 of Lead 1, Rhythm 1.5 beats), capped at AVAudioUnitDelay's 2 s.
     // Bells roll off at 2600 Hz, Pads and Texture at 1800 Hz; Bass and Drums take none.
-    private let zenDelayWet:     [Float]  = [45,   50,   15,   48,   10,   -1,  -1,  -1]
-    private let zenDelayLowpass: [Float]  = [2600, 2600, 1800, 2600, 1800, -1,  -1,  -1]
-    private let zenDelayBeats:   [Double] = [2.0,  1.5,  2.0,  1.5,  2.0,  1.0, 1.0, 1.0]
+    // Faint on purpose (Zack, 2026-11-24): AMB-1's echo is a very quiet, dark smear inside its reverb
+    // (first repeat about 18 dB under the dry bell), so the bells take 14 wet, feedback 8 to 44 by echo step and
+    // a 1800 Hz roll-off. Lead 2 shares Lead 1's 2-beat time so there is one echo, not two.
+    private let zenDelayWet:     [Float]  = [14,   14,   15,   14,   10,   -1,  -1,  -1]
+    private let zenDelayLowpass: [Float]  = [1800, 1800, 1800, 1800, 1800, -1,  -1,  -1]
+    private let zenDelayBeats:   [Double] = [2.0,  2.0,  2.0,  1.5,  2.0,  1.0, 1.0, 1.0]
     /// The Ambient delay wet table in force: Zen's in an Ambient Zen song.
-    /// A deep or dry echo moves the bells' wet mix (Lead 1, Lead 2, Rhythm) 15 points either way.
+    /// A deep or dry echo moves the bells' wet mix (Lead 1, Lead 2, Rhythm); the usual light, medium and long steps move it -4, -3 and -2.
     private var ambientDelayWetTable: [Float] {
         guard cachedIsAmbientZen else {
             return ambientDelayWet
@@ -2061,7 +2064,7 @@ final class PlaybackEngine: ObservableObject {
         perTrackReverbPresets[kTrackLeadSynth] = .mediumHall
         let tempo    = songState?.frame.tempo ?? 72
         let beatSecs = 60.0 / Double(tempo)
-        let feedback = zenDials?.echoFeedbackPercent ?? 76
+        let feedback = zenDials?.echoFeedbackPercent ?? 22
         for i in 0..<Swift.min(delays.count, zenDelayWet.count) where zenDelayWet[i] >= 0 {
             delays[i].delayTime     = Swift.min(2.0, beatSecs * zenDelayBeats[i])
             delays[i].feedback      = feedback

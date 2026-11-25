@@ -1,12 +1,10 @@
 # Zudio Change Log
 
-## V 3.1 (Build 139)
+## V 3.5 (Build 139)
 
 **Release candidate, expected on the App Store December 1.** The 2026-11-24 Mac DMG is build 139: Ambient Zen, base Ambient, the Ambient filter tides, the export-matches-playback work and the Chill bass slides are in, with the Ambient mix back at Piano 22 / base 23 / Zen 55. Only minor tuning by ear is still expected.
 
 - **Ambient Piano notes capped at one bar** — (2026-11-24, build 139, unheard) A low note held 3 bars at bar 18 and bar 28 and a long closing chord at the outro in Soft Landing in the Open Plan (AMB-PNO-003) showed in the piano roll as holds a piano never sounds. `generateAmbientPianoLead` now caps every note it returns at 16 steps (`pianoMaxSustainSteps`), for AMB-PNO-001, AMB-PNO-002 and AMB-PNO-003, vamp and regenerated leads included. The cap runs on the finished notes, so no random draw changes and the notes and rhythm are as before, only shorter holds; a song's trimmed length can come out up to two bars shorter where a long closing chord set it. Test: AmbientPianoSustainTests.
-
-- **Ambient Piano Lead 1 +2 dB, narrower top velocities** — (2026-11-24, build 139, unheard) Soft piano passages sat under Zen, so the Stereo Piano boost on Lead 1 went from 8.0 to 10.0 (playback and export share it). The arc's top velocities are lowered where the rules write them: the urgent figures are capped at 64, the run into the climax peaks at 75 (was 80), the foreshadow chord is 10 lower, the climax chord is 73 to 84 (was 78 to 89), the Koln climax ceiling is 83 (was 88), and the aftershock stabs 4 lower. Chill's piano is untouched.
 
 - **Ambient Zen, phase 1: the bed** — (2026-11-20, build 139) A third Ambient substyle, a homage to AMB-1 and Eno's Music for Airports (docs/Ambient-Zen-plan.md). Each song draws its own mode, tempo and settings, and walks a slow journey of random 7th chords that leaves home and returns, over breathing pads, a held Texture drone and a droning root bass.
 
@@ -22,11 +20,11 @@
 
 - **Base Ambient: more musical** — (2026-11-21, build 139) Base Ambient songs now move through short chord cycles with smooth changes, and the bass names each new chord. Pads and held basses can play soft swells, some songs use 7th chords or Airports 2/1 voices, and Lead 1 now and then drops an octave for a few passes. Added more reverb and air. 
 
-- **Minor improvements to Chill, 2026-11-20.** Chill leads and bass repeat fewer notes. Improved the bass slide in Chill Soho and Chill Blues (2026-11-22).
-
 - **Ambient Piano: stronger melodies** — (2026-11-24, unheard) Satin Melody (AMB-PNO-002) builds one motif per song and states it three or four times: as a question, as an answer landing on the root, and as echoes. Koln / Winter Arc (AMB-PNO-003) gets a short Jarrett-style motif that opens the song, asks the urgent question before the climax, and returns at the climax, the withdrawal and the close; about a third of climaxes climb straight to a held top note. Lines rise to one peak and fall, and phrases end on chord tones. Over 20 songs, Satin's returning statements went from 0.4 to 2.0 per song and Koln's from 0.25 to 1.25.
 
 - **Ambient Piano: left hand under the melody** — (2026-11-24, unheard) In Satin and Koln the left-hand chords now sit below the melody and clear of half-step and tritone rubs, and the bass notes give way to the melody. The dissonance trim no longer drops 9ths over a low root or Satie's suspended endings (Floating Buds too). Melody notes lost to the trim fell from 19% to 4% (Satin) and 15% to 4% (Koln).
+
+- **Ambient Piano Lead 1 +2 dB, narrower top velocities** — (2026-11-24, build 139, unheard) Soft piano passages sat under Zen, so the Stereo Piano boost on Lead 1 went from 8.0 to 10.0 (playback and export share it). The arc's top velocities are lowered where the rules write them: the urgent figures are capped at 64, the run into the climax peaks at 75 (was 80), the foreshadow chord is 10 lower, the climax chord is 73 to 84 (was 78 to 89), the Koln climax ceiling is 83 (was 88), and the aftershock stabs 4 lower. Chill's piano is untouched.
 
 - **Ambient Piano: Floating Buds bells** — (2026-11-24, unheard) The sparse mode picks 3 or 4 colour notes per song (root, 5th, usually the 9th). Bells and dyads sound them, and the floating figures start and rest on them, so each song has a recognisable set of bells.
 
@@ -34,11 +32,11 @@
 
 - **Ambient Piano: Koln jazzy improv** — (2026-11-24, Zack: sounding excellent) 45% of Koln songs take a live concert's liberties: blue-note graces, a slightly wrong held note that resolves by step, falling flurries, trills and turns on top notes, and an extra note in the climax chord. Nothing chromatic falls on a beat or rubs a half-step, and a song has at most 8 chromatic notes.
 
-- **Ambient Piano: Koln vamp, high-note reach and pads** — (2026-11-24, unheard) In about 37% of Koln songs, 6 to 16 bars (mostly short) before the urgent question become a two-chord vamp, after Jarrett's Koln Part IIa: a low pedal under a rocking pair of chords, getting louder toward the climax, with short climbing right-hand phrases. Logged as "Koln Winter Arc - vamp". A Lead 1 regen now draws the vamp afresh and replaces the old Arc markers. The high note in the build zone is logged as "High-note reach"; a third of the time it stands alone, a third it gets one echo, and a third two echoes within 2 bars, each the same note or another high scale tone. Koln gets a pads track in only 15% of songs, down from 30%.
-
-- **Ambient Zen: FM Swell never twice running** — (2026-11-24) FM Swell was already a once-only bass, but an instrument switched in mid-song (by Evolve, ⚡ or the picker) didn't count, so it could carry into the next song. Mid-song switches now count for every once-only instrument.
+- **Ambient Piano: Koln vamp, high-note reach and pads** — (2026-11-24, unheard) In about 37% of Koln songs, 6 to 16 bars (mostly short) before the urgent question become a two-chord vamp, after Jarrett's Koln Part IIa: a low pedal under a rocking pair of chords, getting louder toward the climax, with short climbing right-hand phrases. Logged as "Koln Winter Arc - vamp". A Lead 1 regen now draws the vamp afresh and replaces the old Arc markers. The high note in the build zone is logged as "High-note reach"; a third of the time it stands alone, a third it gets one echo, and a third two echoes within 2 bars, each the same note or another high scale tone. Koln never gets a pads track (it was 30%, then 15%).
 
 - **Minor improvements to Ambient Piano, 2026-11-22.** More reverb on the pads and some swell pads. The three lead rules are renamed Floating Buds, Satin Melody and Koln / Winter Arc.
+
+- **Ambient Zen: FM Swell never twice running** — (2026-11-24) FM Swell was already a once-only bass, but an instrument switched in mid-song (by Evolve, ⚡ or the picker) didn't count, so it could carry into the next song. Mid-song switches now count for every once-only instrument.
 
 - **Ambient Lead 1 no-repeat fix** — (2026-11-21, build 139) Stereo Piano and Ocarina can no longer play Lead 1 in two Ambient songs running.
 
@@ -53,6 +51,8 @@
 - **Resizable Generation Log on Mac** — (2026-11-20, build 139) In Track View, drag the Generation Log bar up to grow the log over the track rows, from the bottom row up; a grip at its right end and the up-down cursor show where to grab, and a double-click resets it. The height is remembered between launches. Mac only.
 
 - **Fewer repeated notes in Chill leads and bass** — (2026-11-20, build 139) Chill leads and bass repeat the same note less often to avoid unnecessary "flattening" of melodies when avoiding tonal clashes.
+
+- **Minor improvements to Chill, 2026-11-20.** Chill leads and bass repeat fewer notes. Improved the bass slide in Chill Soho and Chill Blues (2026-11-22).
 
 - **Regeneration fixes, 2026-11-22.** Regenerating a track now picks a rule at random wherever there is more than one.
 

@@ -682,7 +682,7 @@ struct AmbientZenTitleGenerator {
         "Carports", "USB Ports", "Layovers", "Lobbies", "Gate 23", "Elevators", "Dentists", "Baggage",
         "Naps", "Hold", "Parking", "Delays", "Rebooking", "Standby", "Upgrades", "Gate C17",
         "Seat 23C", "Seat 37E", "Boarding", "Tarmacs", "Red-Eyes", "TSA Lines", "Jet Lag",
-        "Group 9", "Customs", "Carousels", "Gate B12", "Group 5", "Pre-Check",
+        "Group 6", "Customs", "Carousels", "Gate B12", "Group 5", "Pre-Check",
     ]
 
     // 2. One Eno title bent each, then Eno-ish jokes that bend no title (Zack, 2026-11-22).
