@@ -1271,6 +1271,16 @@ struct SongGenerator {
                 .map { $0.stepIndex + $0.durationSteps }
                 .max() ?? (frame.totalBars * 16)
             let trimBars = Swift.max(8, (lastMelodicEnd / 16) + 3)
+            // Where Evolve hands over to pass 1: the start of the closing, worked out from the bars
+            // the rule was written for (before the trim below changes the count). Koln: its closing
+            // phrase; Satin: the end of its last phrase, where the bass-only taper begins.
+            let pianoCloseBar: Int? = {
+                switch AmbientPianoRule(id: pianoRule) {
+                case .koln:  return KolnArc.draw(frame: frame, totalBars: frame.totalBars).closingBar
+                case .satin: return Swift.min(frame.totalBars * 90 / 100, frame.totalBars - 4)
+                case .buds:  return nil
+                }
+            }()
             if trimBars < frame.totalBars - 2 {
                 frame = frame.withTotalBars(trimBars)
                 trackEvents[kTrackLead1] = trackEvents[kTrackLead1]
@@ -1300,6 +1310,10 @@ struct SongGenerator {
                 drumRules: [], bassRules: [], padRules: padRules,
                 lead1Rules: lead1Rules, lead2Rules: [], rhythmRules: [], texRules: [],
                 isAmbientPiano: true, ambientPianoRule: pianoRule)
+            var pianoStructure = structure
+            if let close = pianoCloseBar, close >= 8, close < frame.totalBars - 1 {
+                pianoStructure.evolveHandoverBar = close
+            }
             var stepAnnotations = buildStepAnnotations(
                 structure: structure, trackEvents: trackEvents,
                 frame: frame, isAmbient: true, includeDrumFills: false)
@@ -1317,7 +1331,7 @@ struct SongGenerator {
             if let p = forcePercussionStyle  { forced["PercStyle"] = p.rawValue }
             if useBrushKit                   { forced["BrushKit"] = "true" }   // see below
             return SongState(
-                frame: frame, structure: structure, tonalMap: tonalMap,
+                frame: frame, structure: pianoStructure, tonalMap: tonalMap,
                 trackEvents: trackEvents, globalSeed: seed, trackOverrides: [:],
                 title: title, form: .singleA, style: .ambient,
                 percussionStyle: percussionStyle, kosmicProgFamily: .static_drone,

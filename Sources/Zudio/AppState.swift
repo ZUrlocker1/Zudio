@@ -3460,14 +3460,16 @@ final class AppState: ObservableObject {
         return cycles.first { p in (0..<p).allSatisfy { chord($0) == chord($0 + p) } }
     }
 
-    /// The bar where Evolve's first pass starts: the anchor's Outro, else its end. An Ambient Piano
-    /// song with nothing sounding in its last bar (its closing chord has died away) hands over one
-    /// bar early, so the join doesn't leave a pause that sounds like the song ending (Zack,
-    /// 2026-11-25, Koln: the generator keeps three bars after the last melodic note).
+    /// The bar where Evolve's first pass starts: the anchor's Outro, else (Ambient Piano) the start of
+    /// its closing, which the pass displaces so the join doesn't sound like the song ending (Zack,
+    /// 2026-11-25). A piano song with no recorded closing (Floating Buds) that has nothing sounding in
+    /// its last bar hands over one bar early; anything else starts at the song's end.
     nonisolated static func evolveJoinBar(_ anchor: SongState) -> Int {
         if let outro = anchor.structure.outroSection?.startBar { return outro }
         let total = anchor.frame.totalBars
         guard anchor.isAmbientPiano, total > 8 else { return total }
+        // The closing the rule recorded: displaced by pass 1, as an Outro is in Chill and Motorik
+        if let close = anchor.structure.evolveHandoverBar, close >= 8, close < total { return close }
         let lastEnd = anchor.trackEvents.lazy.flatMap { $0 }.map { $0.stepIndex + $0.durationSteps }.max() ?? 0
         return lastEnd <= (total - 1) * 16 ? total - 1 : total
     }

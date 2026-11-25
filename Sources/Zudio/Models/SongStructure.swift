@@ -55,6 +55,11 @@ struct SongStructure: Equatable, Sendable {
     let chordPlan: [ChordWindow]
     let introStyle: IntroStyle
     let outroStyle: OutroStyle
+    /// Ambient Piano only: the bar where an Evolve pass takes over, in place of an Outro. The song's
+    /// closing (Koln's closing phrase and final chord, Satin's bass-only taper) is displaced the way
+    /// Chill and Motorik pass 1 displaces their Outro. Nil: no recorded closing, and Evolve uses the
+    /// song's end. Not part of the sections, so nothing that reads the Outro sees it.
+    var evolveHandoverBar: Int? = nil
 
     func section(atBar bar: Int) -> SongSection? {
         sections.first { $0.contains(bar: bar) }
