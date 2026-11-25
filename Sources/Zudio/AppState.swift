@@ -807,7 +807,7 @@ final class AppState: ObservableObject {
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack",
                                                 "Warm Pad","Fantasia","FM Piano","Warm Swell","Halo Swell",
                                                 "Glass Swell","Strings 3 Swell","Strings 5 Swell",
-                                                "Sweep Pad Swell","Strings Swell"]   // + base Ambient's own swells (Strings Swell is Synth Strings 1; "Synth Swell" is a Zen bass)
+                                                "Sweep Swell","Strings Swell"]   // + base Ambient's own swells (Strings Swell is Synth Strings 1; "Synth Swell" is a Zen bass)
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2",
                                                 "Synth Strings 3","Synth Strings 4","Synth Strings 5","Stereo Strings Slow"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
@@ -884,7 +884,7 @@ final class AppState: ObservableObject {
         case (kTrackPads, .ambient):   return [95, 50, 94, 97,
                                               89, 88, 5, 14089, 14094,         // + Zen: Warm Pad, Fantasia, FM Piano, Warm Swell, Halo Swell
                                               14092, 14050, 14051,             // + Zen glass and strings: Glass, Strings 3, Strings 5 (all Swell copies; Slow Strings removed 2026-11-21)
-                                              14095, 14048]                    // + base Ambient: Sweep Pad Swell, Synth Strings Swell (Synth Strings 1, 0:50)
+                                              14095, 14048]                    // + base Ambient: Sweep Swell, Synth Strings Swell (Synth Strings 1, 0:50)
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088,
                                               8050, 11050, 11051, 49]                // + Space: Synth Strings 3/4/5, Stereo Strings Slow
         case (kTrackPads, .chill):     return [89, 48, 95, 97, 42, 11051, 49, 94, 92]
@@ -962,6 +962,10 @@ final class AppState: ObservableObject {
             // Warm Pad runs loud among the Ambient pads, base and Zen alike (Zack, 2026-11-23).
             // 70 is about 3 dB down from the untouched 100.
             case (kTrackPads,    .ambient, "Warm Pad"):     return 70
+            // Fantasia runs loud among the Ambient pads, base and Zen alike (Zack, 2026-11-25).
+            // 70 is about 3 dB down from the untouched 100. Kosmic's "Fantasia 2" is a different
+            // pool entry and is not touched.
+            case (kTrackPads,    .ambient, "Fantasia"):     return 70
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
             // Chill audition guitar (Zack, 2026-10-15): Jazz sat under the rest of the rhythm
             // pool. 127 is the CC7 ceiling; the rest of its lift is PlaybackEngine's rhythm boost.
@@ -2900,7 +2904,7 @@ final class AppState: ObservableObject {
             }
             // Base Ambient (not Ambient Piano) draws swell instruments, for a smoother, more relaxed
             // sound, about 55 percent of the time (Zack, 2026-11-22). Its swells are mostly its own:
-            // pads Sweep Pad Swell [12] and Synth Strings Swell [13], plus Zen's Halo Swell [8]; bass
+            // pads Sweep Swell [12] and Synth Strings Swell [13], plus Zen's Halo Swell [8]; bass
             // Metal Swell [12], Cello Swell [13] and Organ Swell [14], all base's own. Every base bass rule
             // holds for bars, so swells go under all of them. Weights are percentages, listed as that many copies of the index.
             // Out of base picks but kept in the pool for Zen or Ambient Piano: Halo Pad [2], Voice

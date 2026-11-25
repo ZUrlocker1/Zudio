@@ -74,7 +74,7 @@ struct KolnArc {
                 }
             }
         }
-        // Vamp (after Koln Part IIa, Zack 2026-11-24): in 35 percent of songs, 8, 12 or 16 bars
+        // Vamp (after Koln Part IIa, Zack 2026-11-24): in about 35 percent of songs, 6 to 14 bars
         // of rocking left hand over a pedal, ending where the urgent question starts (4 bars before
         // the climax), clear of the minor peaks' bars. Drawn after everything above, so no other
         // position moves.
@@ -84,11 +84,11 @@ struct KolnArc {
         if rng.nextDouble() < 0.50 {   // about 35% of songs once the ones it doesn't fit drop out
             let end = climaxBar - 4
             // The drawn length first, then shorter ones if it doesn't fit
-            // 6 to 16 bars in 2-bar steps, skewed short (Zack, 2026-11-24): 6 24%, 8 28%, 10 20%,
-            // 12 15%, 14 8%, 16 5%. The drawn length first, then shorter ones if it doesn't fit.
-            let lens = [6, 8, 10, 12, 14, 16]
+            // 6 to 14 bars in 2-bar steps, skewed short (Zack, 2026-11-25, 16 dropped): 6 27%,
+            // 8 30%, 10 20%, 12 15%, 14 8%. The drawn length first, then shorter ones if it doesn't fit.
+            let lens = [6, 8, 10, 12, 14]
             let roll = rng.nextInt(upperBound: 100)
-            let drawn = roll < 24 ? 0 : roll < 52 ? 1 : roll < 72 ? 2 : roll < 87 ? 3 : roll < 95 ? 4 : 5
+            let drawn = roll < 27 ? 0 : roll < 57 ? 1 : roll < 77 ? 2 : roll < 92 ? 3 : 4
             for len in lens[...drawn].reversed() where vamp == nil {
                 let start = end - len
                 guard start >= 10 else { continue }
