@@ -2,7 +2,7 @@
 
 ## V 3.5 (Build 139)
 
-**Release candidate, expected on the App Store December 1.** The 2026-11-24 Mac DMG is build 139: Ambient Zen, base Ambient, the Ambient filter tides, the export-matches-playback work and the Chill bass slides are in, with the Ambient mix back at Piano 22 / base 23 / Zen 55. Only minor tuning by ear is still expected.
+**Final release candidate, expected on the App Store December 1.** The 2026-11-25 Mac DMG is build 139: Ambient Zen, base Ambient, the Ambient filter tides, the export-matches-playback work and the Chill bass slides are in, with the Ambient mix back at Piano 22 / base 23 / Zen 55. Only minor tuning by ear is still expected.
 
 - **Ambient Piano notes capped at one bar** — (2026-11-24, build 139, unheard) A low note held 3 bars at bar 18 and bar 28 and a long closing chord at the outro in Soft Landing in the Open Plan (AMB-PNO-003) showed in the piano roll as holds a piano never sounds. `generateAmbientPianoLead` now caps every note it returns at 16 steps (`pianoMaxSustainSteps`), for AMB-PNO-001, AMB-PNO-002 and AMB-PNO-003, vamp and regenerated leads included. The cap runs on the finished notes, so no random draw changes and the notes and rhythm are as before, only shorter holds; a song's trimmed length can come out up to two bars shorter where a long closing chord set it. Test: AmbientPianoSustainTests.
 
