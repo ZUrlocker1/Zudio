@@ -76,7 +76,8 @@ struct SongGenerator {
         forceAmbientZen:      Bool    = false,
         forceAmbientBase:     Bool    = false,
         forceSubstyle:        String? = nil,
-        forceMotorikSync:     String? = nil
+        forceMotorikSync:     String? = nil,
+        forceMotorikLock:     String? = nil
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -95,7 +96,8 @@ struct SongGenerator {
                                    forceRhythmRuleID: forceArpRuleID,
                                    forceLeadRuleID:   forceLeadRuleID,
                                    forceSubstyle:     forceSubstyle,
-                                   forceSync:         forceMotorikSync)
+                                   forceSync:         forceMotorikSync,
+                                   forceLock:         forceMotorikLock)
         case .ambient:
             return generateAmbient(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                    moodOverride: moodOverride,
@@ -135,7 +137,8 @@ struct SongGenerator {
         forceRhythmRuleID: String? = nil,
         forceLeadRuleID:   String? = nil,
         forceSubstyle:     String? = nil,
-        forceSync:         String? = nil
+        forceSync:         String? = nil,
+        forceLock:         String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -176,11 +179,47 @@ struct SongGenerator {
             return .machineVoice
         }()
 
+        // Motorik Lock: a coupled flavour of base Motorik (docs/motorik-plan.md, "Motorik Lock").
+        // One draw sets Drums, Bass and Lead 1 to a Neu!-leaning subset and the tempo to 128-138
+        // around 132, and pulls Pads, Rhythm, Lead 2 and Texture toward their sparser rules.
+        // Like the sync roll it uses its OWN stream, and every value is drawn whether or not the
+        // song is a Lock song, so no other decision in any song moves. Never with a sync group,
+        // Noir or Arcade. The song records the result (forced["Lock"]), so a later share change
+        // cannot move it. A song that arrives with a recorded substyle but no Lock entry (saved
+        // before this existed) never rolls one.
+        var lockRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 77))
+        let lockRoll  = lockRNG.nextDouble()
+        let lockDrums = ["MOT-DRUM-001", "MOT-DRUM-003", "MOT-DRUM-002"][lockRNG.weightedPick([0.40, 0.40, 0.20])]
+        let lockBass  = ["MOT-BASS-004", "MOT-BASS-002", "MOT-BASS-001"][lockRNG.weightedPick([0.40, 0.35, 0.25])]
+        let lockLead  = ["MOT-LD1-001", "MOT-LD1-031", "MOT-LD1-005", "MOT-LD1-021"][lockRNG.weightedPick([0.45, 0.35, 0.10, 0.10])]
+        let lockTempoU = lockRNG.nextDouble()
+        let isLock: Bool = {
+            guard !isNoir && !isArcade && !motorikSync.isActive else { return false }
+            if let f = forceLock { return f == "true" }
+            if forceSubstyle != nil { return false }
+            // 12% of the sync-free base songs: about 8% of base Motorik, 5% of all Motorik
+            // (base is 61% of Motorik, and 67% of base songs carry no sync).
+            return lockRoll < 0.12
+        }()
+        // Triangular 128...138, peak 132.
+        let lockTempo: Int = {
+            let a = 128.0, c = 132.0, b = 138.0
+            let u = lockTempoU
+            let t = u < (c - a) / (b - a)
+                ? a + (u * (b - a) * (c - a)).squareRoot()
+                : b - ((1 - u) * (b - a) * (b - c)).squareRoot()
+            return Int(t.rounded())
+        }()
+        let drumForce = forceDrumRuleID ?? (isLock ? lockDrums : nil)
+        let bassForce = forceBassRuleID ?? (isLock ? lockBass : nil)
+        let leadForce = forceLeadRuleID ?? (isLock ? lockLead : nil)
+        let frameTempo = tempoOverride ?? (isLock ? lockTempo : nil)
+
         // Step 1 — Global musical frame
         let frame = MusicalFrameGenerator.generate(
             rng: &rng,
             keyOverride: keyOverride,
-            tempoOverride: tempoOverride,
+            tempoOverride: frameTempo,
             moodOverride: moodOverride,
             motorikNoir: isNoir,
             motorikArcade: isArcade, kraftwerkSync: motorikSync.isActive
@@ -211,7 +250,7 @@ struct SongGenerator {
 
         // Step 4 — Drums
         var drumRules: Set<String> = []
-        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: forceDrumRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
+        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: drumForce, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
 
         // Step 5 — Lead 1 (generated before Bass so bass can react to melodic density)
         var lead1Rules: Set<String> = []
@@ -224,7 +263,7 @@ struct SongGenerator {
         // or more) that dropping the first window can't let a second one in.
         let earlyBreakdownBars = (!isNoir && !isArcade && !motorikSync.isActive)
             ? Set(breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: nil).flatMap { Array($0) }) : []
-        let (lead1Events, ld1Solo) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, breakdownBars: earlyBreakdownBars)
+        let (lead1Events, ld1Solo) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: leadForce, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, breakdownBars: earlyBreakdownBars)
         trackEvents[kTrackLead1] = lead1Events
 
         // When Lead 1 picks a dense arp rule, bias Bass and Lead 2 toward sparse/pulse roles.
@@ -232,21 +271,21 @@ struct SongGenerator {
 
         // Step 6 — Bass
         var bassRules: Set<String> = []
-        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID, noirVariation: isNoir, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, sync: motorikSync)
+        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: bassForce, noirVariation: isNoir, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, sync: motorikSync)
 
         // Step 7 — Pads
         var padRules: Set<String> = []
-        trackEvents[kTrackPads]    = PadsGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &padsRNG, usedRuleIDs: &padRules, noirVariation: isNoir, arcadeVariation: isArcade)
+        trackEvents[kTrackPads]    = PadsGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &padsRNG, usedRuleIDs: &padRules, noirVariation: isNoir, arcadeVariation: isArcade, lock: isLock)
 
         // Step 8 — Lead 2
         // Noir always suppresses Lead 2 — skip generation entirely (lead2RNG is not consumed elsewhere)
         if !isNoir {
-            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, solo: ld1Solo, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody)
+            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, solo: ld1Solo, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, lock: isLock)
         }
 
         // Step 8 — Rhythm
         var rhythmRules: Set<String> = []
-        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
+        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, lock: isLock)
 
         if motorikSync.includes(kTrackRhythm) {
             // Applied before Lead 2 derives from Rhythm, so the partner rules inherit the
@@ -280,7 +319,7 @@ struct SongGenerator {
 
         // Step 9 — Texture
         var texRules: Set<String> = []
-        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, syncWindows: syncWindows)
+        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, syncWindows: syncWindows, lock: isLock)
 
         // Step 10 — Collision / density simplification pass
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure,
@@ -445,7 +484,7 @@ struct SongGenerator {
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
             rhythmRules: rhythmRules, texRules: texRules, isNoir: isNoir, isArcade: isArcade,
             sync: motorikSync, syncLead2Partners: syncLead2Partners,
-            breakdown: !breakdowns.isEmpty
+            breakdown: !breakdowns.isEmpty, lock: isLock
         )
 
         // Base Motorik hands the log the drum pass's own fill bars, so it reports the fills that
@@ -463,6 +502,7 @@ struct SongGenerator {
         if let r = forceLeadRuleID   { forced["Lead"]   = r }
         forced["Substyle"] = isNoir ? "Noir" : isArcade ? "Arcade" : "Base"
         if !isNoir && !isArcade { forced["Sync"] = motorikSync.rawValue }
+        if !isNoir && !isArcade && !motorikSync.isActive { forced["Lock"] = isLock ? "true" : "false" }
 
         return SongState(
             frame: frame,
@@ -481,6 +521,7 @@ struct SongGenerator {
             motorikNoirVariation: isNoir,
             motorikArcadeVariation: isArcade,
             motorikSync: motorikSync,
+            motorikLock: isLock,
             motorikBassDistortion: motorikBassDistortion,
             motorikNoirBassDistortion: motorikNoirBassDistortion,
             motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -2065,6 +2106,7 @@ struct SongGenerator {
         let motNoir    = songState.motorikNoirVariation
         let motArcade  = songState.motorikArcadeVariation
         let motSync    = isMotorik ? songState.motorikSync : .none
+        let motLock    = isMotorik && songState.motorikLock
         let motBase    = isMotorik && !motNoir && !motArcade && !motSync.isActive
         let motSyncWindows = motSync.isActive
             ? syncDropoutWindows(sync: motSync, totalBars: songState.frame.totalBars, seed: songState.globalSeed) : []
@@ -2244,7 +2286,7 @@ struct SongGenerator {
                     sohoVariation: songState.chillSohoVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade)
+                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, lock: motLock)
             }
         case kTrackLead1:
             if let plan = zenPlan {
@@ -2407,7 +2449,7 @@ struct SongGenerator {
                 motLead2Partner = partner.isPartner
             } else {
                 // With the song's solo windows, as generation's Lead 2 has them.
-                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, solo: songState.soloWindows, arcadeVariation: motArcade, arcadeDenseMelody: motArcadeDense)
+                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, solo: songState.soloWindows, arcadeVariation: motArcade, arcadeDenseMelody: motArcadeDense, lock: motLock)
                 // A gap-answer rule is written as generation writes it, from the Lead 1 now
                 // playing, which already has its breakdowns and dropouts cut, and kept out of the
                 // breakdown windows. The current Lead 1 rule comes from the log.
@@ -2460,7 +2502,7 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules,
                     switchAnnotation: &chillRhythmSwitchRegen)
             } else {
-                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync)
+                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync, lock: motLock)
                 if motSync.includes(kTrackRhythm) {
                     // As generation does, before anything doubles it.
                     events = limitIdenticalBars(events, trackIndex: kTrackRhythm,
@@ -2516,7 +2558,7 @@ struct SongGenerator {
                 // Base Chill and Blues texture is audio-only; regen is a no-op for the MIDI track.
                 events = []
             } else {
-                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync, syncWindows: motSyncWindows)
+                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync, syncWindows: motSyncWindows, lock: motLock)
             }
         default:
             return songState
@@ -3428,7 +3470,8 @@ struct SongGenerator {
         isArcade: Bool = false,
         sync: MotorikSync = .none,
         syncLead2Partners: Bool = false,
-        breakdown: Bool = false
+        breakdown: Bool = false,
+        lock: Bool = false
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -3438,7 +3481,7 @@ struct SongGenerator {
         // Style / sub-style tag — always present for consistency with all other styles
         let substyleLabel = isNoir ? "Motorik Noir"
                           : isArcade ? "Motorik Arcade"
-                          : sync.isActive ? "Motorik Europe" : "Motorik"
+                          : sync.isActive ? "Motorik Europe" : lock ? "Motorik Lock" : "Motorik"
         log.append(GenerationLogEntry(tag: "Style", description: "\(substyleLabel) – \(frame.tempo) bpm"))
 
         // Logged as "Sync" rather than "Cluster": Cluster is a krautrock band and the name of

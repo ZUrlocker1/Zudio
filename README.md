@@ -21,8 +21,11 @@ This repository contains the macOS app source, implementation notes, and support
 
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**v3.5 (build 139, 2026-11-24) is the final release candidate, expected on the App Store December 1, with a new substyle.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient and Zen also answer a tap on empty space with a slow filter tide. Also new swipe navigation on Mac tracks view and many bug fixes.
+**v3.5 (build 139, 2026-11-26) is a near-final version for the App Store, expected December 1, with a new substyle and the new Motorik Lock flavour on 5% of Motorik songs.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient-Zen was inspired by Charles Vestal's AMB-1 firmware for the M-VAVE FM-1.
+
 There are also numerous improvements to regular Ambient and Ambient Piano to make them more melodic. 
+
+**Motorik Lock:** a minimalist Motorik vibe. About 5% of Motorik songs draw Neu!-style bass, drums and lead together, with sparser parts around them. It shows as "Motorik Lock" on the Style line. Motorik's Root Anchor and Hallogallo lock basses also move more now, with a rotating pickup note instead of bare root and fifth.
 Details in the [change log](docs/change-log.md).
 
 **Zudio 3.0 is a major release, with many improvements across all four styles.** Build 138 was submitted to the App Store on 2026-11-15. Highlights: Chill has new jazz leads, second-soloist answers and chords that move; Kosmic gains the Jean-Michel Jarre-style Space substyle; Motorik Noir and Europe get new leads transcribed from real tracks; Chill Soho brings back the St Germain beat; playback is smoother with a lighter visualizer; and iPhone audio recovers better from a stuck output. The sections below list the details.
@@ -74,7 +77,7 @@ Earlier releases are covered in the [change log](docs/change-log.md).
 - [continuous-play.md](docs/continuous-play.md) — Continuous play and song evolution mode design. (Done)
 - [distribution-plan.md](docs/distribution-plan.md) — macOS distribution and release plan. (Done)
 
-### Future platform
+### Other design docs
 
 - [ios-ipad-plan.md](docs/ios-ipad-plan.md) — iOS and iPad port planning, design considerations, and architecture notes.
 - [ipad-layout-proposals.md](docs/ipad-layout-proposals.md) — iPad UI layout proposals and sketches.

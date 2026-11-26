@@ -49,7 +49,8 @@ struct RhythmGenerator {
         forceRuleID: String? = nil,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        sync: MotorikSync = .none
+        sync: MotorikSync = .none,
+        lock: Bool = false
     ) -> [MIDIEvent] {
         // The Kraftwerk rules run for the WHOLE song rather than being re-picked per section,
         // and they play through intro and outro too. A cell that changed at a section boundary
@@ -92,6 +93,8 @@ struct RhythmGenerator {
                 ?       [0.20, 0.12, 0.00, 0.00, 0.10, 0.40, 0.18, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
                 : noirVariation
                 ?       [0.04, 0.10, 0.00, 0.00, 0.00, 0.00, 0.10, 0.14, 0.12, 0.14, 0.12, 0.12, 0.12]
+                : lock  // Motorik Lock: Quarter stride, Chord Stab and Harmonia arpeggio lead; 8th-note Stride, Syncopated and Riff step back
+                ?       [0.10, 0.28, 0.10, 0.08, 0.22, 0.22, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
                 :       [0.30, 0.17, 0.17, 0.13, 0.08, 0.15, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
             let patternType = forcedPatternType ?? rng.weightedPick(patternWeights)
             usedRuleIDs.insert(ruleIDs[min(patternType, ruleIDs.count - 1)])

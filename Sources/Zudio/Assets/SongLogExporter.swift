@@ -150,7 +150,7 @@ struct SongLogExporter {
         // ── Generation log ───────────────────────────────────────────────────────
         // Includes the "Instruments" entry written by applyCurrentInstrumentsToPlayback().
         lines.append("--- Generation Log ---")
-        for entry in song.generationLog where !entry.tag.isEmpty || !entry.description.isEmpty {
+        for entry in AppState.inTrackOrder(song.generationLog) where !entry.tag.isEmpty || !entry.description.isEmpty {
             lines.append("  \(col(entry.tag, 16)) \(entry.description)")
         }
         lines.append("")

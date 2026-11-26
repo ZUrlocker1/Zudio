@@ -564,7 +564,8 @@ struct LeadGenerator {
         usedRuleIDs: inout Set<String>,
         solo: SoloWindows = .none,
         arcadeVariation: Bool = false,
-        arcadeDenseMelody: Bool = false
+        arcadeDenseMelody: Bool = false,
+        lock: Bool = false
     ) -> [MIDIEvent] {
         // The regular pool holds the gap-answer rules MOT-LD2-001 to 004 and 006 in every variation.
         // Arcade's arp rules MOT-LD2-007 to 010 are drawn below, from the same stream.
@@ -573,6 +574,8 @@ struct LeadGenerator {
             : ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-006"]
         let ld2Weights: [Double] = arcadeVariation
             ? [0.45,          0.35,          0.20]
+            : lock  // Motorik Lock: Low bed and Hook fragment lead, the sparser answers
+            ? [0.20,          0.30,          0.30,          0.10,          0.10]
             : [0.225,         0.15,          0.225,         0.25,          0.15]
         var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
         // MOT-LD2-006 Statement harmony is drawn in solo songs too: GapAnswerEngine lets it harmonise

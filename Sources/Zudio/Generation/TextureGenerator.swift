@@ -33,7 +33,8 @@ struct TextureGenerator {
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
         sync: MotorikSync = .none,
-        syncWindows: [Range<Int>] = []
+        syncWindows: [Range<Int>] = [],
+        lock: Bool = false
     ) -> [MIDIEvent] {
         // Texture rides along with EVERY sync rather than belonging to one: its scattered
         // wide-register behaviour suits all three, and it is a supporting role rather than part
@@ -65,7 +66,9 @@ struct TextureGenerator {
         let suppWeights = [Double](repeating: 1.0 / Double(suppCandidates.count), count: suppCandidates.count)
         let primaryIdx = rng.weightedPick(suppWeights)
         var activeSupp: Set<String> = [suppCandidates[primaryIdx]]
-        if rng.nextDouble() < 0.40 {
+        // Motorik Lock takes the backbone plus one supplementary rule, never two. The draw is
+        // still made so the stream stays where it was.
+        if rng.nextDouble() < 0.40 && !lock {
             let remaining = suppCandidates.enumerated().filter { $0.offset != primaryIdx }.map { $0.element }
             activeSupp.insert(remaining[rng.nextInt(upperBound: remaining.count)])
         }

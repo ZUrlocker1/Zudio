@@ -394,7 +394,8 @@ final class AppState: ObservableObject {
             forceAmbientZen:      forced["Zen"] == "true",
             forceAmbientBase:     forced["Base"] == "true",
             forceSubstyle:        forced["Substyle"],
-            forceMotorikSync:     forced["Sync"]
+            forceMotorikSync:     forced["Sync"],
+            forceMotorikLock:     forced["Lock"]
         )
         // Every saved seed is known before the replay, so a track that reads another's seed sees the
         // final one whatever the order: Bass (replayed before Drums) locks to the regenerated drums'
@@ -1586,7 +1587,8 @@ final class AppState: ObservableObject {
     /// Reorders the rule lines (tags like KOS-LD1-014) into track order: Lead 1, Lead 2, Pads,
     /// Rhythm, Texture, Bass, Drums. Only the slots that hold such lines are rearranged, so Style,
     /// Form, Chords, Instruments and the Bar lines stay where they are. The sort is stable.
-    private static func inTrackOrder(_ entries: [GenerationLogEntry]) -> [GenerationLogEntry] {
+    /// Also used by SongLogExporter, so a saved file lists its rules in the same order.
+    nonisolated static func inTrackOrder(_ entries: [GenerationLogEntry]) -> [GenerationLogEntry] {
         func rank(_ tag: String) -> Int? {
             let parts = tag.split(separator: "-")
             guard parts.count == 3, parts[0].count == 3, Int(parts[2]) != nil else { return nil }
@@ -4262,7 +4264,7 @@ final class AppState: ObservableObject {
                 }
                 let nameStr = loadTitle.isEmpty ? "" : " \(loadTitle)"
                 batch.append(GenerationLogEntry(tag: "FILE", description: "Loading song:\(nameStr) --Zudio \(loadVersion)", isTitle: false))
-                batch.append(contentsOf: state.generationLog)
+                batch.append(contentsOf: Self.inTrackOrder(state.generationLog))
                 self.appendToLog(batch)
                 let wasPlaying = self.playback.isPlaying
                 self.playback.stop()

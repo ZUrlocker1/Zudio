@@ -422,22 +422,36 @@ kick-only (40%).
 
 One rule selected per song. All patterns anchor beat 1 as primary attack, matching the kick drum.
 
-**Bass variation for simple rules** (BAS-001/002/004): in B sections or after bar 48, substitutes
+**Bass variation for simple rules** (BAS-002 only now): in B sections or after bar 48, substitutes
 a slightly more complex variant to maintain musical interest without abandoning the rule's identity:
 
-- BAS-001 variation: quarter-note walk root→third→fifth→root (mode-correct)
 - BAS-002 variation: root–root–third–root quarter pulse (mode-correct third on beat 3)
-- BAS-004 variation: root (long)→third→fifth arc (mode-correct passing third)
+
+**BAS-001 and BAS-004 pickup cells (2026-11-25).** The old variation fired only in B sections or after
+bar 48, so a song with one long A section played bare root and fifth for its first 48 bars. Both
+rules now carry one off-beat or pickup note in most bars, rotating over each 4-bar group, from bar 1.
+The variation above is retired for them. Cells (all in-scale, on the "and" of a beat, never a strong
+beat): up2 (short root, the scale step above on the "and" of 1), repeat10 (the beat-3 note struck
+again a dotted eighth later, the Hallogallo lock), drop10 (short beat-3 note, then the scale note
+just under the root on the "and" of 3) and pickup14 (a step-below approach into the next bar).
+Each 4-bar group is plain 20% of the time (50% for the first two groups, so the song settles before
+it moves), and a moving group has a plain bar 20% of the time; no two neighbouring bars share a cell.
+Measured over 300 seeds each: 73% of bars have three or more notes, 2.96 notes a bar (was 2.0), and
+23% of songs have a plain run over 8 bars (the opening and the occasional plain group, by design).
+The cells are drawn from the bass rng after the rule pick, so only songs that draw 001 or 004
+change. Code: `pickupCellPlan` and `pickupCellBar` in BassGenerator.swift.
 
 Status log emits `BASS-EVOL` when variation begins; `BASS-DEVOL` when it reverts. Variation runs
 through qualifying section(s) only — alternates every other A section after bar 48.
 
 **Bass rule catalog:**
 
-- BAS-001 Root Anchor (10%): root beat 1 (long sustain), chord tone beat 3. Simplest Motorik bass.
+- BAS-001 Root Anchor (10%): root beat 1 (long sustain), chord tone beat 3, plus a rotating
+  off-beat or pickup note in most bars (pickup cells, 2026-11-25).
 - BAS-002 Motorik Drive (10%): four staccato quarter notes, velocity accented beats 1+3.
 - BAS-003 Crawling Walk (7%): 2-bar root/fifth/approach-note pattern. Slow stepwise motion.
-- BAS-004 Neu! Hallogallo lock (10%): root beat 1 (long), fifth beat 3, kick-locked.
+- BAS-004 Neu! Hallogallo lock (10%): root beat 1 (long), fifth beat 3, kick-locked, plus the same
+  rotating pickup cells as BAS-001.
 - BAS-005 McCartney Drive (12%): 8th-note groove; bar 1 descends root→m3→5→m3, bar 2 breathes
   with root sustain + approach pickup. ~1/3 chance of all-drive 4-bar block.
 - BAS-006 LA Woman Sustain (6%): root holds most of bar, chromatic neighbor shimmer at end.
@@ -992,6 +1006,116 @@ produces a floating, unresolved sound. Use sparingly — one event per section a
 
 **Groove/swing microtiming:** swing amount 50–52% (nearly straight). Per-event drift: drums ±6ms,
 bass ±8ms, rhythm ±7ms, leads ±10ms.
+
+---
+
+## Motorik Lock (built 2026-11-26, uncommitted, unheard)
+
+**What it is.** Motorik Lock (named 2026-11-26, working title was Motorik Neu) is a coupled flavour of base Motorik, built the way Chill's St Germain beat
+is: one derived-stream draw lands a stated share of base songs and forces Drums, Bass and Lead 1 to a
+restricted subset of Neu!-leaning rules. Nothing is silenced. Lead 2, Pads, Rhythm and Texture all play,
+but lean toward their less busy, sparser rules. Chords are free (Zack, 2026-11-26: "whatever chord
+changes"). An earlier draft of this section silenced four tracks; Zack dropped that.
+
+**How it differs from Motorik Europe.** Europe changes how tracks relate (a coupled sync group locks to
+rigid Kraftwerk cells, tempo 120 to 132). Lock changes which rules the rhythm section and the lead may
+draw (tempo 128 to 138 around 132). Both are one coupled draw inside base Motorik from a derived
+stream. Lock is never drawn with a sync group, and never in Noir, Arcade or Europe. There is no
+dropout pass to reuse: the sync dropout (`syncDropoutWindows` on stream 66 and `applySyncDropout` in
+SongGenerator.swift) only cuts two windows of 4 to 14 bars, and Lock needs nothing cut.
+
+**Goal.** Base Motorik should now and then play the stripped Neu! sound: Apache, Dinger or Open Pocket
+drums, a bass that locks, and a sparse hook. A 2000-seed experiment (2026-11-25) found this drums, bass
+and lead combination by chance in 0.4% of songs (8 of 2000), so the sound exists in the rules but
+almost never reaches the listener.
+
+**Precedent: St Germain in Chill.** The beat style is drawn at 13% of base Chill, and that single draw
+sets the chords, the Lead 1 split, a rhythm bias (sgBias), the form label and the tempo. The first
+Chill song also forces it. The Kraftwerk sync groups use the same mechanism in Motorik (derived stream
+64, base Motorik only, no shift to any other draw). Lock is a fourth flavour beside the three sync
+groups. Where the St Germain recipe is written: chill-plan.md (Lead 1 split near the St Germain Staccato
+Burst rule), change-log.md, and the memory note project_st_germain_revival.
+
+**What the two good examples share** (minimal_104_001_001 and minimal_105_003_004, from the note data;
+Zack picked them by ear):
+- Drums are not the difference. One is Motorik Apache beat and one is Dinger groove.
+- Bass is the difference. The good two play 2.8 to 3.6 notes a bar: the main notes on beats 1 and 3
+  plus one off-beat pickup or a repeated note, changing at section boundaries. The weak two played
+  two notes a bar, root and fifth, for 100 bars. That is now fixed in MOT-BASS-001 Root Anchor and
+  MOT-BASS-004 Neu! Hallogallo lock (rotating pickup cells, built 2026-11-25, uncommitted).
+- Lead stays inside one octave, enters near bar 12 after bass and drums settle, plays 6 or 7
+  statements and leaves 15 to 25 bar gaps. The weaker hooks opened on two or three notes or jumped an
+  octave in the first statement.
+- Tempo 137 and 138 in the two examples. Zack later settled on 132.
+
+**Recipe (all drawn from one derived stream, so no other draw moves):**
+1. **Share.** Base Motorik only, never together with a sync group. Target (Zack, 2026-11-26) 5% of all
+   Motorik, about 8% of base songs. Tune by the sync roll thresholds, as with the other groups.
+2. **Drums.** MOT-DRUM-001 Motorik Apache beat 40%, MOT-DRUM-003 Dinger groove 40%, MOT-DRUM-002 Open
+   Pocket 20%. Open Pocket keeps the same kick 1 and 3 and snare 2 and 4 skeleton as the other two,
+   with 8th hats in place of Apache's 16ths, so it is close enough to join at the lower weight (Zack
+   allowed it if similar, 2026-11-26).
+3. **Bass.** MOT-BASS-004 Neu! Hallogallo lock 40%, MOT-BASS-002 Motorik Drive 35%, MOT-BASS-001 Root
+   Anchor 25%. MOT-BASS-006 LA Woman Sustain is omitted from the pool (Zack, 2026-11-26). Bass range
+   MIDI 37 to 53.
+4. **Lead 1.** MOT-LD1-001 Hallogallo hook 45%, MOT-LD1-031 Pocket Calculator riff 35%, MOT-LD1-005
+   Call and answer 10%, MOT-LD1-021 Short Statement 10% (Zack set the hook to 45 and Short Statement
+   to 10, 2026-11-26; Pocket Calculator and Call and answer share the balance in their listening
+   order). One octave, first statement no earlier than bar 12 and no thinner than four notes, 6 to 7
+   statements counting fragments.
+5. **Lead 2, Pads, Rhythm, Texture.** All play. Each draws from its sparser rules, by a weight bias
+   like sgBias in Chill. Which rules count as sparse, and whether each generator already has a hook
+   for a bias, is the next thing to read (see below).
+6. **Harmony.** Free. The normal base Motorik chord draw applies.
+7. **Tempo and length.** 128 to 138 BPM (the 2026-11-26 sample set pinned every song to 132 with tempoOverride, to separate tempo from the other variables; the real draw is a range), triangular around 132 (Zack: "a minimal 132 bpm is best");
+   96 to 124 bars.
+8. **Log.** The Style line names it ("Motorik Lock") the way St Germain names its form, and the forced
+   rules round-trip through the .zudio file.
+
+**Open choices:**
+1. Whether the first Motorik song forces Motorik Lock, as the first Chill song forces St Germain. Today
+   it forces MOT-BASS-015, MOT-DRUM-001 and MOT-RTHM-001.
+2. Which rules of Lead 2, Pads, Rhythm and Texture count as sparse, and the bias strength.
+3. The tempo band, after the 132 BPM sample set.
+4. The final share, by ear, on 20 or so Motorik Lock seeds.
+
+**Built (2026-11-26).** SongGenerator.generateMotorik draws Lock on its own stream (trackIndex 77, every
+value drawn whether or not the song is Lock, so no other decision moves). Lock needs no sync group, Noir
+or Arcade, and rolls 12% of the sync-free base songs, which is about 5% of all Motorik. The first measurement, at
+7.5%, gave 55 Lock songs of 816 sync-free base songs (6.7%, 2.75% of all seeds); the share was raised to
+12% afterwards and not re-measured. The draw forces drums, bass and
+Lead 1 per the recipe and takes a triangular tempo (measured 128 to 137, peak near 132). Pads, Rhythm,
+Lead 2 and Texture take a `lock` flag: Rhythm row 10/28/10/8/22/22 over MOT-RTHM-001 to 006, Pads row
+28/0/30/10/10/22 over MOT-PADS-001 to 006, Lead 2 row 20/30/30/10/10 over MOT-LD2-001, 002, 003, 004, 006,
+and Texture never takes a second supplementary rule. The Style line reads "Motorik Lock - N bpm" and
+nothing else about the log display changed. The song records `Lock=true` or `Lock=false` in its Forced
+Rules line (only base songs without a sync), and `SongState.motorikLock` carries it through the copy
+methods and track regens. A song that arrives with a recorded Substyle but no Lock entry (saved before
+this) never rolls a Lock. Checked in a throwaway test (deleted): Style line, recorded flag, reload through
+`AppState.regenerateSong` and the Pads regen all agreed on every Lock song.
+
+Not built: the bass range limit (MIDI 37 to 53), the "first statement no earlier than bar 12" lead
+limits (the hook rules keep their own), and forcing Lock on the first Motorik song.
+
+**Next steps, in order:**
+1. Listen to tools/batch-output/motorik-lock (nine natural Lock songs) and tune the share and rows.
+2. Fingerprint check before any commit (tools/fpcheck.sh; the baseline was already stale). Motorik
+   differences should be limited to Lock songs and the MOT-BASS-001 and 004 pickup cells.
+3. Decide whether the first Motorik song forces Lock.
+
+**Listening round, 2026-11-25** (nine seeded songs, base Motorik, new bass; tools/batch-output/motorik-neu).
+Zack's order: Raum Rad (Hallogallo lock, Apache, Hallogallo hook, F# Mixolydian, 137 BPM, 96 bars)
+and Rattert Gonif (Motorik Drive, Dinger, Hallogallo hook, D Dorian, 128 BPM, 104 bars) best;
+Farklempt Welle (Root Anchor, Dinger, Hallogallo hook, B Aeolian, 141 BPM) pretty good; Fiedler and
+E Axis (both Pocket Calculator) ok; Call and answer songs not singled out. Readings: the Hallogallo
+hook took the top three places, so it is the main lead; Pocket Calculator is a clear second and
+Call and answer the weakest; Motorik Drive earned its place in the bass mix; drums showed no
+preference; the best tempos were 128 to 137, nothing above 144 stood out; the two best songs were
+the two shortest and in Mixolydian and Dorian (one song each, a hint only). The lead effect cannot
+be separated from tempo and mode, since all three top songs share the hook.
+
+**Test material.** tools/batch-output/motorik-minimal holds six seeded songs (101 to 106) as stripped
+MIDI plus logs; 104 and 105 are the reference pair.
 
 ---
 

@@ -27,7 +27,8 @@ struct PadsGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         noirVariation: Bool = false,
-        arcadeVariation: Bool = false
+        arcadeVariation: Bool = false,
+        lock: Bool = false
     ) -> [MIDIEvent] {
         // Motorik Noir: pads absent 50% of songs — industrial austerity.
         if noirVariation && rng.nextDouble() < 0.50 {
@@ -55,6 +56,8 @@ struct PadsGenerator {
             // 002/007/008 Noir-only; 005 excluded
             ? [0.05, 0.17, 0.20, 0.08, 0.00, 0.20, 0.15, 0.15]
             // 002/007/008 excluded; 005 Regular-only
+            : lock  // Motorik Lock: Sustained, Pulsed and Half-bar Breathe lead; Stabs and Charleston step back
+            ? [0.28, 0.00, 0.30, 0.10, 0.10, 0.22, 0.00, 0.00]
             : [0.20, 0.00, 0.22, 0.19, 0.22, 0.17, 0.00, 0.00]
         let primaryRule = padRules[rng.weightedPick(padWeights)]
         usedRuleIDs.insert(primaryRule)

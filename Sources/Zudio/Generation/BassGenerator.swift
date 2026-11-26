@@ -72,10 +72,12 @@
 struct BassGenerator {
 
     // Rules that receive a variation pattern in B sections and A sections at bar >= 48.
+    // MOT-BASS-001 and MOT-BASS-004 are not here: their own 4-bar pickup rotation (see
+    // BassPickupCell) moves the line from bar 1, so they need no later variation.
     // MOT-BASS-015 is included so variationBars is populated, but it handles the flag
     // internally rather than delegating to simpleRuleVariationBar.
     private static let variationRules: Set<String> = [
-        "MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
+        "MOT-BASS-002",
         "MOT-BASS-013", "MOT-BASS-014", "MOT-BASS-015",
         "MOT-BASS-016", "MOT-BASS-017", "MOT-BASS-018"
     ]
@@ -172,7 +174,15 @@ struct BassGenerator {
             mccartney4BarDrive = (0..<groups).map { _ in rng.nextDouble() < 0.33 }
         }
 
-        // Precompute variation windows for simple 1–2 note rules (BAS-001/002/004).
+        // BAS-001 / BAS-004: pre-roll one pickup cell per bar, rotating over each 4-bar group.
+        // Drawn from the bass rng after the rule pick, so only songs that draw these two rules
+        // change; every other rule's draws are untouched.
+        var pickupCells: [BassPickupCell] = []
+        if ruleID == "MOT-BASS-001" || ruleID == "MOT-BASS-004" {
+            pickupCells = pickupCellPlan(totalBars: frame.totalBars, rng: &rng)
+        }
+
+        // Precompute variation windows for simple 1–2 note rules (BAS-002, and the Kraftwerk/Noir rules).
         // Fires for: every B section; every other A section that starts at or after bar 48
         // (alternating on/off so the variation doesn't take over the whole second half).
         // This keeps the bass interesting at section boundaries without being relentless.
@@ -244,7 +254,8 @@ struct BassGenerator {
                 barEvents = bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
                                     frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
                                     useVariation: useVariation, mot015Variant: mot015Variant,
-                                    noirVariation: noirVariation)
+                                    noirVariation: noirVariation,
+                                    pickupCell: pickupCells.isEmpty ? .plain : pickupCells[bar])
             }
 
             events += applyNoirShift ? noirOctaveDown(barEvents) : barEvents
@@ -270,7 +281,8 @@ struct BassGenerator {
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG, mccartney4BarDrive: [Bool],
         useVariation: Bool = false, mot015Variant: Int = 0,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        pickupCell: BassPickupCell = .plain
     ) -> [MIDIEvent] {
         // Rules in the variation set get a more interesting variant in B sections and after bar 48.
         // MOT-BASS-015 is in variationRules but excluded here — it passes the flag to its own function.
@@ -280,7 +292,7 @@ struct BassGenerator {
         switch ruleID {
         case "MOT-BASS-002": return motorikDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-003": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "MOT-BASS-004": return hallogalloLockBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-004": return hallogalloLockBar(barStart: barStart, entry: entry, frame: frame, cell: pickupCell)
         case "MOT-BASS-005":
             let allDrive = mccartney4BarDrive[min(bar / 4, mccartney4BarDrive.count - 1)]
             return mccartneyDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame, allDrive: allDrive)
@@ -311,11 +323,11 @@ struct BassGenerator {
         case "MOT-BASS-023": return acidSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-024": return arcadeDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-025": return electroPumpBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
+        default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng, cell: pickupCell)
         }
     }
 
-    // MARK: - Variation for simple rules (BAS-001 / BAS-002 / BAS-004)
+    // MARK: - Variation for simple rules (BAS-002 and the rules in variationRules)
     // Fires in B sections and at bars >= 48. Keeps the Motorik quarter-note pulse
     // but adds a third or fifth to break the monotony.
 
@@ -341,15 +353,6 @@ struct BassGenerator {
                                      velocity: vels[beat], durationSteps: durs[beat]))
             }
             return evs
-
-        case "MOT-BASS-004":
-            // Hallogallo + arc: root (long) → third → fifth instead of root → fifth.
-            // Adds a passing third between the two anchor notes.
-            return [
-                MIDIEvent(stepIndex: barStart,      note: root,  velocity: 96, durationSteps: 5),
-                MIDIEvent(stepIndex: barStart + 6,  note: third, velocity: 78, durationSteps: 3),
-                MIDIEvent(stepIndex: barStart + 10, note: fifth, velocity: 84, durationSteps: 5),
-            ]
 
         case "MOT-BASS-013":
             // Kraftwerk Roboter B-section: lock to root–octave–third only (drop fifth cycling).
@@ -719,11 +722,10 @@ struct BassGenerator {
     // MARK: - BAS-001: Root Anchor — clean, locked to beat 1 and 3
 
     private static func rootAnchorBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG,
+        cell: BassPickupCell = .plain
     ) -> [MIDIEvent] {
-        var events: [MIDIEvent] = []
         let rootNote = chordRootNote(entry: entry, frame: frame)
-        events.append(MIDIEvent(stepIndex: barStart, note: rootNote, velocity: 92, durationSteps: 6))
 
         let beat3Note: UInt8
         // sorted() so the search order is fixed; .first(where:) over a Set is arbitrary.
@@ -732,8 +734,75 @@ struct BassGenerator {
         } else {
             beat3Note = rootNote
         }
-        events.append(MIDIEvent(stepIndex: barStart + 8, note: beat3Note, velocity: 80, durationSteps: 5))
-        return events
+        return pickupCellBar(cell, barStart: barStart, root: rootNote, beat3: beat3Note,
+                             rootVel: 92, rootDur: 6, beat3Vel: 80, beat3Dur: 5, frame: frame)
+    }
+
+    // MARK: - Pickup cells for BAS-001 and BAS-004
+    // Zack, 2026-11-25: a Neu! bass that is only root and fifth for 100 bars is boring. Most bars
+    // now carry one off-beat or pickup note, a different one from bar to bar over each 4-bar
+    // group. An occasional plain group (and a plain opening) keeps the lock. All notes are
+    // in-scale and sit on the "and" of a beat, never on a strong beat.
+
+    enum BassPickupCell { case plain, up2, repeat10, drop10, pickup14 }
+
+    /// One cell per bar. Each 4-bar group is plain 20% of the time (50% for the first two groups,
+    /// so the song settles before it moves); otherwise it takes four cells, no two neighbours
+    /// the same, with a plain bar now and then.
+    private static func pickupCellPlan(totalBars: Int, rng: inout SeededRNG) -> [BassPickupCell] {
+        let moving: [BassPickupCell] = [.up2, .repeat10, .drop10, .pickup14]
+        var plan: [BassPickupCell] = []
+        var last: BassPickupCell = .plain
+        for group in 0..<((totalBars + 3) / 4) {
+            let plainGroup = rng.nextDouble() < (group < 2 ? 0.5 : 0.2)
+            for _ in 0..<4 {
+                let plainBar = rng.nextDouble() < 0.2
+                let pick = rng.nextInt(upperBound: moving.count)
+                var cell: BassPickupCell = moving[pick]
+                if plainGroup || plainBar {
+                    cell = .plain
+                } else if cell == last {
+                    cell = moving[(pick + 1) % moving.count]
+                }
+                plan.append(cell)
+                last = cell
+            }
+        }
+        return plan
+    }
+
+    /// The two anchor notes of BAS-001 and BAS-004 plus the bar's cell.
+    private static func pickupCellBar(
+        _ cell: BassPickupCell, barStart: Int, root: UInt8, beat3: UInt8,
+        rootVel: UInt8, rootDur: Int, beat3Vel: UInt8, beat3Dur: Int, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let below = nearestScaleNote(to: Int(root) - 2, frame: frame, low: 28, high: 56)
+        switch cell {
+        case .plain:
+            return [MIDIEvent(stepIndex: barStart,     note: root,  velocity: rootVel,  durationSteps: rootDur),
+                    MIDIEvent(stepIndex: barStart + 8, note: beat3, velocity: beat3Vel, durationSteps: beat3Dur)]
+        case .up2:
+            // Short root, the scale step above it on the "and" of 1, then the beat-3 note.
+            let above = nearestScaleNote(to: Int(root) + 2, frame: frame, low: 28, high: 56)
+            return [MIDIEvent(stepIndex: barStart,     note: root,  velocity: rootVel,  durationSteps: 2),
+                    MIDIEvent(stepIndex: barStart + 2, note: above, velocity: 74,       durationSteps: 3),
+                    MIDIEvent(stepIndex: barStart + 8, note: beat3, velocity: beat3Vel, durationSteps: beat3Dur)]
+        case .repeat10:
+            // The beat-3 note struck again a dotted eighth later: the Hallogallo lock.
+            return [MIDIEvent(stepIndex: barStart,      note: root,  velocity: rootVel,  durationSteps: rootDur),
+                    MIDIEvent(stepIndex: barStart + 8,  note: beat3, velocity: beat3Vel, durationSteps: 2),
+                    MIDIEvent(stepIndex: barStart + 10, note: beat3, velocity: beat3Vel &- 4, durationSteps: 4)]
+        case .drop10:
+            // Beat-3 note short, then the scale note just under the root on the "and" of 3.
+            return [MIDIEvent(stepIndex: barStart,      note: root,  velocity: rootVel,  durationSteps: rootDur),
+                    MIDIEvent(stepIndex: barStart + 8,  note: beat3, velocity: beat3Vel, durationSteps: 2),
+                    MIDIEvent(stepIndex: barStart + 10, note: below, velocity: 72,       durationSteps: 3)]
+        case .pickup14:
+            // Plain bar with a short step-below approach into the next bar's root.
+            return [MIDIEvent(stepIndex: barStart,      note: root,  velocity: rootVel,  durationSteps: rootDur),
+                    MIDIEvent(stepIndex: barStart + 8,  note: beat3, velocity: beat3Vel, durationSteps: min(beat3Dur, 5)),
+                    MIDIEvent(stepIndex: barStart + 14, note: below, velocity: 68,       durationSteps: 2)]
+        }
     }
 
     // MARK: - BAS-002: Motorik Drive — steady quarter pulse, velocity-accented
@@ -811,14 +880,13 @@ struct BassGenerator {
     // MARK: - BAS-004: Hallogallo Lock — most authentic Motorik bass
 
     private static func hallogalloLockBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        cell: BassPickupCell = .plain
     ) -> [MIDIEvent] {
-        var events: [MIDIEvent] = []
         let rootNote  = chordRootNote(entry: entry, frame: frame)
         let fifthNote = UInt8(clamped(Int(rootNote) + 7, low: 28, high: 52))
-        events.append(MIDIEvent(stepIndex: barStart,     note: rootNote,  velocity: 96, durationSteps: 7))
-        events.append(MIDIEvent(stepIndex: barStart + 8, note: fifthNote, velocity: 80, durationSteps: 6))
-        return events
+        return pickupCellBar(cell, barStart: barStart, root: rootNote, beat3: fifthNote,
+                             rootVel: 96, rootDur: 7, beat3Vel: 80, beat3Dur: 6, frame: frame)
     }
 
     // MARK: - BAS-005: McCartney Drive — 8th-note locked groove from SLS verse
