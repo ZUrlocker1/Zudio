@@ -1624,6 +1624,7 @@ final class AppState: ObservableObject {
         let key = autoSweepKey(song)
         if autoSweepCache.key != key {
             var steps = Set(song.style == .ambient ? AmbientAutoTide.steps(for: song)
+                          : song.style == .motorik ? MotorikAutoTide.plan(for: song).map(\.step)
                                                     : KosmicAutoSweep.steps(for: song))
             steps.formUnion(evolveBoundarySweepSteps())
             autoSweepCache = (key, steps)
@@ -1659,7 +1660,15 @@ final class AppState: ObservableObject {
         // fast sweep. A trigger that lands while a sweep or tide runs adds no log line.
         let slow = selectedStyle == .ambient && songState?.isAmbientPiano != true
         var text = "Filter sweep"
-        if slow {
+        // Motorik's scheduled tides (opening in, closing out); a tap there keeps the fast sweep.
+        if selectedStyle == .motorik, let step, let song = songState,
+           let item = MotorikAutoTide.plan(for: song).first(where: { $0.step == step }) {
+            playback.triggerSlowFilterTide(tideIn: !item.isClosing && !item.isMid, seconds: item.seconds,
+                                           closing: item.isClosing, openHold: item.isClosing || item.isMid ? nil : item.hold)
+            text = item.isClosing ? "Closing filter tide out \(item.seconds) seconds"
+                 : item.isMid ? "Filter tide out \(item.seconds) seconds, opening on the change"
+                              : "Opening filter tide in \(item.seconds) seconds"
+        } else if slow {
             let tideIn: Bool
             let seconds: Int
             if let step, let seed = songState?.globalSeed {

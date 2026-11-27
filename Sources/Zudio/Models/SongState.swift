@@ -43,6 +43,8 @@ struct GenerationLogEntry: Sendable {
         // Floating Buds (2026-11-24): the sparse mode's floating notes start and rest on a colour
         // constellation. The log shows every Floating Buds mode as AMB-PNO-001, so all three get the star.
         "AMB-PNO-001",
+        // Motorik Root Anchor and Hallogallo lock basses (2026-11-25): rotating pickup cells.
+        "MOT-BASS-001", "MOT-BASS-004",
     ]
 
     /// TESTING ONLY. Rules fixed in the current round, marked with "F " ("AMB-LEAD-003 F  ...").

@@ -142,12 +142,12 @@ struct SongGenerator {
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
-        // Motorik substyle: Noir/Arcade/base. Production split: 21/19/60. The song records the
+        // Motorik substyle: Noir/Arcade/base. Production split: 15/17/68. The song records the
         // result (forced["Substyle"], forced["Sync"]), so a later share change can't move it. The
         // roll is still drawn when a substyle is forced, so every later draw stays in place.
         let substyleRoll = rng.nextDouble()
-        let isNoir    = forceSubstyle.map { $0 == "Noir" } ?? (substyleRoll < 0.20)
-        let isArcade  = forceSubstyle.map { $0 == "Arcade" } ?? (!isNoir && substyleRoll < 0.39)
+        let isNoir    = forceSubstyle.map { $0 == "Noir" } ?? (substyleRoll < 0.15)
+        let isArcade  = forceSubstyle.map { $0 == "Arcade" } ?? (!isNoir && substyleRoll < 0.32)
         // Bass distortion: 20% of regular (non-Noir, non-Arcade) Motorik songs get Dist. on bass by default.
         let motorikBassDistortion = !isNoir && !isArcade && rng.nextDouble() < 0.20
         // Noir distortion: 75% chance independently for Bass and Rhythm.
@@ -197,9 +197,9 @@ struct SongGenerator {
             guard !isNoir && !isArcade && !motorikSync.isActive else { return false }
             if let f = forceLock { return f == "true" }
             if forceSubstyle != nil { return false }
-            // 12% of the sync-free base songs: about 8% of base Motorik, 5% of all Motorik
-            // (base is 61% of Motorik, and 67% of base songs carry no sync).
-            return lockRoll < 0.12
+            // 18% of the sync-free base songs: about 12% of base Motorik, 8% of all Motorik
+            // (base is 68% of Motorik, and 67% of base songs carry no sync).
+            return lockRoll < 0.18
         }()
         // Triangular 128...138, peak 132.
         let lockTempo: Int = {

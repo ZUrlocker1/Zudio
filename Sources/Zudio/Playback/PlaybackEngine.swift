@@ -213,6 +213,10 @@ final class PlaybackEngine: ObservableObject {
     /// True while the running tide is a tide in (dark first, then slowly brightening) rather than
     /// a tide out (slowly darkening, then back). Only meaningful with `globalSweepIsTide`.
     private var globalSweepIsTideIn = false
+    /// True while the running tide is Motorik's closing tide: it closes and stays closed.
+    private var globalSweepIsTideClose = false
+    /// Set while the running tide is Motorik's opening tide: the dark fraction before it opens.
+    private var globalSweepOpenHold: Double?
     private var slowTotalTicks = 400        // length of the slow effect now running
     private var preGlobalSweepEnabled: [Bool] = Array(repeating: false, count: kTrackCount)
 
@@ -1428,6 +1432,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.0    // Stereo Piano — gain via boostBaseMultiplier
             } else if trackIndex == kTrackLead1 && ambientMode && (program == 8014 || program == 11014) {
                 vol = 1.4    // Church Bells, Bell Tower (Zen Lead 1) render about 6 dB under Vibraphone (RMS), with louder strikes; +3 dB, by ear
+            } else if trackIndex == kTrackLead1 && ambientMode && program == 46 {
+                vol = 1.9    // Harp on Ambient and Ambient Zen Lead 1 sat too far back at 1.35; about +3 dB (Zack, 2026-11-26); by ear
             } else if trackIndex == kTrackLead1 && program == 46 {
                 vol = 1.35   // Harp runs soft in GM on Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 56 {
@@ -1498,8 +1504,10 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.85   // Pad 3 Poly (90) and Fifths Lead (86) run loud — pull back
             } else if trackIndex == kTrackTexture && ambientMode && program == 99 {
                 vol = 4.0    // FX Atmosphere very soft on Ambient Texture — boost more
+            } else if trackIndex == kTrackTexture && motorikStyle && program == 99 {
+                vol = 3.6    // FX Atmosphere on Motorik Texture raised from 2.6, about +3 dB (Zack, 2026-11-26); by ear
             } else if trackIndex == kTrackTexture && program == 99 {
-                vol = 2.6    // FX Atmosphere runs very soft on Texture — boost
+                vol = 2.6   // FX Atmosphere runs very soft on Texture — boost
             } else if trackIndex == kTrackPads && ambientMode && program == 97 {
                 vol = 0.68   // Soundtrack runs hot on Ambient Pads — pull back
             } else if trackIndex == kTrackPads && chillPadsMode && program == 89 {
@@ -2483,7 +2491,9 @@ final class PlaybackEngine: ObservableObject {
                 // brightness comes back slowly over the last 70%. Resonance stays at the static
                 // 3 dB; the fast sweep's wah boost would ring in Ambient's long echoes.
                 let p = 1.0 - Double(globalSweepTicksRemaining) / Double(slowTotalTicks)
-                let cutoff = MixAutomation.tideCutoff(progress: p, tideIn: globalSweepIsTideIn)
+                let cutoff = globalSweepIsTideClose ? MixAutomation.closeCutoff(progress: p)
+                    : globalSweepOpenHold.map { MixAutomation.openCutoff(progress: p, hold: $0) }
+                    ?? MixAutomation.tideCutoff(progress: p, tideIn: globalSweepIsTideIn)
                 for i in 0..<kTrackCount where i != kTrackDrums {
                     AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
                 }
@@ -2773,11 +2783,13 @@ final class PlaybackEngine: ObservableObject {
     /// Slow Ambient version of the global sweep: 16 to 24 s, the filters close to 600 Hz, hold,
     /// then reopen. Same filters and restore path as the fast sweep, but no resonance boost.
     /// Re-triggering while a tide runs does nothing, so a double tap cannot restart it.
-    func triggerSlowFilterTide(tideIn: Bool = false, seconds: Int = 19) {
+    func triggerSlowFilterTide(tideIn: Bool = false, seconds: Int = 19, closing: Bool = false, openHold: Double? = nil) {
         guard !isGlobalSweepRunning else { return }
         preGlobalSweepEnabled = sweepEnabled
         globalSweepIsTide = true
         globalSweepIsTideIn = tideIn
+        globalSweepIsTideClose = closing
+        globalSweepOpenHold = openHold
         slowTotalTicks = seconds * 20   // 20 ticks a second
         globalSweepTicksRemaining = slowTotalTicks
         canvasFlashDate = Date()

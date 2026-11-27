@@ -47,6 +47,23 @@ enum MixAutomation {
         return 6000 * Float(pow(Double(tideFloorHz / 6000), closed))
     }
 
+    /// The cutoff of Motorik's opening tide at progress `p`: dark from the first instant, held
+    /// dark for the first `hold` of the run (the intro, under its fade-in), then opening on the
+    /// log scale in smoothstep steps over the rest.
+    static func openCutoff(progress p: Double, hold: Double) -> Float {
+        let ramp = p < hold ? 1.0 : max(0.0, (1.0 - p) / max(0.001, 1.0 - hold))
+        let closed = ramp * ramp * (3.0 - 2.0 * ramp)
+        return 6000 * Float(pow(Double(tideFloorHz / 6000), closed))
+    }
+
+    /// The cutoff of a closing tide at progress `p`: it closes over the first 70% and stays closed,
+    /// since the song's outro fade carries it out (Motorik's closing tide, see `MotorikAutoTide`).
+    static func closeCutoff(progress p: Double) -> Float {
+        let ramp = min(1.0, max(0.0, p / 0.7))
+        let closed = ramp * ramp * (3.0 - 2.0 * ramp)
+        return 6000 * Float(pow(Double(tideFloorHz / 6000), closed))
+    }
+
     /// The cutoff of the fast open-close-open sweep at a phase, 300 to 6000 Hz.
     static func fastSweepCutoff(phase: Double) -> Float {
         Float(300 + 5700 * (1.0 + sin(phase)) / 2.0)
@@ -54,7 +71,7 @@ enum MixAutomation {
 
     /// One automatic filter effect in a song: a Kosmic fast sweep or an Ambient slow tide.
     struct FilterSweep: Sendable {
-        enum Kind: Sendable { case fast, tide(isIn: Bool) }
+        enum Kind: Sendable { case fast, tide(isIn: Bool), tideOpen(hold: Double), tideClose }
         let start: Double      // seconds from the top of the song
         let seconds: Double
         let kind: Kind
@@ -72,6 +89,11 @@ enum MixAutomation {
                             seconds: Double(AmbientAutoTide.tideSeconds(seed: state.globalSeed, step: step)),
                             kind: .tide(isIn: AmbientAutoTide.isTideIn(seed: state.globalSeed, step: step)))
             }
+        case .motorik:
+            return MotorikAutoTide.plan(for: state).map { item in
+                FilterSweep(start: Double(item.step) * sps, seconds: Double(item.seconds),
+                            kind: item.isClosing ? .tideClose : (item.isMid ? .tide(isIn: false) : .tideOpen(hold: item.hold)))
+            }
         case .kosmic:
             return Set(KosmicAutoSweep.steps(for: state)).union(extraSteps).sorted().map {
                 FilterSweep(start: Double($0) * sps, seconds: fastSweepSeconds, kind: .fast)
@@ -88,6 +110,8 @@ enum MixAutomation {
         switch s.kind {
         case .fast: return fastSweepCutoff(phase: Double.pi / 2 + fastSweepPhasePerTick * ticksPerSecond * e)
         case .tide(let isIn): return tideCutoff(progress: e / s.seconds, tideIn: isIn)
+        case .tideOpen(let hold): return openCutoff(progress: e / s.seconds, hold: hold)
+        case .tideClose: return closeCutoff(progress: e / s.seconds)
         }
     }
 
@@ -261,5 +285,78 @@ enum MixAutomation {
             vel = velocity
         }
         return (fire, vel)
+    }
+}
+
+
+/// Motorik's occasional filter tides, after Neu!'s filter moves, shaped around the intro and outro
+/// fades that most Motorik songs have. The opening tide starts dark and holds dark through the
+/// intro (under its fade-in), then opens over the next 8 bars. The closing tide starts 4 bars
+/// before the outro, so it closes at full volume, is shut by about the middle of the outro and
+/// stays closed under the fade. They come as a pair: 25% of songs get both, the rest neither.
+/// Regular Motorik and Motorik Noir only, never Arcade or Europe. Drums are never filtered. The schedule comes from the seed with its own SeededRNG, so it
+/// consumes nothing from the generator's stream and never changes a note, and nothing is stored
+/// in SongState.
+enum MotorikAutoTide {
+    static let songChance = 0.25
+    static let openBars = 8
+    static let closeLeadBars = 4
+    /// The mid-song tide out starts this many bars before the change it releases onto.
+    static let midLeadBars = 5
+    static let midClearBars = 8
+
+    /// `hold` is the dark fraction of an opening tide; unused for a closing one.
+    struct Item { let step: Int; let seconds: Int; let isClosing: Bool; let hold: Double; var isMid = false }
+
+    static func plan(for song: SongState) -> [Item] {
+        guard song.style == .motorik, !song.motorikArcadeVariation, !song.motorikSync.isActive,
+              song.frame.totalBars >= 32 else { return [] }
+        var rng = SeededRNG(seed: song.globalSeed ^ 0x4E45_5521_7DE5_A11D)
+        guard rng.nextDouble() < songChance else { return [] }
+        let sps = song.frame.secondsPerStep
+        let introBars = max(2, song.structure.introSection?.endBar ?? 2)
+        let openTotal = introBars + openBars
+        var items = [Item(step: 0, seconds: Int((Double(openTotal * 16) * sps).rounded()), isClosing: false,
+                          hold: Double(introBars) / Double(openTotal))]
+        var closeStartBar = song.frame.totalBars
+        if let outro = song.structure.outroSection, outro.lengthBars > 0 {
+            let startBar = max(introBars + openBars, outro.startBar - closeLeadBars)
+            let lengthBars = song.frame.totalBars - startBar
+            if lengthBars > 0 {
+                closeStartBar = startBar
+                items.append(Item(step: startBar * 16, seconds: Int((Double(lengthBars * 16) * sps).rounded(.up)),
+                                  isClosing: true, hold: 0))
+            }
+        }
+        if let mid = midItem(for: song, rng: &rng, introBars: introBars, openTotal: openTotal,
+                             closeStart: closeStartBar) {
+            items.insert(mid, at: 1)
+        }
+        return items
+    }
+
+    /// A tide out that reopens on a change in the middle of the song, `midLeadBars` ahead of it: a
+    /// bridge or section change if the body has one, else a chord change on an 8-bar bar in the middle
+    /// third. With neither there is no mid-song tide. Needs `midClearBars` clear of the opening and
+    /// closing tides; nil if nothing fits.
+    private static func midItem(for song: SongState, rng: inout SeededRNG, introBars: Int,
+                                openTotal: Int, closeStart: Int) -> Item? {
+        let total = song.frame.totalBars
+        let earliest = openTotal + midClearBars + midLeadBars   // the change bar, at the earliest
+        let latest = closeStart - midClearBars
+        func fits(_ bar: Int) -> Bool { bar >= earliest && bar <= latest }
+        func pick(_ bars: [Int]) -> Int? {
+            bars.isEmpty ? nil : bars[Int(rng.next() % UInt64(bars.count))]
+        }
+        let lo = total / 3, hi = total * 2 / 3
+        let bodyStarts = song.structure.sections
+            .filter { $0.label != .intro && $0.label != .outro && $0.startBar > 0 && fits($0.startBar) }
+        let bridgey = bodyStarts.filter { $0.label != .A }.map(\.startBar)
+        let sectionBar = pick(bridgey) ?? pick(bodyStarts.map(\.startBar))
+        let chordBar = pick(song.structure.chordPlan.map(\.startBar)
+            .filter { $0 % 8 == 0 && $0 >= lo && $0 <= hi && fits($0) })
+        guard let change = sectionBar ?? chordBar else { return nil }
+        let seconds = Int((Double(midLeadBars * 16) * song.frame.secondsPerStep).rounded())
+        return Item(step: (change - midLeadBars) * 16, seconds: seconds, isClosing: false, hold: 0, isMid: true)
     }
 }

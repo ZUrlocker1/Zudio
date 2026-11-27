@@ -1049,8 +1049,8 @@ Zack picked them by ear):
 - Tempo 137 and 138 in the two examples. Zack later settled on 132.
 
 **Recipe (all drawn from one derived stream, so no other draw moves):**
-1. **Share.** Base Motorik only, never together with a sync group. Target (Zack, 2026-11-26) 5% of all
-   Motorik, about 8% of base songs. Tune by the sync roll thresholds, as with the other groups.
+1. **Share.** Base Motorik only, never together with a sync group. Target (Zack, 2026-11-26) 8% of all
+   Motorik, about 12% of base songs. Tune by the sync roll thresholds, as with the other groups.
 2. **Drums.** MOT-DRUM-001 Motorik Apache beat 40%, MOT-DRUM-003 Dinger groove 40%, MOT-DRUM-002 Open
    Pocket 20%. Open Pocket keeps the same kick 1 and 3 and snare 2 and 4 skeleton as the other two,
    with 8th hats in place of Apache's 16ths, so it is close enough to join at the lower weight (Zack
@@ -1081,9 +1081,9 @@ Zack picked them by ear):
 
 **Built (2026-11-26).** SongGenerator.generateMotorik draws Lock on its own stream (trackIndex 77, every
 value drawn whether or not the song is Lock, so no other decision moves). Lock needs no sync group, Noir
-or Arcade, and rolls 12% of the sync-free base songs, which is about 5% of all Motorik. The first measurement, at
+or Arcade, and rolls 18% of the sync-free base songs, which is about 8% of all Motorik. The first measurement, at
 7.5%, gave 55 Lock songs of 816 sync-free base songs (6.7%, 2.75% of all seeds); the share was raised to
-12% afterwards and not re-measured. The draw forces drums, bass and
+18% afterwards and not re-measured. The draw forces drums, bass and
 Lead 1 per the recipe and takes a triangular tempo (measured 128 to 137, peak near 132). Pads, Rhythm,
 Lead 2 and Texture take a `lock` flag: Rhythm row 10/28/10/8/22/22 over MOT-RTHM-001 to 006, Pads row
 28/0/30/10/10/22 over MOT-PADS-001 to 006, Lead 2 row 20/30/30/10/10 over MOT-LD2-001, 002, 003, 004, 006,
@@ -1118,6 +1118,10 @@ be separated from tempo and mode, since all three top songs share the hook.
 MIDI plus logs; 104 and 105 are the reference pair.
 
 ---
+
+## Motorik filter tides (built 2026-11-26, uncommitted, unheard)
+
+`MotorikAutoTide` (bottom of MixAutomation.swift) schedules a pair of tides, in 25% of songs (both or neither), from the seed with its own SeededRNG, so no note changes. Opening: step 0, dark from the first instant and held dark through the intro (under its fade-in), then opens over 8 bars (`MixAutomation.openCutoff`). Closing: starts 4 bars before the outro and runs to the song end, closes over the first 70% and stays closed (`closeCutoff`), so it is shut by about mid-outro. Regular Motorik and Noir only, never Arcade or Europe. Mid-song: one ordinary tide out (`midItem`) started `midLeadBars` (5) ahead of a change so the reopening lands on it: a bridge or section start, else a chord-window start on an 8-bar bar in the middle third; with neither there is no mid-song tide. It keeps `midClearBars` (8) clear of the other two tides. Drums are never filtered. Playback fires them through `triggerFilterSweep` (with the canvas flash), export reads the same plan through `MixAutomation.filterSweeps`. Tuning dials: the 25% chance, `openBars`, `closeLeadBars`, the 70% ramp.
 
 ## Title Generator
 
