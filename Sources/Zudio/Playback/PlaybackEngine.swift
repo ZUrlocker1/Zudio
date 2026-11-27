@@ -220,9 +220,9 @@ final class PlaybackEngine: ObservableObject {
     private var slowTotalTicks = 400        // length of the slow effect now running
     private var preGlobalSweepEnabled: [Bool] = Array(repeating: false, count: kTrackCount)
 
-    // Canvas-wide flash for filter-sweep gesture — set when sweep triggers, read by VisualizerView Canvas.
-    // NOT @Published: Canvas reads it on TimelineView ticks, no SwiftUI reactive update needed.
-    var canvasFlashDate: Date? = nil
+    // How closed the global sweep or tide filter is, 0 (open) to 1 (fully closed). The visualizer
+    // eases its colours with it. NOT @Published: Canvas reads it on TimelineView ticks.
+    var filterClosedness: Double = 0
 
     // Pan LFO (auto-pan on boost mixer node)
     private var panEnabled   = Array(repeating: false, count: kTrackCount)
@@ -2497,12 +2497,14 @@ final class PlaybackEngine: ObservableObject {
                 for i in 0..<kTrackCount where i != kTrackDrums {
                     AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
                 }
+                filterClosedness = log(6000.0 / Double(cutoff)) / log(6000.0 / Double(MixAutomation.tideFloorHz))
             } else {
                 globalSweepPhase += 0.052   // ~0.33 Hz → full open-close cycle in ~6 seconds
                 let cutoff = MixAutomation.fastSweepCutoff(phase: globalSweepPhase)
                 for i in 0..<kTrackCount where i != kTrackDrums {
                     AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
                 }
+                filterClosedness = log(6000.0 / Double(cutoff)) / log(6000.0 / 300.0)
             }
             if globalSweepTicksRemaining == 0 { restoreFiltersAfterGlobalSweep() }
         }
@@ -2760,6 +2762,7 @@ final class PlaybackEngine: ObservableObject {
     /// Puts every non-drum filter back to its pre-sweep state and the static 3 dB resonance.
     private func restoreFiltersAfterGlobalSweep() {
         globalSweepIsTide = false
+        filterClosedness = 0
         for i in 0..<kTrackCount where i != kTrackDrums {
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0) // restore from 10 dB
             if preGlobalSweepEnabled[i] {
@@ -2792,7 +2795,6 @@ final class PlaybackEngine: ObservableObject {
         globalSweepOpenHold = openHold
         slowTotalTicks = seconds * 20   // 20 ticks a second
         globalSweepTicksRemaining = slowTotalTicks
-        canvasFlashDate = Date()
         for i in 0..<kTrackCount where i != kTrackDrums {
             sweepFilters[i].auAudioUnit.shouldBypassEffect = false
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
@@ -2811,7 +2813,6 @@ final class PlaybackEngine: ObservableObject {
         preGlobalSweepEnabled = sweepEnabled
         globalSweepPhase = .pi / 2    // start at maximum cutoff (6000 Hz — fully open)
         globalSweepTicksRemaining = 60 // 60 × 50ms (20fps) ≈ 3 seconds (open → close → open)
-        canvasFlashDate = Date()       // triggers canvas-wide white flash in VisualizerView
         for i in 0..<kTrackCount where i != kTrackDrums {
             sweepFilters[i].auAudioUnit.shouldBypassEffect = false
             // Boost resonance from 3 dB (static) to 10 dB for an audible resonant wah peak.

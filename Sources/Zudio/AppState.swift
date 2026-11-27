@@ -1238,7 +1238,13 @@ final class AppState: ObservableObject {
     /// canvas reads it each frame via TimelineView, same as visualizerFlashEvents.
     var orbTapFlashes: [(pos: CGPoint, date: Date, duration: Double, maxRadius: Double, maxOpacity: Double)] = []
 
+    /// The last tap on the canvas, kept so a filter sweep it starts can bloom from that point.
+    var lastTapPoint: CGPoint? = nil
+    var lastTapDate: Date = .distantPast
+
     func recordOrbTap(at pos: CGPoint) {
+        lastTapPoint = pos
+        lastTapDate = Date()
         let duration   = Double.random(in: 0.20...0.40)
         let maxRadius  = Double.random(in: 30...70)
         let maxOpacity = Double.random(in: 0.25...0.60)
@@ -1650,7 +1656,7 @@ final class AppState: ObservableObject {
         "\(song.globalSeed)-\(song.frame.totalBars)-\(playMode)-\(evolvePhaseToken)-\(evolvePass1Bars)"
     }
 
-    /// Fires the global filter sweep (audio plus canvas flash) and logs it. Used by the tap-empty
+    /// Fires the global filter sweep (audio plus the visualizer colour drift, both driven by the filter itself) and logs it. Used by the tap-empty
     /// gesture, the Kosmic automatic sweeps and the Evolve phase changes. A trigger that lands
     /// while a sweep is still running restarts it but adds no second log line.
     func triggerFilterSweep(bar: Int? = nil, step: Int? = nil) {

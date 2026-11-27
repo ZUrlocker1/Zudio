@@ -17,6 +17,15 @@ private struct VisualizerFeedObserver<Content: View>: View {
 private final class OrbFrameCache {
     var hx       = [Double](repeating: 0.5,  count: kTrackCount)
     var hy       = [Double](repeating: 0.5,  count: kTrackCount)
+    // Eased filter closedness (0 open, 1 fully closed) and its direction (+1 opening, -1 closing)
+    // for the sweep and tide colour drift. Eased per frame so the colours fade, not step.
+    var sweepShade: Double = 0
+    var sweepDir:   Double = 0
+    // Where and when the running sweep began: the wash blooms from the tap point (canvas centre for
+    // a generated sweep) and starts in the tap ring's green before settling to blue or amber.
+    var sweepWasRunning = false
+    var sweepStart: Date = .distantPast
+    var sweepOrigin: CGPoint? = nil
     var unmuteAge = [Double](repeating: -1.0, count: kTrackCount) // -1 = no active flash
 }
 
@@ -86,6 +95,7 @@ struct VisualizerView: View {
         TimelineView(.animation(minimumInterval: 1.0 / 12,
                                 paused: !playback.isPlaying && !playback.visualizerFeed.hasNotes)) { tl in
             Canvas { ctx, size in
+                updateSweepShade(now: tl.date)
                 drawBackground(ctx: &ctx, size: size, now: tl.date)
                 drawOrbs(ctx: &ctx, size: size, now: tl.date)
             }
@@ -236,6 +246,7 @@ struct VisualizerView: View {
         }
         guard mult > 0.001 else {
             ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+            drawSweepWash(ctx: &ctx, size: size, now: now)
             return
         }
         // Random gradient direction — angle chosen per song in onChange(defaultsResetToken).
@@ -247,6 +258,65 @@ struct VisualizerView: View {
             with: .linearGradient(Gradient(colors: bgColors(mult: mult)),
                 startPoint: startPoint, endPoint: endPoint)
         )
+    }
+
+    /// Eases the shared shade toward the engine's filter closedness (one read a frame, no timers).
+    /// Direction follows the change: closing drifts cool and dark, opening drifts warm and bright.
+    private func updateSweepShade(now: Date) {
+        let running = playback.isGlobalSweepRunning
+        if running && !orbCache.sweepWasRunning {
+            orbCache.sweepStart = now
+            // A sweep begun by a tap blooms from that tap; a generated one from the centre.
+            orbCache.sweepOrigin = now.timeIntervalSince(appState.lastTapDate) < 0.6 ? appState.lastTapPoint : nil
+        }
+        orbCache.sweepWasRunning = running
+        let target = playback.filterClosedness
+        let delta = target - orbCache.sweepShade
+        orbCache.sweepShade += delta * 0.18
+        let want: Double = delta > 0.002 ? -1 : (delta < -0.002 ? 1 : orbCache.sweepDir)
+        orbCache.sweepDir += (want - orbCache.sweepDir) * 0.15
+        if orbCache.sweepShade < 0.002 && target == 0 { orbCache.sweepShade = 0; orbCache.sweepDir = 0 }
+    }
+
+    /// The wash behind the orbs while a sweep or tide runs. It blooms outward from the tap point
+    /// (canvas centre for a generated sweep) in the tap ring's green, then settles to cool blue as
+    /// the filter closes or purple as it opens. One radial gradient fill, only while showing.
+    private func drawSweepWash(ctx: inout GraphicsContext, size: CGSize, now: Date) {
+        let age = now.timeIntervalSince(orbCache.sweepStart)
+        let green = age < 1.4 ? 1.0 - age / 1.4 : 0.0        // 1 at the tap, 0 after 1.4 s
+        let c = max(orbCache.sweepShade, 0.55 * green)
+        guard c > 0.004 else { return }
+        let warm = max(0.0, orbCache.sweepDir), cool = max(0.0, -orbCache.sweepDir)
+        let w = warm / max(0.001, warm + cool)
+        let settledHue = 0.60 + 0.18 * w
+        let g = green * green * (3.0 - 2.0 * green)           // smoothstep: green holds, then yields
+        let tint = Color(hue: settledHue + (0.38 - settledHue) * g, saturation: 0.85,
+                         brightness: 0.75 + 0.25 * w * (1.0 - g) + 0.20 * g)
+        let origin = orbCache.sweepOrigin ?? CGPoint(x: size.width / 2, y: size.height / 2)
+        let far = max(hypot(origin.x, origin.y), hypot(size.width - origin.x, origin.y),
+                      hypot(origin.x, size.height - origin.y),
+                      hypot(size.width - origin.x, size.height - origin.y))
+        let bloom = min(1.0, age / 1.6)
+        let eased = 1.0 - (1.0 - bloom) * (1.0 - bloom)       // ease-out
+        let reach = max(8.0, far * eased)
+        ctx.fill(Path(CGRect(origin: .zero, size: size)),
+                 with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: tint.opacity(0.60 * c), location: 0),
+                        .init(color: tint.opacity(0.35 * c), location: 0.6),
+                        .init(color: tint.opacity((bloom >= 1.0 ? 0.22 : 0.22 * bloom) * c), location: 1)]),
+                    center: origin, startRadius: 0, endRadius: reach))
+    }
+
+    /// Track colors with the sweep drift applied: hue slides toward blue and brightness dips as
+    /// the filter closes. Seven colors a frame, only while a sweep or tide shows.
+    private func driftedTrackColors() -> [Color] {
+        let c = orbCache.sweepShade
+        guard c > 0.004 else { return Self.kTrackColors }
+        return Self.kTrackHSB.map { t in
+            Color(hue: t.h + (0.62 - t.h) * 0.30 * c, saturation: t.s,
+                  brightness: t.b * (1.0 - 0.28 * c))
+        }
     }
 
     private func bgColors(mult: Double) -> [Color] {
@@ -263,15 +333,16 @@ struct VisualizerView: View {
 
     // MARK: - Track colors (static — one Color per track, not one per orb per frame)
 
-    private static let kTrackColors: [Color] = [
-        Color(hue: 0.02, saturation: 0.85, brightness: 0.95), // Lead1: pure red
-        Color(hue: 0.06, saturation: 0.85, brightness: 0.95), // Lead2: orange-red
-        Color(hue: 0.60, saturation: 0.75, brightness: 0.90), // Pads: soft blue (slow float)
-        Color(hue: 0.54, saturation: 0.80, brightness: 0.88), // Rhythm: cyan-blue (tight)
-        Color(hue: 0.66, saturation: 0.70, brightness: 0.92), // Texture: indigo (wide lateral)
-        Color(hue: 0.78, saturation: 0.70, brightness: 0.90), // Bass: purple
-        Color(hue: 0.14, saturation: 0.85, brightness: 0.98), // Drums: yellow
+    private static let kTrackHSB: [(h: Double, s: Double, b: Double)] = [
+        (0.02, 0.85, 0.95), // Lead1: pure red
+        (0.06, 0.85, 0.95), // Lead2: orange-red
+        (0.60, 0.75, 0.90), // Pads: soft blue (slow float)
+        (0.54, 0.80, 0.88), // Rhythm: cyan-blue (tight)
+        (0.66, 0.70, 0.92), // Texture: indigo (wide lateral)
+        (0.78, 0.70, 0.90), // Bass: purple
+        (0.14, 0.85, 0.98), // Drums: yellow
     ]
+    private static let kTrackColors: [Color] = kTrackHSB.map { Color(hue: $0.h, saturation: $0.s, brightness: $0.b) }
 
     // MARK: - Orbs
 
@@ -280,6 +351,7 @@ struct VisualizerView: View {
         let muteSnap = appState.muteState   // snapshot once — avoids per-orb observation overhead
         let soloSnap = appState.soloState
         let wallTime = now.timeIntervalSinceReferenceDate
+        let trackColors = driftedTrackColors()
 
         // Fill reusable home-position cache once per frame — avoids redundant sin/cos for
         // comet-tail ghost passes (each long note calls orbPosition 3–4× per frame).
@@ -331,7 +403,7 @@ struct VisualizerView: View {
 
             // Compute radius and color once — reused for all ghost passes and the live orb.
             let radius = orbRadius(orb)
-            let color  = Self.kTrackColors[min(orb.trackIndex, Self.kTrackColors.count - 1)]
+            let color  = trackColors[min(orb.trackIndex, trackColors.count - 1)]
             let ox = hx[orb.trackIndex], oy = hy[orb.trackIndex]
 
             // Comet tail: 1 ghost pass for all long notes regardless of length.
@@ -410,17 +482,6 @@ struct VisualizerView: View {
             var ring = Path(ellipseIn: orbRect(flash.pos, flashR + rw))
             ring.addEllipse(in: orbRect(flash.pos, max(0, flashR - rw)))
             ctx.fill(ring, with: .color(Color(hue: 0.38, saturation: 0.85, brightness: 0.95).opacity(flashOp)))
-        }
-
-        // Canvas-wide white flash for filter-sweep gesture — fades over 3 s.
-        if let flashDate = playback.canvasFlashDate {
-            let flashAge = now.timeIntervalSince(flashDate)
-            if flashAge < 3.0 {
-                let fp = flashAge / 3.0
-                let flashOp = 0.20 * 0.5 * (1.0 + cos(fp * .pi))
-                ctx.fill(Path(CGRect(origin: .zero, size: size)),
-                         with: .color(Color.white.opacity(flashOp)))
-            }
         }
     }
 
