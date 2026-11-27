@@ -21,7 +21,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**v3.5 (build 139, 2026-11-26) is a near-final version for the App Store, expected December 1, with a new substyle and the new Motorik Lock flavour on 5% of Motorik songs.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient-Zen was inspired by Charles Vestal's AMB-1 firmware for the M-VAVE FM-1.
+**v3.5 (build 139, 2026-11-27) is the final release candidate for the App Store, due December 1, with a new substyle and the new Motorik Lock flavour on 5% of Motorik songs.** Ambient gains a third substyle, **Ambient Zen**, a homage to Brian Eno's Music for Airports with breathing pads, a held drone, drifting bell loops and a slow journey of 7th chords. Ambient-Zen was inspired by Charles Vestal's AMB-1 firmware for the M-VAVE FM-1.
 
 There are also numerous improvements to regular Ambient and Ambient Piano to make them more melodic. 
 

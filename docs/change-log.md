@@ -2,7 +2,7 @@
 
 ## V 3.5 (Build 139)
 
-**Near-final version for the App Store, expected December 1, with the new Motorik Lock on 8% of Motorik songs.** The 2026-11-26 Mac DMG is build 139: Motorik Lock, the livelier Root Anchor and Hallogallo lock basses, Ambient Zen, base Ambient, the Ambient filter tides, the export-matches-playback work and the Chill bass slides are in, with the Ambient mix back at Piano 22 / base 23 / Zen 55. Only minor tuning by ear is still expected.
+**Final release candidate for the App Store, due December 1, with the new Motorik Lock on 8% of Motorik songs.** The 2026-11-27 Mac DMG is build 139: Motorik Lock, the livelier Root Anchor and Hallogallo lock basses, Ambient Zen, base Ambient, the Ambient filter tides, the export-matches-playback work and the Chill bass slides are in, with the Ambient mix back at Piano 22 / base 23 / Zen 55. No further changes are planned before submission.
 
 - **Motorik Lock** — (2026-11-26, build 139, unheard) A minimalist flavour of base Motorik. About 8% of all Motorik songs (18% of base songs with no Europe sync) draw Neu!-style bass, drums and Lead 1 together: Apache, Dinger or Open Pocket drums, a locked bass (Hallogallo lock, Motorik Drive or Root Anchor), a sparse Lead 1 (mostly the Hallogallo hook), and a tempo of 128 to 138 around 132. Pads, Rhythm, Lead 2 and Texture play their sparser rules. It shows as "Motorik Lock" on the Style line only, and a saved song reloads as Lock. Never in Noir, Arcade or Europe. A loaded .zudio file and a saved one now list rules in track order.
 
