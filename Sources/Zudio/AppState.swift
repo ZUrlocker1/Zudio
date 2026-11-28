@@ -2968,7 +2968,7 @@ final class AppState: ObservableObject {
         switch trackIndex {
         case kTrackTexture where isSoho:
             // [0=Trumpet, 1=Trombone, 2=Muted Trumpet, 3=Vibraphone] — brass leads at 70% of
-            // picks, as a horn section is the idiomatic voice for both the stabs and the halo;
+            // picks, as a horn section is the idiomatic voice for both the stabs and the riffs;
             // Vibraphone is the colour, with Xylophone's 10% since it left (2026-10-15).
             // Filtered by poolCount: a caller that sized the pool without isChillSoho would get
             // the 7-entry audio list, so an index past its end must not be returned.

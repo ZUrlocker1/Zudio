@@ -211,7 +211,7 @@ import Foundation
     /// Exactly one texture rule per song — running both turns Texture into a fourth rhythm part.
     @Test func exactlyOneTextureRule() {
         for s in Self.sohoSongs() {
-            let tex = s.generationLog.filter { $0.tag == "CHL-TEXT-001" || $0.tag == "CHL-TEXT-002" }
+            let tex = s.generationLog.filter { ["CHL-TEXT-001", "CHL-TEXT-002", "CHL-TEXT-003", "CHL-TEXT-004"].contains($0.tag) }
             #expect(tex.count == 1, "expected one CHL-TEXT rule, got \(tex.map { $0.tag })")
         }
     }
@@ -224,7 +224,11 @@ import Foundation
         where s.generationLog.contains(where: { $0.tag == "CHL-TEXT-002" }) {
             let crashes = ChillSohoTextureGenerator.CrashPoints(s.trackEvents[kTrackDrums]).bars
             let stabSteps = Set(s.trackEvents[kTrackTexture].map { $0.stepIndex })
-            for bar in crashes {
+            // A stab is left out when it would land on Lead 1 or Lead 2 (2026-11-27), so a crash
+            // without one must have a lead sounding at it.
+            let lead = ChillSohoTextureGenerator.LeadOccupancy(
+                s.trackEvents[kTrackLead1] + s.trackEvents[kTrackLead2])
+            for bar in crashes where !(bar * 16..<(bar * 16 + 8)).contains(where: { lead.steps.contains($0) }) {
                 #expect(stabSteps.contains(bar * 16), "no stab on the crash at bar \(bar)")
             }
             checked += 1
@@ -232,23 +236,30 @@ import Foundation
         #expect(checked > 0)
     }
 
-    /// Sustained Halo: 3–10 long, high notes across the whole song, half of them with a second
-    /// chord tone a third to a sixth below (2026-10-15). Counted by onset, not by note.
-    @Test func haloIsSparseLongAndHigh() {
-        for s in Self.sohoSongs()
-        where s.generationLog.contains(where: { $0.tag == "CHL-TEXT-001" }) {
-            // The breakdown horns and the turnaround stabs are separate figures on this track —
-            // see breakdownAnswer and turnaroundStabs.
+    /// The three horn riffs (2026-11-27): Freddie Hubbard, Jimmy Cliff and Cantaloop Parallel.
+    /// Occasional ornaments, so no more than a third of a song's bars carry a note; every note a
+    /// chord tone of its own bar; two notes struck together never closer than a minor third.
+    @Test func riffsAreSparseChordTonesAndNeverClash() {
+        var checked = 0
+        for s in Self.sohoSongs() {
+            guard ["CHL-TEXT-001", "CHL-TEXT-003", "CHL-TEXT-004"].contains(where: { Self.uses(s, $0) })
+            else { continue }
+            // The breakdown horns and the turnaround stabs are separate figures on this track.
             let skip = Self.bridgeBars(s).union(Self.turnaroundBars(s))
             let ev = s.trackEvents[kTrackTexture].filter { !skip.contains($0.stepIndex / 16) }
-            let onsets = Dictionary(grouping: ev, by: \.stepIndex)
-            #expect((1...10).contains(onsets.count), "halo has \(onsets.count) onsets")
-            for (_, chord) in onsets {
-                let top = Int(chord.map(\.note).max()!)
-                #expect(chord.count <= 2 && (72...84).contains(top))
-                #expect(chord.allSatisfy { $0.durationSteps >= 8 && top - Int($0.note) <= 9 })
+            let bars = Set(ev.map { $0.stepIndex / 16 })
+            #expect(bars.count * 3 <= s.frame.totalBars, "riff fills \(bars.count) of \(s.frame.totalBars) bars")
+            for e in ev {
+                guard let c = s.structure.chordWindow(atBar: e.stepIndex / 16) else { continue }
+                #expect(c.chordTones.contains(Int(e.note) % 12), "non-chord riff note \(e.note) at step \(e.stepIndex)")
             }
+            for (_, group) in Dictionary(grouping: ev, by: \.stepIndex) {
+                let sorted = group.map { Int($0.note) }.sorted()
+                for (lo, hi) in zip(sorted, sorted.dropFirst()) { #expect(hi - lo >= 3) }
+            }
+            checked += 1
         }
+        #expect(checked > 0)
     }
 
     /// Base Chill and Blues keep their audio texture path: no MIDI texture events at all.
@@ -611,7 +622,11 @@ import Foundation
         for s in Self.sohoSongs() + Self.remixSongs()
         where Self.uses(s, "CHL-TEXT-002") {
             let stabSteps = Set(s.trackEvents[kTrackTexture].map(\.stepIndex))
-            for at in ChillSohoTextureGenerator.CrashPoints(s.trackEvents[kTrackDrums]).steps {
+            // A stab is left out when it would land on a lead (2026-11-27).
+            let lead = ChillSohoTextureGenerator.LeadOccupancy(
+                s.trackEvents[kTrackLead1] + s.trackEvents[kTrackLead2])
+            for at in ChillSohoTextureGenerator.CrashPoints(s.trackEvents[kTrackDrums]).steps
+            where !(at..<(at + 8)).contains(where: { lead.steps.contains($0) }) {
                 #expect(stabSteps.contains(at), "no stab on the crash at step \(at)")
             }
         }
@@ -1122,9 +1137,9 @@ import Foundation
         let total = counts.values.reduce(0, +)
         #expect(total > 0)
         func share(_ hits: Int) -> Double { Double(counts[hits] ?? 0) / Double(total) }
-        // Roughly half are a single hit; the rest are two- or three-hit figures. Pushing the
-        // singles much below this was an over-correction.
-        #expect(share(1) > 0.40 && share(1) < 0.65, "single hits are \(share(1)) of figures")
+        // Some single hits, but most figures are two or three hits (Zack, 2026-11-27; it was
+        // about half single hits from 2026-10-12).
+        #expect(share(1) > 0.05 && share(1) < 0.35, "single hits are \(share(1)) of figures")
         #expect(share(2) > 0.20, "two-hit figures are only \(share(2))")
         #expect(share(3) > 0.05, "three-hit figures are only \(share(3))")
     }
@@ -1296,8 +1311,11 @@ import Foundation
             var checked = 0
             for s in Self.sohoSongs() where s.chillBreakdownStyle == style {
                 guard let b = s.structure.sections.first(where: { $0.label == .bridge }) else { continue }
-                checked += 1
+                // The horns keep off the leads (2026-11-27): a break where a lead plays has none.
                 let bars = b.startBar..<b.endBar
+                guard !(s.trackEvents[kTrackLead1] + s.trackEvents[kTrackLead2])
+                    .contains(where: { bars.contains($0.stepIndex / 16) }) else { continue }
+                checked += 1
                 #expect(s.trackEvents[kTrackTexture].contains { bars.contains($0.stepIndex / 16) },
                         "\(style): no horns in the break")
             }

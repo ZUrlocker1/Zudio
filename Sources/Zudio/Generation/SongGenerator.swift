@@ -2553,6 +2553,7 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     drumEvents: songState.trackEvents[kTrackDrums],
                     breakdownStyle: songState.chillBreakdownStyle,
+                    leadEvents: songState.trackEvents[kTrackLead1] + songState.trackEvents[kTrackLead2],
                     rng: &rng, usedRuleIDs: &usedRules)
             } else if isChill {
                 // Base Chill and Blues texture is audio-only; regen is a no-op for the MIDI track.
@@ -5553,6 +5554,7 @@ struct SongGenerator {
             trackEvents[kTrackTexture] = ChillSohoTextureGenerator.generate(
                 frame: frame, structure: structure, drumEvents: trackEvents[kTrackDrums],
                 breakdownStyle: chillBreakdownStyle,
+                leadEvents: trackEvents[kTrackLead1] + trackEvents[kTrackLead2],
                 rng: &sohoTexRNG, usedRuleIDs: &sohoTexRules)
         } else {
             trackEvents[kTrackTexture] = []
@@ -6687,8 +6689,10 @@ struct SongGenerator {
         case "CHL-LD1-012":  return "Avalon"
         case "CHL-PAD-007":  return "Soho chord hold"
         case "CHL-PAD-008":  return "Half-bar pad"
-        case "CHL-TEXT-001": return "Sustained halo"
+        case "CHL-TEXT-001": return "Freddie Hubbard riff"
         case "CHL-TEXT-002": return "Punctuation stabs"
+        case "CHL-TEXT-003": return "Jimmy Cliff riff"
+        case "CHL-TEXT-004": return "Cantaloop parallel riff"
         case "CHL-PAD-001":  return "Chord sustain"
         case "CHL-PAD-002":  return "Staggered entry"
         case "CHL-PAD-003":  return "Moby anchor"

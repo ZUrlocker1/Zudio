@@ -543,24 +543,89 @@ capped so the next attack is not cut off by the pad fade.
 
 ### Texture — horns and bells
 
-Soho runs a MIDI Texture track instead of base Chill's audio loops. The corpus's rarely-firing
-pitched parts (median under half a note a bar) split into two roles, and exactly one runs per
-song:
+Soho runs a MIDI Texture track instead of base Chill's audio loops. Exactly one of four rules
+runs per song, 25% each (2026-11-27). The three riffs are occasional ornaments like the stabs,
+not a part: a statement of two to six bars, then rest. Every riff note is a chord tone, and every
+statement adds a second horn so one instrument reads as a section: a third below, or a third
+above for a statement too low to fit one below; the Parallel Riff uses its own voicing (below).
+No horn note is below F3, the lowest note of the Cantaloop section, which keeps the horns out of
+the bass, and no riff note is above A5, where the trumpet turns shrill (2026-11-27).
 
-- `CHL-TEXT-001` Sustained halo 45% — *Smooth Operator*'s synth pad plays five notes in 149
-  bars. A few very long, high notes at section boundaries and over breakdowns, and every 16 bars
-  in long sections. Half of them are two-note chords — the held tone over a chord tone a
-  third to a sixth below, slightly softer — so one horn reads as a section; the rest stay single
-- `CHL-TEXT-002` Punctuation stabs 55% — *Holding Back the Years*' brass. Horn figures struck
-  once, twice or three times (53% / 34% / 12%) — *bap-bap*, *bap-baaa* — on every drum crash,
-  and as lighter pickups on beat 4 at phrase ends. One horn playing a chord reads as a section, so
-  accents are 3 notes 60%, 2 notes 34%, 1 note 6%; pickups 2 notes 50%, 3 notes 30%, 1 note 20%;
-  turnaround stabs 2 or 3 notes evenly. Each song draws a home voicing (`StabVoicing`) — spread
-  40%, close 35%, colour (a 9th or 6th in place of an inner note, refused if a semitone from
-  another) 25% — and moves off it on about one stab in four
+- `CHL-TEXT-001` Freddie Hubbard Riff — the trumpet in Us3's *Cantaloop* (the line samples
+  Hubbard). A beat-4 pickup climbs three chord tones to a held note, a quick three-note rise
+  answers and drops away, and the bar rests (shortened to two bars on 2026-11-27: the original's
+  third bar, a soft held root, is cut). Two to four statements a
+  song at the start of a groove phrase, never in the same bars as a crash or a turnaround.
+  Replaced the old Sustained halo (a synth pad from *Smooth Operator*), retired 2026-11-27
+- `CHL-TEXT-002` Punctuation stabs — *Holding Back the Years*' brass. Horn figures on every
+  drum crash, and as lighter pickups on beat 4 at phrase ends. Since 2026-11-27 mostly two or
+  three hits (Zack: more of them, in different shapes, some single hits kept): a single hit 15%
+  (*bap*, *baaap*), a short phrase moving through the chord 25% (a scoop up, a three-note climb,
+  a fall-off, a step down), two hits of one chord 35% (*bap-bap*, *baaaaap-bap*, *bap-baaa*) and
+  three 25% (*bap-bap-baaap*, *baaap-bap-bap*). Measured over seeds 1 to 400: 27% of figures a
+  single hit, 39% two, 35% three; it was about half single hits. No figure runs past eight
+  sixteenths. The turnaround stab is one gesture: a single hit or a short phrase. Every stab is
+  2 or 3 notes thick — accents 3 notes 64%, pickups 2 notes 62% — and a note a semitone from
+  another is swapped for another chord tone rather than dropped, so a stab is never a single
+  pitch. Each song draws a home voicing (`StabVoicing`) — spread 40%, close 35%, colour (a 9th
+  or 6th in place of an inner note, refused if a semitone from another) 25% — and moves off it
+  on about one stab in four
+- `CHL-TEXT-003` Jimmy Cliff Riff — the trumpet in *You Can Get It If You Really Want*. Three bars
+  (cut from the transcription's four on 2026-11-27) of call and response, almost all repeated
+  notes: one pitch three times then a step down twice, a leap to a repeated high note that falls
+  away, and a drop to the bottom that is held. At most one statement
+  in a groove section, never in two sections running, three a song at the most
+- `CHL-TEXT-004` Cantaloop Parallel Riff — the three-horn hook in *Cantaloop*. Hits on steps 2,
+  5, 8 and 10 (3+3+2+2) on one pitch, the last a step up; the second bar answers a fifth lower;
+  two bars of that, the hook and its answer, in 80% of statements; 15% add one high note on step 6
+  in a third bar and 5% two (Zack, 2026-11-27: mostly two bars). Voiced as the record has it:
+  the hook bar is three horns inside one octave, the line, a chord tone about a fourth below and
+  the line an octave down (F5, C5, F4 in the source); the answer bar is two, a fifth apart (C4
+  over F3). Until 2026-11-27 the third horn sat an octave under the lower one and an octave-down
+  transformation could drop the whole statement, reaching C3 in the bass's register, which Zack
+  heard as an inauthentic low bottom. One
+  statement in the last groove section with room, and a second in an earlier one 40% of the time
+
+No statement of any riff is an exact copy of its source or of the one before it (Zack,
+2026-11-27): each takes one or two transformations, never the set the previous statement used —
+a hit moved a sixteenth, one or two notes moved a chord tone, only the first or second half, a
+pickup or a repeated last note, or the whole statement a chord tone higher or lower. That last one
+was an octave until 2026-11-27, which no riff can move inside F3 to A5 without crushing its
+contour. The Parallel Riff keeps its 3+3+2+2 rhythm and moves only its last hit of a bar, its
+pings, its length and its register, which only rises.
+
+The horns never step on Lead 1 or Lead 2 (Zack, 2026-11-27). Both leads are final before the
+Texture runs, and every figure — riff statement, stab, turnaround stab, breakdown answer — asks
+whether it fits before it is written: at most a third of its onsets (never more than two) may
+sound while a lead does, so a stab of one or two hits keeps clear altogether, a three-hit figure
+may touch once and a riff twice. A riff that does not fit tries other bars in its section, nearest
+first, and stays silent if none fits; a stab that does not fit is left out. If every figure is
+refused the least intrusive riff plays, or failing that the stabs play regardless, so the track is
+never absent. Regenerating a lead does not redo the Texture; regenerate the Texture to re-fit it.
+
+A song with no room for a riff (too short, or every bar taken by a crash or turnaround) plays the
+stabs instead, so the track is never absent. Sources: the MIDI files of the two songs, trumpet
+tracks, read 2026-11-27.
 
 The stabs read the finished drum track, so they land with the crashes. Either rule also answers
 the harmonic drone and groove pocket, and 55% of songs mark each turnaround with a stab.
+
+**Status (2026-11-27): done for now.** Zack listened and judged the horns good enough for their
+job, which is punctuation, not a featured part. Possible further work, not planned, in the order
+Claude would take it:
+
+1. Falls on held stab and riff notes through pitch bend, as the Soho and Blues bass slides do.
+   Falls are a large part of Soul and Latin horn style.
+2. A passing note or blue note on a weak off-beat in the riffs, never a strong beat. The riffs use
+   chord tones only, so they can sound like arpeggios, and the Hubbard original's held fourth is
+   lost.
+3. The second horn in scale thirds rather than the nearest chord tone, so the two parts move
+   together like two players reading a chart instead of the lower one holding still.
+4. Riffs placed as answers in the bars right after a Lead 1 phrase ends, call and response,
+   instead of at fixed phrase starts that are then checked against the leads.
+5. A horn sound per song: the starting note, the harmony interval and the note length drawn once
+   per song, so the same rule sounds different from song to song.
+6. Shorter held riff notes when the vibraphone is drawn, since it decays before a long note ends.
 
 ---
 

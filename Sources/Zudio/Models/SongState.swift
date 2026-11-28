@@ -45,6 +45,8 @@ struct GenerationLogEntry: Sendable {
         "AMB-PNO-001",
         // Motorik Root Anchor and Hallogallo lock basses (2026-11-25): rotating pickup cells.
         "MOT-BASS-001", "MOT-BASS-004",
+        // Chill Soho horn riffs (2026-11-27): 001 replaces the retired Sustained halo; 003 and 004 are new.
+        "CHL-TEXT-001", "CHL-TEXT-003", "CHL-TEXT-004",
     ]
 
     /// TESTING ONLY. Rules fixed in the current round, marked with "F " ("AMB-LEAD-003 F  ...").
